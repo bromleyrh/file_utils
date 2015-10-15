@@ -67,3 +67,4 @@ main(int argc, char **argv)
     return EXIT_FAILURE;
 }
 
+/* vi: set expandtab sw=4 ts=4: */

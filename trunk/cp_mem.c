@@ -149,3 +149,4 @@ err1:
     return EXIT_FAILURE;
 }
 
+/* vi: set expandtab sw=4 ts=4: */
