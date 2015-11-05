@@ -4,6 +4,8 @@
 
 #define _GNU_SOURCE
 
+#define _FILE_OFFSET_BITS 64
+
 #include <err.h>
 #include <errno.h>
 #include <error.h>
