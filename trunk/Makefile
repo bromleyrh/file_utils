@@ -2,12 +2,15 @@
 # Makefile
 #
 
-all: cp_mem open libdirectio
+all: cp_mem open open_pipes libdirectio
 
 cp_mem: cp_mem.c
 	gcc -O2 -o $@ -s -Wall -Wextra $^
 
 open: open.c
+	gcc -O2 -o $@ -s -Wall -Wextra $^
+
+open_pipes: open_pipes.c
 	gcc -O2 -o $@ -s -Wall -Wextra $^
 
 libdirectio.o: libdirectio.c
