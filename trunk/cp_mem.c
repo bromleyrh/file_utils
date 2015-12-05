@@ -20,6 +20,24 @@
 
 static const char *src;
 static const char *dst;
+static int hugetlbfs;
+
+static int
+parse_cmdline(int argc, char **argv)
+{
+    if (argc < 3) {
+        error(0, 0, "Must specify source and destination files");
+        return -1;
+    }
+
+    src = argv[1];
+    dst = argv[2];
+
+    if ((argc > 3) && (strcmp(argv[3], "-t") == 0))
+        hugetlbfs = 1;
+
+    return 0;
+}
 
 static int
 do_copy(int fd1, int fd2, int hugetlbfs)
@@ -103,14 +121,9 @@ int
 main(int argc, char **argv)
 {
     int fd1, fd2;
-    int hugetlbfs = 0;
 
-    if (argc < 3)
-        error(EXIT_FAILURE, 0, "Must specify source and destination files");
-    src = argv[1];
-    dst = argv[2];
-    if ((argc > 3) && (strcmp(argv[3], "-t") == 0))
-        hugetlbfs = 1;
+    if (parse_cmdline(argc, argv) == -1)
+        return EXIT_FAILURE;
 
     fd1 = open(src, O_RDONLY);
     if (fd1 == -1)
