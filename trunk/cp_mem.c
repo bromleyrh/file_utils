@@ -25,6 +25,8 @@ static int hugetlbfs;
 static int
 parse_cmdline(int argc, char **argv)
 {
+    struct stat dsts;
+
     if (argc < 3) {
         error(0, 0, "Must specify source and destination files");
         return -1;
@@ -32,6 +34,15 @@ parse_cmdline(int argc, char **argv)
 
     src = argv[1];
     dst = argv[2];
+    if ((stat(dst, &dsts) == 0) && S_ISDIR(dsts.st_mode)) {
+        char *tmpdst;
+
+        if (asprintf(&tmpdst, "%s/%s", dst, basename(strdupa(src))) == -1) {
+            error(0, 0, "Out of memory");
+            return -1;
+        }
+        dst = tmpdst;
+    }
 
     if ((argc > 3) && (strcmp(argv[3], "-t") == 0))
         hugetlbfs = 1;
