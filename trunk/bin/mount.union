@@ -1,0 +1,111 @@
+#!/bin/sh
+
+. ~/lib/lock_mtab || exit 1
+
+update_mtab()
+{
+	local mtab_tmp=/etc/mtab.union.tmp
+
+	if ! cat /etc/mtab | awk "$1" > $mtab_tmp
+	then
+		echo "Error updating /etc/mtab"
+		exit 1
+	fi
+
+	if ! mv $mtab_tmp /etc/mtab; then
+		echo "Error updating /etc/mtab"
+		exit 1
+	fi
+}
+
+add_to_mtab()
+{
+	local awkscript
+
+	lock_mtab
+
+	read -d '' awkscript <<- 'EOF'
+		{ if ($3 == "overlay")
+			printf "%s %s %s %s,helper=union %s %s\\n", $1, $2, $3, $4, $5, $6
+		else
+			print
+		}
+	EOF
+
+	update_mtab "$awkscript"
+	unlock_mtab
+}
+
+remove_from_mtab()
+{
+	local awkscript
+
+	lock_mtab
+
+	read -d '' awkscript <<- 'EOF'
+		{ if ($3 == "overlay")
+			printf "%s %s %s ro %s %s\\n", $1, $2, $3, $5, $6
+		else
+			print
+		}
+	EOF
+
+	update_mtab "$awkscript"
+	unlock_mtab
+}
+
+brprefix=/mnt/.union/branch
+unionpath=/mnt/union
+
+do_mount()
+{
+	local ret
+
+	for d in ${brprefix}? ${brprefix}??; do
+		mount $d
+		ret=$?
+		if [ $ret != 0 ]; then
+			echo "Mounting branch $d failed"
+			exit $ret
+		fi
+	done
+
+	mount ${unionpath}
+	ret=$?
+	if [ $ret != 0 ]; then
+		echo "Mounting union ${unionpath} failed"
+		exit $ret
+	fi
+
+	add_to_mtab
+	exit 0
+}
+
+do_unmount()
+{
+	local ret
+
+	remove_from_mtab
+
+	umount ${unionpath}
+	ret=$?
+	if [ $ret != 0 ]; then
+		echo "Unmounting union ${unionpath} failed"
+		exit $ret
+	fi
+
+	umount ${brprefix}*
+	ret=$?
+	if [ $ret != 0 ]; then
+		echo "Unmounting a branch failed"
+	fi
+
+	exit $ret
+}
+
+if [ `basename $0` == "umount.union" ]; then
+	do_unmount
+fi
+do_mount
+
+# vi: set noexpandtab sw=4 ts=4:
