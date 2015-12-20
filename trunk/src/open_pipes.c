@@ -8,8 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define DEFAULT_NPIPES 2
-#define DEFAULT_PIPEFDS {3, 4, 5, 6}
+#define DEFAULT_PIPEFDS ((int []){3, 4, 5, 6})
 
 struct pipe_data {
     int npipes;
@@ -108,8 +107,8 @@ main(int argc, char **argv)
 {
     char **cmd;
     struct pipe_data pd = {
-        .npipes = DEFAULT_NPIPES,
-        .pipefds = (int [DEFAULT_NPIPES * 2])DEFAULT_PIPEFDS
+        .npipes = sizeof(DEFAULT_PIPEFDS) / sizeof(DEFAULT_PIPEFDS[0]),
+        .pipefds = DEFAULT_PIPEFDS
     };
 
     if (parse_cmdline(argc, argv, &cmd, &pd) == -1)
