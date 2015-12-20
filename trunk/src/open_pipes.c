@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define DEFAULT_PIPEFDS ((int []){3, 4, 5, 6})
+#define DEFAULT_PIPEFDS ((int []){5, 6, 7, 8})
 
 struct pipe_data {
     int npipes;
