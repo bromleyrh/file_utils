@@ -23,6 +23,25 @@ parse_cmdline(int argc, char **argv)
     return 0;
 }
 
+static int
+open_pipes(int pipe1[2], int pipe2[2])
+{
+    if ((pipe(pipe1) == -1) || (pipe(pipe2) == -1)) {
+        error(0, errno, "Error opening pipe");
+        return -1;
+    }
+
+    if ((dup2(pipe1[0], BASE_FD) == -1)
+        || (dup2(pipe1[1], BASE_FD + 1) == -1)
+        || (dup2(pipe2[0], BASE_FD + 2) == -1)
+        || (dup2(pipe2[1], BASE_FD + 3) == -1)) {
+        error(0, errno, "Error duplicating file descriptor");
+        return -1;
+    }
+
+    return 0;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -31,16 +50,8 @@ main(int argc, char **argv)
     if (parse_cmdline(argc, argv) == -1)
         return EXIT_FAILURE;
 
-    if ((pipe(pipe1) == -1) || (pipe(pipe2) == -1))
-        error(EXIT_FAILURE, errno, "Error opening pipe");
-
-    if ((dup2(pipe1[0], BASE_FD) == -1)
-        || (dup2(pipe1[1], BASE_FD + 1) == -1)
-        || (dup2(pipe2[0], BASE_FD + 2) == -1)
-        || (dup2(pipe2[1], BASE_FD + 3) == -1)) {
-        error(0, errno, "Error duplicating file descriptor");
+    if (open_pipes(pipe1, pipe2) == -1)
         goto err;
-    }
 
     execvp(cmd[0], cmd);
     error(0, errno, "Error executing %s", cmd[0]);
