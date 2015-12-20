@@ -5,63 +5,117 @@
 #include <errno.h>
 #include <error.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
-#define BASE_FD 3
+#define DEFAULT_NPIPES 2
+#define DEFAULT_PIPEFDS {3, 4, 5, 6}
+
+struct pipe_data {
+    int npipes;
+    int *pipefds;
+};
 
 static int
-parse_cmdline(int argc, char **argv, const char **cmd)
+parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
 {
+    int i;
+    int npipefds;
+
     if (argc < 2) {
         error(0, 0, "Must specify command");
         return -1;
     }
-    *cmd = &argv[1];
+
+    if (strcmp(argv[1], "-d") != 0) {
+        *cmd = &argv[1];
+        return 0;
+    }
+
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--") == 0) {
+            ++i;
+            break;
+        }
+    }
+
+    if (i == argc) {
+        error(0, 0, "Must specify command");
+        return -1;
+    }
+    *cmd = &argv[i];
+
+    if ((i-3) % 2 != 0) {
+        error(0, 0, "Must specify 2 FDs per pipe");
+        return -1;
+    }
+    pd->npipes = (i-3) / 2;
+    npipefds = pd->npipes * 2;
+    pd->pipefds = malloc(npipefds * sizeof(int));
+    if (pd->pipefds == NULL) {
+        error(0, 0, "Out of memory");
+        return -1;
+    }
+    for (i = 0; i < npipefds; i++)
+        pd->pipefds[i] = atoi(argv[2+i]);
 
     return 0;
 }
 
 static int
-open_pipes(int pipe1[2], int pipe2[2])
+open_pipes(struct pipe_data *pd)
 {
-    if ((pipe(pipe1) == -1) || (pipe(pipe2) == -1)) {
-        error(0, errno, "Error opening pipe");
-        goto err;
+    int i;
+    int (*pipes)[2];
+
+    pipes = calloc(pd->npipes, sizeof(pipes[0]));
+    if (pipes == NULL) {
+        error(0, 0, "Out of memory");
+        return -1;
     }
 
-    if ((dup2(pipe1[0], BASE_FD) == -1)
-        || (dup2(pipe1[1], BASE_FD + 1) == -1)
-        || (dup2(pipe2[0], BASE_FD + 2) == -1)
-        || (dup2(pipe2[1], BASE_FD + 3) == -1)) {
-        error(0, errno, "Error duplicating file descriptor");
-        goto err;
-    }
+    for (i = 0; i < pd->npipes; i++) {
+        if (pipe(pipes[i]) == -1) {
+            error(0, errno, "Error opening pipe");
+            break;
+        }
+        if ((dup2(pipes[i][0], pd->pipefds[2*i]) == -1)
+            || (dup2(pipes[i][1], pd->pipefds[2*i+1]) == -1)) {
+            error(0, errno, "Error duplicating file descriptor");
+            close(pipes[i][0]);
+            close(pipes[i][1]);
+            break;
+        }
 
-    close(pipe1[0]);
-    close(pipe1[1]);
-    close(pipe2[0]);
-    close(pipe2[1]);
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+    }
+    if (i != pd->npipes) {
+        int j;
+
+        for (j = 0; j <= i; j++) {
+            close(pd->pipefds[2*i]);
+            close(pd->pipefds[2*i+1]);
+        }
+        return -1;
+    }
 
     return 0;
-
-err:
-    close(pipe1[0]);
-    close(pipe1[1]);
-    close(pipe2[0]);
-    close(pipe2[1]);
-    return -1;
 }
 
 int
 main(int argc, char **argv)
 {
-    const char **cmd;
-    int pipe1[2], pipe2[2];
+    char **cmd;
+    struct pipe_data pd = {
+        .npipes = DEFAULT_NPIPES,
+        .pipefds = (int [DEFAULT_NPIPES * 2])DEFAULT_PIPEFDS
+    };
 
-    if (parse_cmdline(argc, argv, &cmd) == -1)
+    if (parse_cmdline(argc, argv, &cmd, &pd) == -1)
         return EXIT_FAILURE;
 
-    if (open_pipes(pipe1, pipe2) == -1)
+    if (open_pipes(&pd) == -1)
         return EXIT_FAILURE;
 
     execvp(cmd[0], cmd);
