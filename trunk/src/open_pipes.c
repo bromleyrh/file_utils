@@ -9,13 +9,27 @@
 
 #define BASE_FD 3
 
+static const char **cmd;
+
+static int
+parse_cmdline(int argc, char **argv)
+{
+    if (argc < 2) {
+        error(0, 0, "Must specify command");
+        return -1;
+    }
+    cmd = &argv[1];
+
+    return 0;
+}
+
 int
 main(int argc, char **argv)
 {
     int pipe1[2], pipe2[2];
 
-    if (argc < 2)
-        error(EXIT_FAILURE, 0, "Must specify command");
+    if (parse_cmdline(argc, argv) == -1)
+        return EXIT_FAILURE;
 
     if ((pipe(pipe1) == -1) || (pipe(pipe2) == -1))
         error(EXIT_FAILURE, errno, "Error opening pipe");
@@ -28,8 +42,8 @@ main(int argc, char **argv)
         goto err;
     }
 
-    if (execvp(argv[1], &argv[1]) == -1)
-        error(0, errno, "Error executing %s", argv[0]);
+    if (execvp(cmd[0], cmd) == -1)
+        error(0, errno, "Error executing %s", cmd[0]);
 
 err:
     close(pipe1[0]);
