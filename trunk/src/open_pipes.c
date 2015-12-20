@@ -2,8 +2,11 @@
  * open_pipes.c
  */
 
+#define _GNU_SOURCE
+
 #include <errno.h>
 #include <error.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -15,6 +18,17 @@ struct pipe_data {
     int *pipefds;
 };
 
+static const char *
+usage()
+{
+    static char buf[64];
+
+    snprintf(buf, sizeof(buf), "Usage: %s [-d FD ... --] command [args]",
+             program_invocation_short_name);
+
+    return buf;
+}
+
 static int
 parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
 {
@@ -22,8 +36,13 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
     int npipefds;
 
     if (argc < 2) {
-        error(0, 0, "Must specify command");
+        error(0, 0, usage());
         return -1;
+    }
+
+    if (strcmp(argv[1], "-h") == 0) {
+        printf("%s\n", usage());
+        return -2;
     }
 
     if (strcmp(argv[1], "-d") != 0) {
@@ -39,7 +58,7 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
     }
 
     if (i == argc) {
-        error(0, 0, "Must specify command");
+        error(0, 0, usage());
         return -1;
     }
     *cmd = &argv[i];
@@ -106,13 +125,17 @@ int
 main(int argc, char **argv)
 {
     char **cmd;
+    int ret;
     struct pipe_data pd = {
         .npipes = sizeof(DEFAULT_PIPEFDS) / sizeof(DEFAULT_PIPEFDS[0]),
         .pipefds = DEFAULT_PIPEFDS
     };
 
-    if (parse_cmdline(argc, argv, &cmd, &pd) == -1)
+    ret = parse_cmdline(argc, argv, &cmd, &pd);
+    if (ret == -1)
         return EXIT_FAILURE;
+    if (ret == -2)
+        return EXIT_SUCCESS;
 
     if (open_pipes(&pd) == -1)
         return EXIT_FAILURE;
