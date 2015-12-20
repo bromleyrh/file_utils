@@ -9,16 +9,14 @@
 
 #define BASE_FD 3
 
-static const char **cmd;
-
 static int
-parse_cmdline(int argc, char **argv)
+parse_cmdline(int argc, char **argv, const char **cmd)
 {
     if (argc < 2) {
         error(0, 0, "Must specify command");
         return -1;
     }
-    cmd = &argv[1];
+    *cmd = &argv[1];
 
     return 0;
 }
@@ -57,9 +55,10 @@ err:
 int
 main(int argc, char **argv)
 {
+    const char **cmd;
     int pipe1[2], pipe2[2];
 
-    if (parse_cmdline(argc, argv) == -1)
+    if (parse_cmdline(argc, argv, &cmd) == -1)
         return EXIT_FAILURE;
 
     if (open_pipes(pipe1, pipe2) == -1)
