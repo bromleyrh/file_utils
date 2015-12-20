@@ -42,8 +42,8 @@ main(int argc, char **argv)
         goto err;
     }
 
-    if (execvp(cmd[0], cmd) == -1)
-        error(0, errno, "Error executing %s", cmd[0]);
+    execvp(cmd[0], cmd);
+    error(0, errno, "Error executing %s", cmd[0]);
 
 err:
     close(pipe1[0]);
