@@ -2,10 +2,13 @@
 # Makefile
 #
 
-all: cp_mem open open_pipes libdirectio
+all: cp_mem glacier_util open open_pipes libdirectio
 
 cp_mem: cp_mem.c
 	gcc -O2 -o $@ -s -Wall -Wextra $^
+
+glacier_util: glacier_util.java
+	javac $^
 
 open: open.c
 	gcc -O2 -o $@ -s -Wall -Wextra $^
