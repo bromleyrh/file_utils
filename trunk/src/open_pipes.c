@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define DEFAULT_PIPEFDS ((int []){5, 6, 7, 8})
+#define DEFAULT_PIPEFDS 5, 6, 7, 8
 
 struct pipe_data {
     int npipes;
@@ -126,9 +126,10 @@ main(int argc, char **argv)
 {
     char **cmd;
     int ret;
+    static int def_pipefds[] = {DEFAULT_PIPEFDS};
     struct pipe_data pd = {
-        .npipes = sizeof(DEFAULT_PIPEFDS) / sizeof(DEFAULT_PIPEFDS[0]),
-        .pipefds = DEFAULT_PIPEFDS
+        .npipes = sizeof(def_pipefds) / sizeof(def_pipefds[0]),
+        .pipefds = def_pipefds
     };
 
     ret = parse_cmdline(argc, argv, &cmd, &pd);
