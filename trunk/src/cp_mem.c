@@ -49,13 +49,7 @@ parse_cmdline(int argc, char **argv)
     numopts = i - 1;
 
     numsrcs = argc - numopts - 2;
-    srcs = malloc(numsrcs * sizeof(char *));
-    if (srcs == NULL) {
-        error(0, 0, "Out of memory");
-        return -1;
-    }
-    for (i = 0; i < numsrcs; i++)
-        srcs[i] = argv[1+numopts+i];
+    srcs = (const char **)&argv[1+numopts];
     dst = argv[argc-1];
 
     return 0;
