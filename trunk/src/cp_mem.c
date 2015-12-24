@@ -18,6 +18,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#define BLKSIZE 512
+
 static const char *src;
 static const char *dst;
 static int hugetlbfs;
@@ -50,20 +52,24 @@ parse_cmdline(int argc, char **argv)
     return 0;
 }
 
+#define BUFSIZE (1024 * 1024)
+
 static int
 do_copy(int fd1, int fd2, int hugetlbfs)
 {
     char *dest;
+    int err = 0;
     off_t off;
-    ssize_t ret;
     struct stat srcs;
+
+    (void)hugetlbfs;
 
     if (fstat(fd1, &srcs) == -1) {
         error(0, errno, "Couldn't stat %s", src);
         return -1;
     }
 
-    if (!hugetlbfs && (ftruncate(fd2, srcs.st_size) == -1)) {
+    if (ftruncate(fd2, srcs.st_size) == -1) {
         error(0, errno, "Couldn't extend %s", dst);
         return -1;
     }
@@ -75,20 +81,44 @@ do_copy(int fd1, int fd2, int hugetlbfs)
         return -1;
     }
 
-    for (off = 0; off < srcs.st_size; off += ret) {
-        ret = read(fd1, dest + off, 1024 * 1024);
-        if (ret == 0)
-            break;
-        if (ret == -1) {
-            error(0, errno, "Couldn't read %s", src);
-            break;
+    for (off = 0; off < srcs.st_size; off += BUFSIZE) {
+        char buf[BUFSIZE];
+        size_t blockbytes, bytesread, to_read;
+        ssize_t ret;
+        static char zeroblock[BLKSIZE];
+
+        to_read = srcsb.st_size - off;
+        if (to_read > sizeof(buf))
+            to_read = sizeof(buf);
+
+        for (bytesread = 0; bytesread < to_read; bytesread += ret) {
+            ret = read(fd1, buf + bytesread, to_read - bytesread);
+            if (ret == 0)
+                goto end;
+            if (ret == -1) {
+                error(0, errno, "Couldn't read %s", src);
+                err = -1;
+                goto end;
+            }
+        }
+        for (bytesread = 0; bytesread < to_read; bytesread += blockbytes) {
+            if (to_read - bytesread < BLKSIZE)
+                blockbytes = to_read - bytesread;
+            else {
+                blockbytes = BLKSIZE;
+                if (memcmp(buf + bytesread, zeroblock, BLKSIZE) == 0)
+                    continue;
+            }
+            memcpy(dest + off + bytesread, buf + bytesread, blockbytes);
         }
     }
 
+end:
     munmap(dest, srcs.st_size);
-
-    return 0;
+    return err;
 }
+
+#undef BUFSIZE
 
 static int
 copy_mode(int fd1, int fd2)
