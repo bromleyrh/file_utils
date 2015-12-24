@@ -25,6 +25,7 @@ static const char *dst;
 static int dstdir;
 static int hugetlbfs;
 static int numsrcs;
+static int verbose;
 
 static int
 parse_cmdline(int argc, char **argv)
@@ -40,6 +41,8 @@ parse_cmdline(int argc, char **argv)
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-t") == 0)
             hugetlbfs = 1;
+        else if (strcmp(argv[i], "-v") == 0)
+            verbose = 1;
         else
             break;
     }
@@ -211,6 +214,8 @@ copy(int n)
         return -1;
     }
 
+    if (verbose)
+        fprintf(stderr, "%s -> %s\n", srcfile, dstfile);
     return 0;
 
 err2:
@@ -230,8 +235,13 @@ main(int argc, char **argv)
     if (parse_cmdline(argc, argv) == -1)
         return EXIT_FAILURE;
 
-    if ((numsrcs > 1) || ((stat(dst, &dstsb) == 0) && S_ISDIR(dstsb.st_mode)))
+    if ((numsrcs > 1) || ((stat(dst, &dstsb) == 0) && S_ISDIR(dstsb.st_mode))) {
+        size_t slen = strlen(dst);
+
+        if (dst[slen-1] == '/')
+            *((char *)dst+slen-1) = '\0';
         dstdir = 1;
+    }
 
     for (i = 0; i < numsrcs; i++) {
         if (copy(i) == -1) {
