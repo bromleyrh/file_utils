@@ -20,34 +20,40 @@
 
 #define BLKSIZE 512
 
-static const char *src;
+static const char **srcs;
 static const char *dst;
+static int dstdir;
 static int hugetlbfs;
+static int numsrcs;
 
 static int
 parse_cmdline(int argc, char **argv)
 {
-    struct stat dsts;
+    int i;
+    int numopts;
 
     if (argc < 3) {
-        error(0, 0, "Must specify source and destination files");
+        error(0, 0, "Must specify a source file and destination");
         return -1;
     }
 
-    src = argv[1];
-    dst = argv[2];
-    if ((stat(dst, &dsts) == 0) && S_ISDIR(dsts.st_mode)) {
-        char *tmpdst;
-
-        if (asprintf(&tmpdst, "%s/%s", dst, basename(strdupa(src))) == -1) {
-            error(0, 0, "Out of memory");
-            return -1;
-        }
-        dst = tmpdst;
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-t") == 0)
+            hugetlbfs = 1;
+        else
+            break;
     }
+    numopts = i - 1;
 
-    if ((argc > 3) && (strcmp(argv[3], "-t") == 0))
-        hugetlbfs = 1;
+    numsrcs = argc - numopts - 2;
+    srcs = malloc(numsrcs * sizeof(char *));
+    if (srcs == NULL) {
+        error(0, 0, "Out of memory");
+        return -1;
+    }
+    for (i = 0; i < numsrcs; i++)
+        srcs[i] = argv[1+numopts+i];
+    dst = argv[argc-1];
 
     return 0;
 }
@@ -60,28 +66,28 @@ do_copy(int fd1, int fd2, int hugetlbfs)
     char *dest;
     int err = 0;
     off_t off;
-    struct stat srcs;
+    struct stat srcsb;
 
     (void)hugetlbfs;
 
-    if (fstat(fd1, &srcs) == -1) {
-        error(0, errno, "Couldn't stat %s", src);
+    if (fstat(fd1, &srcsb) == -1) {
+        error(0, errno, "Couldn't stat source file");
         return -1;
     }
 
-    if (ftruncate(fd2, srcs.st_size) == -1) {
-        error(0, errno, "Couldn't extend %s", dst);
+    if (ftruncate(fd2, srcsb.st_size) == -1) {
+        error(0, errno, "Couldn't extend destination file");
         return -1;
     }
 
-    dest = (char *)mmap(0, srcs.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+    dest = (char *)mmap(0, srcsb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                         fd2, 0);
     if (dest == MAP_FAILED) {
-        error(0, errno, "Memory mapping %s failed", dst);
+        error(0, errno, "Memory mapping destination file failed");
         return -1;
     }
 
-    for (off = 0; off < srcs.st_size; off += BUFSIZE) {
+    for (off = 0; off < srcsb.st_size; off += BUFSIZE) {
         char buf[BUFSIZE];
         size_t blockbytes, bytesread, to_read;
         ssize_t ret;
@@ -96,7 +102,7 @@ do_copy(int fd1, int fd2, int hugetlbfs)
             if (ret == 0)
                 goto end;
             if (ret == -1) {
-                error(0, errno, "Couldn't read %s", src);
+                error(0, errno, "Couldn't read source file");
                 err = -1;
                 goto end;
             }
@@ -114,7 +120,7 @@ do_copy(int fd1, int fd2, int hugetlbfs)
     }
 
 end:
-    munmap(dest, srcs.st_size);
+    munmap(dest, srcsb.st_size);
     return err;
 }
 
@@ -123,14 +129,14 @@ end:
 static int
 copy_mode(int fd1, int fd2)
 {
-    struct stat srcs;
+    struct stat srcsb;
 
-    if (fstat(fd1, &srcs) == -1) {
-        error(0, errno, "Couldn't stat %s", src);
+    if (fstat(fd1, &srcsb) == -1) {
+        error(0, errno, "Couldn't stat source file");
         return -1;
     }
-    if (fchmod(fd2, srcs.st_mode) == -1) {
-        error(0, errno, "Couldn't set file mode of %s", dst);
+    if (fchmod(fd2, srcsb.st_mode) == -1) {
+        error(0, errno, "Couldn't set mode of destination file");
         return -1;
     }
 
@@ -158,26 +164,37 @@ do_link(int fd, const char *name)
     return 0;
 }
 
-int
-main(int argc, char **argv)
+static int
+copy(int n)
 {
+    const char *srcfile, *dstfile;
     int fd1, fd2;
 
-    if (parse_cmdline(argc, argv) == -1)
-        return EXIT_FAILURE;
+    srcfile = srcs[n];
 
-    fd1 = open(src, O_RDONLY);
-    if (fd1 == -1)
-        error(EXIT_FAILURE, errno, "Couldn't open %s", src);
+    if (dstdir) {
+        if (asprintf((char **)&dstfile, "%s/%s", dst,
+                     basename(strdupa(srcfile))) == -1) {
+            error(0, 0, "Out of memory");
+            return -1;
+        }
+    } else
+        dstfile = dst;
+
+    fd1 = open(srcfile, O_RDONLY);
+    if (fd1 == -1) {
+        error(0, errno, "Couldn't open %s", srcfile);
+        return -1;
+    }
 
     if (hugetlbfs)
-        fd2 = open(dst, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+        fd2 = open(dstfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
     else {
-        fd2 = open(dirname(strdupa(dst)), O_RDWR | O_TMPFILE,
+        fd2 = open(dirname(strdupa(dstfile)), O_RDWR | O_TMPFILE,
                    S_IRUSR | S_IWUSR);
     }
     if (fd2 == -1) {
-        error(0, errno, "Couldn't open %s", dst);
+        error(0, errno, "Couldn't open %s", dstfile);
         goto err1;
     }
 
@@ -188,19 +205,42 @@ main(int argc, char **argv)
 
     close(fd1);
     if (!hugetlbfs)
-        do_link(fd2, dst);
+        do_link(fd2, dstfile);
     if (close(fd2) == -1) {
-        error(0, errno, "Couldn't close %s", dst);
-        return EXIT_FAILURE;
+        error(0, errno, "Couldn't close %s", dstfile);
+        return -1;
     }
 
-    return EXIT_SUCCESS;
+    return 0;
 
 err2:
     close(fd2);
 err1:
     close(fd1);
-    return EXIT_FAILURE;
+    return -1;
+}
+
+int
+main(int argc, char **argv)
+{
+    int err = 0;
+    int i;
+    struct stat dstsb;
+
+    if (parse_cmdline(argc, argv) == -1)
+        return EXIT_FAILURE;
+
+    if ((numsrcs > 1) || ((stat(dst, &dstsb) == 0) && S_ISDIR(dstsb.st_mode)))
+        dstdir = 1;
+
+    for (i = 0; i < numsrcs; i++) {
+        if (copy(i) == -1) {
+            err = 1;
+            error(0, 0, "Error copying %s", srcs[i]);
+        }
+    }
+
+    return err ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 /* vi: set expandtab sw=4 ts=4: */
