@@ -4,6 +4,7 @@
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.Arrays;
 
 final class parser {
     private int indent;
@@ -57,11 +58,11 @@ final class parser {
     }
 }
 
-final class inventory {
+final class inventory_file {
     private final String pathname;
     private final BufferedReader f;
 
-    public inventory(String _pathname) throws IOException
+    public inventory_file(String _pathname) throws IOException
     {
         InputStream is;
 
@@ -77,7 +78,7 @@ final class inventory {
 
     public void parse() throws IOException
     {
-        char[] buf = new char[1024 * 1024];
+        char[] buf = new char[4096];
         parser p = new parser();
 
         for (;;) {
@@ -101,27 +102,230 @@ final class inventory {
     }
 }
 
-public final class glacier_util {
-    public static void main(String[] args)
-    {
-        inventory i;
-        String file;
+interface glacier_util_cmd_iface {
+    abstract public boolean parse_cmdline();
+    abstract public int run_cmd();
+}
 
-        if (args.length == 0) {
-            System.err.print("Must specify file\n");
-            System.exit(1);
+abstract class glacier_util_cmd implements glacier_util_cmd_iface {
+    boolean parsed_cmdline = false;
+    String[] args;
+    String cmdname;
+    
+    public glacier_util_cmd(String[] _args)
+    {
+        cmdname = this.getClass().getSimpleName();
+        args = _args;
+    }
+
+    boolean do_parse_cmdline()
+    {
+        return true;
+    }
+    
+    final @Override public boolean parse_cmdline()
+    {
+        boolean ret = do_parse_cmdline();
+        parsed_cmdline = true;
+
+        return ret;
+    }
+    
+    int do_run_cmd()
+    {
+        return 0;
+    }
+    
+    final @Override public int run_cmd()
+    {
+        if (!parsed_cmdline)
+            return -1;
+
+        return do_run_cmd();
+    }
+}
+
+abstract class glacier_util_supercmd extends glacier_util_cmd {
+    glacier_util_cmd subcmd;
+    String[] subcmdargs;
+    String subcmdstr;
+
+    public glacier_util_supercmd(String[] _args)
+    {
+        super(_args);
+    }
+
+    private boolean get_subcmd()
+    {
+        if ((args == null) || (args.length == 0)) {
+            System.err.print("\"" + cmdname + "\" command requires subcommand "
+                             + "argument\n");
+            return false;
         }
+
+        subcmdstr = args[0];
+        if (args.length > 1)
+            subcmdargs = Arrays.copyOfRange(args, 1, args.length);
+
+        return true;
+    }
+
+    boolean finish_parse_cmdline()
+    {
+        return true;
+    }
+  
+    final @Override public boolean do_parse_cmdline()
+    {
+        return (get_subcmd() && finish_parse_cmdline());
+    }
+}
+
+final class parse extends glacier_util_cmd {
+    private String file;
+
+    public parse(String[] _args)
+    {
+        super(_args);
+    }
+
+    @Override public boolean do_parse_cmdline()
+    {
+        if ((args == null) || (args.length == 0)) {
+            System.err.print("Must specify file\n");
+            return false;
+        }
+
         file = args[0];
+        return true;
+    }
+
+    @Override public int do_run_cmd()
+    {
+        inventory_file i;
 
         try {
-            i = new inventory(file);
+            i = new inventory_file(file);
             i.parse();
         } catch (IOException e) {
-            System.err.format("Couldn't parse inventory %s", file);
-            System.exit(1);
+            return -1;
         }
 
-        System.exit(0);
+        return 0;
+    }
+}
+
+final class format extends glacier_util_cmd {
+    private String file;
+    
+    public format(String[] _args)
+    {
+        super(_args);
+    }
+    
+    @Override public boolean do_parse_cmdline()
+    {
+        if ((args == null) || (args.length == 0)) {
+            System.err.print("Must specify file");
+            return false;
+        }
+        
+        file = args[0];
+        return true;
+    }
+    
+    @Override public int do_run_cmd()
+    {
+        System.err.print("Not yet implemented");
+        return -1;
+    }
+}
+
+final class inventory extends glacier_util_supercmd {
+    private char mode;
+
+    public inventory(String[] _args)
+    {
+        super(_args);
+    }
+
+    @Override boolean finish_parse_cmdline()
+    {
+        if (subcmdstr.equals("parse"))
+            mode = 'p';
+        else if (subcmdstr.equals("format"))
+            mode = 'f';
+        else {
+            System.err.print("Invalid subcommand \"" + subcmdstr + "\"\n");
+            return false;
+        }
+        return true;
+    }
+
+    @Override public int do_run_cmd()
+    {
+        int ret;
+
+        switch (mode) {
+        case 'p':
+            {
+                parse pc = new parse(subcmdargs);
+
+                if (pc.parse_cmdline() == false)
+                    ret = -1;
+                else
+                    ret = pc.run_cmd();
+                break;
+            }
+        case 'f':
+            {
+                format fc = new format(subcmdargs);
+
+                if (fc.parse_cmdline() == false)
+                    ret = -1;
+                else
+                    ret = fc.run_cmd();
+                break;
+            }
+        default:
+            ret = -1;
+        }
+        
+        return -1;
+    }
+}
+
+public final class glacier_util extends glacier_util_supercmd {
+    public glacier_util(String[] _args)
+    {
+        super(_args);
+    }
+
+    @Override public boolean finish_parse_cmdline()
+    {
+        if (!subcmdstr.equals("inventory")) {
+            System.err.format("Invalid subcommand \"" + subcmdstr + "\"\n");
+            return false;
+        }
+        return true;
+    }
+    
+    @Override public int do_run_cmd()
+    {
+        inventory ic = new inventory(subcmdargs);
+        
+        if (ic.parse_cmdline() == false)
+            return -1;
+        return ic.run_cmd();
+    }
+
+    public static void main(String[] args)
+    {
+        glacier_util gu = new glacier_util(args);
+        
+        if (gu.parse_cmdline() == false)
+            return;
+        gu.run_cmd();
     }
 }
 
