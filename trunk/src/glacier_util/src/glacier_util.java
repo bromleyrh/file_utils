@@ -16,7 +16,7 @@ final class parser {
     public String parse(String s)
     {
         int i, j;
-        StringBuilder ret = new StringBuilder();
+        StringBuilder strb = new StringBuilder();
 
         for (i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
@@ -25,30 +25,30 @@ final class parser {
             case '{':
             case '[':
                 ++indent;
-                ret.append(Character.toString(c));
-                ret.append("\n");
+                strb.append(Character.toString(c));
+                strb.append("\n");
                 for (j = 0; j < indent; j++)
-                    ret.append("\t");
+                    strb.append("\t");
                 break;
             case '}':
             case ']':
                 --indent;
-                ret.append("\n");
+                strb.append("\n");
                 for (j = 0; j < indent; j++)
-                    ret.append("\t");
-                ret.append(Character.toString(c));
+                    strb.append("\t");
+                strb.append(Character.toString(c));
                 break;
             case ',':
-                ret.append(",\n");
+                strb.append(",\n");
                 for (j = 0; j < indent; j++)
-                    ret.append("\t");
+                    strb.append("\t");
                 break;
             default:
-                ret.append(Character.toString(c));
+                strb.append(Character.toString(c));
             }
         }
 
-        return ret.toString();
+        return strb.toString();
     }
     
     public void reset()
