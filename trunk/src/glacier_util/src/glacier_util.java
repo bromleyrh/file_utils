@@ -2,17 +2,36 @@
  * glacier_util.java
  */
 
-class inventory {
-    private String file;
+import java.io.*;
+import java.nio.file.*;
 
-    public inventory(String _file)
+class inventory {
+    private final Path pathname;
+    private BufferedReader f;
+
+    public inventory(String _pathname)
     {
-        file = _file;
+        pathname = Paths.get(_pathname);
+    }
+    
+    public String getPath()
+    {
+        return pathname.toString();
     }
 
-    public void parse()
+    public void open() throws IOException
     {
-        System.out.format("%s\n", file);
+        InputStream is = Files.newInputStream(pathname);
+        f = new BufferedReader(new InputStreamReader(is));
+    }
+
+    public boolean parse()
+    {
+        if (f == null)
+            return false;
+    
+        System.out.format("%s\n", pathname.toString());
+        return true;
     }
 }
 
@@ -28,7 +47,15 @@ public final class glacier_util {
         file = args[0];
 
         inventory i = new inventory(file);
-        i.parse();
+        try {
+            i.open();
+        } catch (IOException e) {
+            System.err.format("Couldn't open inventory %s", i.getPath());
+            System.exit(1);
+        }
+        if (i.parse() == false)
+            System.exit(1);
+
         System.exit(0);
     }
 }
