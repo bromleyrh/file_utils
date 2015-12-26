@@ -181,10 +181,10 @@ abstract class glacier_util_supercmd extends glacier_util_cmd {
     }
 }
 
-final class parse extends glacier_util_cmd {
+final class format extends glacier_util_cmd {
     private String file;
 
-    public parse(String[] _args)
+    public format(String[] _args)
     {
         super(_args);
     }
@@ -215,32 +215,6 @@ final class parse extends glacier_util_cmd {
     }
 }
 
-final class format extends glacier_util_cmd {
-    private String file;
-    
-    public format(String[] _args)
-    {
-        super(_args);
-    }
-    
-    @Override public boolean do_parse_cmdline()
-    {
-        if ((args == null) || (args.length == 0)) {
-            System.err.print("Must specify file");
-            return false;
-        }
-        
-        file = args[0];
-        return true;
-    }
-    
-    @Override public int do_run_cmd()
-    {
-        System.err.print("Not yet implemented");
-        return -1;
-    }
-}
-
 final class inventory extends glacier_util_supercmd {
     private char mode;
 
@@ -251,11 +225,7 @@ final class inventory extends glacier_util_supercmd {
 
     @Override boolean finish_parse_cmdline()
     {
-        if (subcmdstr.equals("parse"))
-            mode = 'p';
-        else if (subcmdstr.equals("format"))
-            mode = 'f';
-        else {
+        if (!subcmdstr.equals("format")) {
             System.err.print("Invalid subcommand \"" + subcmdstr + "\"\n");
             return false;
         }
@@ -264,34 +234,11 @@ final class inventory extends glacier_util_supercmd {
 
     @Override public int do_run_cmd()
     {
-        int ret;
+        format fc = new format(subcmdargs);
 
-        switch (mode) {
-        case 'p':
-            {
-                parse pc = new parse(subcmdargs);
-
-                if (pc.parse_cmdline() == false)
-                    ret = -1;
-                else
-                    ret = pc.run_cmd();
-                break;
-            }
-        case 'f':
-            {
-                format fc = new format(subcmdargs);
-
-                if (fc.parse_cmdline() == false)
-                    ret = -1;
-                else
-                    ret = fc.run_cmd();
-                break;
-            }
-        default:
-            ret = -1;
-        }
-        
-        return -1;
+        if (fc.parse_cmdline() == false)
+            return -1;
+        return fc.run_cmd();
     }
 }
 
@@ -324,8 +271,10 @@ public final class glacier_util extends glacier_util_supercmd {
         glacier_util gu = new glacier_util(args);
         
         if (gu.parse_cmdline() == false)
-            return;
-        gu.run_cmd();
+            System.exit(1);
+        if (gu.run_cmd() != 0)
+            System.exit(1);
+        System.exit(0);
     }
 }
 
