@@ -1,0 +1,47 @@
+#!/bin/sh
+
+restore_files()
+{
+    mv $archive.save $archive &>/dev/null
+    mv $archive.asc.save $archive.asc &>/dev/null
+}
+
+if ! [[ -d .git ]]; then
+    echo "Current directory is not root of a git repository" 1>&2
+    exit 1
+fi
+reponame=$(basename $(realpath .))
+
+while true; do
+    if [[ $1 == "--amend" ]]; then
+        amend=1
+        shift
+    elif [[ $1 == "-s" ]]; then
+        sign=1
+        shift
+    else
+        break
+    fi
+done
+if [[ $1 ]]; then
+    dstdir=$1/
+    shift
+fi
+[[ $amend == 1 ]] && commitopts="--amend"
+archive=$dstdir$reponame.tar.xz
+
+trap restore_files EXIT
+mv $archive $archive.save &>/dev/null
+mv $archive.asc $archive.asc.save &>/dev/null
+
+git config tar.tar.xz.command "xz -9c" || exit 1
+git archive -o $archive HEAD $@ || exit 1
+git add $archive || exit 1
+if [[ $sign == 1 ]]; then
+    gpg -a --detach-sign -o $archive.asc $archive || exit 1
+    git add $archive.asc || exit 1
+fi
+git commit $commitopts || exit 1
+
+trap '' EXIT
+rm $archive.save $archive.asc.save
