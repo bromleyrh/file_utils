@@ -4,6 +4,7 @@
 
 #define _GNU_SOURCE
 
+#include <alloca.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -14,11 +15,11 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <linux/fs.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#define BLKSIZE 512
 
 static const char **srcs;
 static const char *dst;
@@ -60,12 +61,21 @@ parse_cmdline(int argc, char **argv)
 static int
 do_copy(int fd1, int fd2, int hugetlbfs)
 {
+    char *zeroblock;
     char *dest;
+    int blksize;
     int err = 0;
     off_t off;
     struct stat srcsb;
 
     (void)hugetlbfs;
+
+    if (ioctl(fd2, FIGETBSZ, &blksize) == -1) {
+        error(0, errno, "Couldn't get destination filesystem block size");
+        return -1;
+    }
+    zeroblock = alloca(blksize);
+    memset(zeroblock, 0, blksize);
 
     if (fstat(fd1, &srcsb) == -1) {
         error(0, errno, "Couldn't stat source file");
@@ -88,7 +98,6 @@ do_copy(int fd1, int fd2, int hugetlbfs)
         char buf[BUFSIZE];
         size_t blockbytes, bytesread, to_read;
         ssize_t ret;
-        static char zeroblock[BLKSIZE];
 
         to_read = srcsb.st_size - off;
         if (to_read > sizeof(buf))
@@ -105,11 +114,11 @@ do_copy(int fd1, int fd2, int hugetlbfs)
             }
         }
         for (bytesread = 0; bytesread < to_read; bytesread += blockbytes) {
-            if (to_read - bytesread < BLKSIZE)
+            if (to_read - bytesread < (size_t)blksize)
                 blockbytes = to_read - bytesread;
             else {
-                blockbytes = BLKSIZE;
-                if (memcmp(buf + bytesread, zeroblock, BLKSIZE) == 0)
+                blockbytes = blksize;
+                if (memcmp(buf + bytesread, zeroblock, blksize) == 0)
                     continue;
             }
             memcpy(dest + off + bytesread, buf + bytesread, blockbytes);
