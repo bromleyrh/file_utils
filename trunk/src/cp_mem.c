@@ -82,9 +82,11 @@ do_copy(int fd1, int fd2, int hugetlbfs)
         return -1;
     }
 
-    if (ftruncate(fd2, srcsb.st_size) == -1) {
-        error(0, errno, "Couldn't extend destination file");
-        return -1;
+    while (ftruncate(fd2, srcsb.st_size) == -1) {
+        if (errno != EINTR) {
+            error(0, errno, "Couldn't extend destination file");
+            return -1;
+        }
     }
 
     dest = (char *)mmap(0, srcsb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,

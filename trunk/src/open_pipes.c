@@ -18,6 +18,19 @@ struct pipe_data {
     int *pipefds;
 };
 
+static int
+do_dup2(int oldfd, int newfd)
+{
+    int ret;
+
+    while ((ret = dup2(oldfd, newfd)) == -1) {
+        if (errno != EINTR)
+            break;
+    }
+
+    return ret;
+}
+
 static const char *
 usage()
 {
@@ -97,8 +110,8 @@ open_pipes(struct pipe_data *pd)
             error(0, errno, "Error opening pipe");
             break;
         }
-        if ((dup2(pipes[i][0], pd->pipefds[2*i]) == -1)
-            || (dup2(pipes[i][1], pd->pipefds[2*i+1]) == -1)) {
+        if ((do_dup2(pipes[i][0], pd->pipefds[2*i]) == -1)
+            || (do_dup2(pipes[i][1], pd->pipefds[2*i+1]) == -1)) {
             error(0, errno, "Error duplicating file descriptor");
             close(pipes[i][0]);
             close(pipes[i][1]);

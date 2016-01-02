@@ -51,10 +51,12 @@ main(int argc, char **argv)
     if (fd == -1)
         error(EXIT_FAILURE, errno, "Could not open %s", file);
 
-    if (dup2(fd, STDIN_FILENO) == -1) {
-        err = errno;
-        close(fd);
-        error(EXIT_FAILURE, err, "Could not duplicate file descriptor");
+    while (dup2(fd, STDIN_FILENO) == -1) {
+        if (errno != EINTR) {
+            err = errno;
+            close(fd);
+            error(EXIT_FAILURE, err, "Could not duplicate file descriptor");
+        }
     }
 
     close(fd);
