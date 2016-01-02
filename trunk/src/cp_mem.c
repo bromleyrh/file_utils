@@ -105,13 +105,18 @@ do_copy(int fd1, int fd2, int hugetlbfs)
 
         for (bytesread = 0; bytesread < to_read; bytesread += ret) {
             ret = read(fd1, buf + bytesread, to_read - bytesread);
+            if (ret > 0)
+                continue;
             if (ret == 0)
                 goto end;
-            if (ret == -1) {
-                error(0, errno, "Couldn't read source file");
-                err = -1;
-                goto end;
+            /* ret == -1 */
+            if (errno == EINTR) {
+                ret = 0;
+                continue;
             }
+            error(0, errno, "Couldn't read source file");
+            err = -1;
+            goto end;
         }
         for (bytesread = 0; bytesread < to_read; bytesread += blockbytes) {
             if (to_read - bytesread < (size_t)blksize)
