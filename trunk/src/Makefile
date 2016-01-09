@@ -2,22 +2,25 @@
 # Makefile
 #
 
+ldio_vmaj = 0
+ldio_vmin = 1
+ldio_so = libdirectio.so.$(ldio_vmaj).$(ldio_vmin)
+
+progs = cp_mem open open_pipes
+libs = $(ldio_so)
+
 all: cp_mem open open_pipes libdirectio
 
-cp_mem: cp_mem.c
-	gcc -O2 -o $@ -s -Wall -Wextra $^
-
-open: open.c
-	gcc -O2 -o $@ -s -Wall -Wextra $^
-
-open_pipes: open_pipes.c
+%: %.c
 	gcc -O2 -o $@ -s -Wall -Wextra $^
 
 libdirectio.o: libdirectio.c
 	gcc -c -fPIC -O2 -Wall -Wextra $^
 
-LDIO_VMAJ = 0
-LDIO_VMIN = 1
 libdirectio: libdirectio.o
-	gcc -o libdirectio.so.$(LDIO_VMAJ).$(LDIO_VMIN) -shared \
-	-Wl,-soname,libdirectio.so.$(LDIO_VMAJ) $^ -lc -ldl
+	gcc -o $(ldio_so) -shared \
+	-Wl,-soname,libdirectio.so.$(ldio_vmaj) $^ -lc -ldl
+
+.PHONY:
+clean:
+	rm -f *.o $(progs) $(libs)
