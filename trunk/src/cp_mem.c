@@ -219,6 +219,8 @@ do_copy(int fd1, int fd2, int hugetlbfs)
             goto err;
 
         num_read = do_read(fd1, buf, sizeof(buf));
+        if (num_read == 0)
+            break;
         if (num_read == -1) {
             error(0, errno, "Couldn't read source file");
             goto err;
