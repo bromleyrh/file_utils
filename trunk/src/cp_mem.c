@@ -21,12 +21,36 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+struct dest {
+    int     fd;
+    off_t   bufsize;
+    char    *buf;
+    size_t  blksize;
+    char    *zeroblock;
+};
+
 static const char **srcs;
 static const char *dst;
 static int dstdir;
 static int hugetlbfs;
 static int numsrcs;
 static int verbose;
+
+static int parse_cmdline(int, char **);
+
+static int dest_init(int, off_t, struct dest *);
+static int dest_buf_resize(off_t, struct dest *);
+static void dest_free(struct dest *);
+
+static int do_ftruncate(int, off_t);
+static ssize_t do_read(int, void *, size_t);
+static int do_write(struct dest *, const void *, size_t, off_t);
+
+static int do_copy(int, int, int);
+static int copy_mode(int, int);
+static int do_link(int, const char *);
+
+static int copy(int);
 
 static int
 parse_cmdline(int argc, char **argv)
@@ -56,85 +80,167 @@ parse_cmdline(int argc, char **argv)
     return 0;
 }
 
+static int
+dest_init(int fd, off_t bufsize, struct dest *dst)
+{
+    if (dst == NULL)
+        return -1;
+
+    dst->fd = fd;
+
+    dst->bufsize = bufsize;
+    dst->buf = (char *)mmap(0, dst->bufsize, PROT_READ | PROT_WRITE, MAP_SHARED,
+                            fd, 0);
+    if (dst->buf == MAP_FAILED) {
+        error(0, errno, "Memory mapping destination file failed");
+        return -1;
+    }
+
+    if (ioctl(dst->fd, FIGETBSZ, &dst->blksize) == -1) {
+        error(0, errno, "Couldn't get destination filesystem block size");
+        goto err;
+    }
+
+    dst->zeroblock = malloc(dst->blksize);
+    if (dst->zeroblock == NULL) {
+        error(0, 0, "Out of memory");
+        goto err;
+    }
+    memset(dst->zeroblock, 0, dst->blksize);
+
+    return 0;
+
+err:
+    munmap(dst->buf, dst->bufsize);
+    return -1;
+}
+
+static int
+dest_buf_resize(off_t bufsize, struct dest *dst)
+{
+    if (dst == NULL)
+        return -1;
+
+    dst->buf = mremap(dst->buf, dst->bufsize, bufsize, 0);
+    if (dst->buf == NULL) {
+        error(0, errno, "Couldn't extend destination file");
+        return -1;
+    }
+
+    dst->bufsize = bufsize;
+
+    return 0;
+}
+
+static void
+dest_free(struct dest *dst)
+{
+    if (dst != NULL) {
+        munmap(dst->buf, dst->bufsize);
+        free(dst->zeroblock);
+    }
+}
+
+static int
+do_ftruncate(int fd, off_t length)
+{
+    while (ftruncate(fd, length) == -1) {
+        if (errno != EINTR)
+            return -1;
+    }
+
+    return 0;
+}
+
+static ssize_t
+do_read(int fd, void *buf, size_t count)
+{
+    size_t bytesread;
+    ssize_t ret;
+
+    for (bytesread = 0; bytesread < count; bytesread += ret) {
+        ret = read(fd, buf + bytesread, count - bytesread);
+        if (ret > 0)
+            continue;
+        if (ret == 0)
+            break;
+        /* ret == -1 */
+        if (errno == EINTR) {
+            ret = 0;
+            continue;
+        }
+        break;
+    }
+
+    return ret;
+}
+
+static int
+do_write(struct dest *dst, const void *buf, size_t count, off_t offset)
+{
+    size_t blockbytes, byteswritten;
+
+    if (dst == NULL)
+        return -1;
+
+    for (byteswritten = 0; byteswritten < count; byteswritten += blockbytes) {
+        if (count - byteswritten < (size_t)dst->blksize)
+            blockbytes = count - byteswritten;
+        else {
+            blockbytes = dst->blksize;
+            if (memcmp(buf + byteswritten, dst->zeroblock, dst->blksize) == 0)
+                continue;
+        }
+        memcpy(dst->buf + offset + byteswritten, buf + byteswritten,
+               blockbytes);
+    }
+
+    return 0;
+}
+
 #define BUFSIZE (1024 * 1024)
 
 static int
 do_copy(int fd1, int fd2, int hugetlbfs)
 {
-    char *zeroblock;
-    char *dest;
-    int blksize;
-    int err = 0;
     off_t off;
-    struct stat srcsb;
+    struct dest dsts;
+    ssize_t num_read;
 
     (void)hugetlbfs;
 
-    if (ioctl(fd2, FIGETBSZ, &blksize) == -1) {
-        error(0, errno, "Couldn't get destination filesystem block size");
+    if (dest_init(fd2, BUFSIZE, &dsts) == -1)
         return -1;
-    }
-    zeroblock = alloca(blksize);
-    memset(zeroblock, 0, blksize);
 
-    if (fstat(fd1, &srcsb) == -1) {
-        error(0, errno, "Couldn't stat source file");
-        return -1;
-    }
-
-    while (ftruncate(fd2, srcsb.st_size) == -1) {
-        if (errno != EINTR) {
-            error(0, errno, "Couldn't extend destination file");
-            return -1;
-        }
-    }
-
-    dest = (char *)mmap(0, srcsb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        fd2, 0);
-    if (dest == MAP_FAILED) {
-        error(0, errno, "Memory mapping destination file failed");
-        return -1;
-    }
-
-    for (off = 0; off < srcsb.st_size; off += BUFSIZE) {
+    for (off = 0;; off += num_read) {
         char buf[BUFSIZE];
-        size_t blockbytes, bytesread, to_read;
-        ssize_t ret;
 
-        to_read = srcsb.st_size - off;
-        if (to_read > sizeof(buf))
-            to_read = sizeof(buf);
+        if (dest_buf_resize(off + sizeof(buf), &dsts) == -1)
+            goto err;
 
-        for (bytesread = 0; bytesread < to_read; bytesread += ret) {
-            ret = read(fd1, buf + bytesread, to_read - bytesread);
-            if (ret > 0)
-                continue;
-            if (ret == 0)
-                goto end;
-            /* ret == -1 */
-            if (errno == EINTR) {
-                ret = 0;
-                continue;
-            }
+        num_read = do_read(fd1, buf, sizeof(buf));
+        if (num_read == -1) {
             error(0, errno, "Couldn't read source file");
-            err = -1;
-            goto end;
+            goto err;
         }
-        for (bytesread = 0; bytesread < to_read; bytesread += blockbytes) {
-            if (to_read - bytesread < (size_t)blksize)
-                blockbytes = to_read - bytesread;
-            else {
-                blockbytes = blksize;
-                if (memcmp(buf + bytesread, zeroblock, blksize) == 0)
-                    continue;
-            }
-            memcpy(dest + off + bytesread, buf + bytesread, blockbytes);
+        if (do_write(&dsts, buf, num_read, off) == -1) {
+            error(0, 0, "Couldn't write destination file");
+            goto err;
         }
     }
 
-end:
-    munmap(dest, srcsb.st_size);
-    return err;
+    dest_free(&dsts);
+
+    if (do_ftruncate(fd2, off) == -1) {
+        error(0, errno, "Couldn't truncate destination file");
+        return -1;
+    }
+
+    return 0;
+
+err:
+    dest_free(&dsts);
+    return -1;
 }
 
 #undef BUFSIZE
@@ -194,10 +300,14 @@ copy(int n)
     } else
         dstfile = dst;
 
-    fd1 = open(srcfile, O_RDONLY);
-    if (fd1 == -1) {
-        error(0, errno, "Couldn't open %s", srcfile);
-        return -1;
+    if (strcmp("-", srcfile) == 0)
+        fd1 = STDIN_FILENO;
+    else {
+        fd1 = open(srcfile, O_RDONLY);
+        if (fd1 == -1) {
+            error(0, errno, "Couldn't open %s", srcfile);
+            return -1;
+        }
     }
 
     if (hugetlbfs)
