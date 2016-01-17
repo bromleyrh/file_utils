@@ -111,17 +111,23 @@ get_dest_info(const char *pathname)
 {
     const char *dirpath;
     int dst_on_hugetlbfs;
-    struct stat dstsb;
 
-    if ((numsrcs == 1) && (stat(pathname, &dstsb) == -1))
-        goto err;
+    if (numsrcs > 1)
+        dstdir = 1;
+    else {
+        struct stat dstsb;
 
-    if ((numsrcs > 1) || S_ISDIR(dstsb.st_mode)) {
+        if (stat(pathname, &dstsb) == -1) {
+            ;
+        } else if (S_ISDIR(dstsb.st_mode))
+            dstdir = 1;
+    }
+
+    if (dstdir) {
         size_t slen = strlen(pathname);
 
         if (pathname[slen-1] == '/')
             *((char *)pathname+slen-1) = '\0';
-        dstdir = 1;
     }
 
     dirpath = dstdir ? pathname : dirname(strdupa(pathname));
