@@ -16,10 +16,12 @@
 #include <unistd.h>
 
 #include <linux/fs.h>
+#include <linux/magic.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 
 struct buf {
     off_t   off;
@@ -44,6 +46,7 @@ static int verbose;
 
 static int parse_cmdline(int, char **);
 
+static int is_on_fs_of_type(const char *, int);
 static int get_dest_info(const char *);
 
 static off_t get_page_offset(off_t);
@@ -91,14 +94,26 @@ parse_cmdline(int argc, char **argv)
 }
 
 static int
+is_on_fs_of_type(const char *pathname, int fstype)
+{
+    struct statfs buf;
+
+    while (statfs(pathname, &buf) == -1) {
+        if (errno != EINTR)
+            return -1;
+    }
+
+    return buf.f_type == fstype;
+}
+
+static int
 get_dest_info(const char *pathname)
 {
+    int dst_on_hugetlbfs;
     struct stat dstsb;
 
-    if ((numsrcs == 1) && (stat(pathname, &dstsb) == -1)) {
-        error(0, errno, "Couldn't stat destination");
-        return -1;
-    }
+    if ((numsrcs == 1) && (stat(pathname, &dstsb) == -1))
+        goto err;
 
     if ((numsrcs > 1) || S_ISDIR(dstsb.st_mode)) {
         size_t slen = strlen(pathname);
@@ -108,7 +123,17 @@ get_dest_info(const char *pathname)
         dstdir = 1;
     }
 
+    dst_on_hugetlbfs = is_on_fs_of_type(pathname, HUGETLBFS_MAGIC);
+    if (dst_on_hugetlbfs == -1)
+        goto err;
+    if (dst_on_hugetlbfs)
+        hugetlbfs = 1;
+
     return 0;
+
+err:
+    error(0, errno, "Couldn't stat destination");
+    return -1;
 }
 
 static off_t
