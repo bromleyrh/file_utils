@@ -21,13 +21,18 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-struct dest {
-    int     fd;
-    off_t   bufsize;
+struct buf {
+    off_t   off;
+    off_t   size;
     char    *buf;
-    size_t  blksize;
-    char    *zeroblock;
-    int     hugetlbfs;
+};
+
+struct dest {
+    int         fd;
+    struct buf  buf;
+    size_t      blksize;
+    char        *zeroblock;
+    int         hugetlbfs;
 };
 
 static const char **srcs;
@@ -41,7 +46,7 @@ static int parse_cmdline(int, char **);
 
 static off_t get_page_offset(off_t);
 
-static int dest_init(int, off_t, int, struct dest *);
+static int dest_init(int, int, struct dest *);
 static int dest_buf_reposition(off_t, off_t, struct dest *);
 static void dest_free(struct dest *);
 
@@ -99,40 +104,30 @@ get_page_offset(off_t off)
 }
 
 static int
-dest_init(int fd, off_t bufsize, int hugetlbfs, struct dest *dst)
+dest_init(int fd, int hugetlbfs, struct dest *dst)
 {
     if (dst == NULL)
         return -1;
 
     dst->fd = fd;
 
-    dst->bufsize = bufsize;
-    dst->buf = (char *)mmap(0, dst->bufsize, PROT_READ | PROT_WRITE, MAP_SHARED,
-                            fd, 0);
-    if (dst->buf == MAP_FAILED) {
-        error(0, errno, "Memory mapping destination file failed");
-        return -1;
-    }
+    dst->buf.buf = NULL;
 
     if (ioctl(dst->fd, FIGETBSZ, &dst->blksize) == -1) {
         error(0, errno, "Couldn't get destination filesystem block size");
-        goto err;
+        return -1;
     }
 
     dst->zeroblock = malloc(dst->blksize);
     if (dst->zeroblock == NULL) {
         error(0, 0, "Out of memory");
-        goto err;
+        return -1;
     }
     memset(dst->zeroblock, 0, dst->blksize);
 
     dst->hugetlbfs = hugetlbfs;
 
     return 0;
-
-err:
-    munmap(dst->buf, dst->bufsize);
-    return -1;
 }
 
 static int
@@ -150,13 +145,16 @@ dest_buf_reposition(off_t offset, off_t bufsize, struct dest *dst)
     if (!dst->hugetlbfs && (do_ftruncate(dst->fd, offset + bufsize) == -1))
         goto err;
 
-    munmap(dst->buf, dst->bufsize);
-    dst->bufsize = bufsize;
-    dst->buf = (char *)mmap(0, offset - pgoff + dst->bufsize,
-                            PROT_READ | PROT_WRITE, MAP_SHARED, dst->fd, pgoff);
-    if (dst->buf == MAP_FAILED)
+    if (dst->buf.buf != NULL)
+        munmap(dst->buf.buf, dst->buf.size);
+    dst->buf.off = offset;
+    dst->buf.size = bufsize;
+    dst->buf.buf = (char *)mmap(0, dst->buf.off - pgoff + dst->buf.size,
+                                PROT_READ | PROT_WRITE, MAP_SHARED, dst->fd,
+                                pgoff);
+    if (dst->buf.buf == MAP_FAILED)
         goto err;
-    dst->buf += offset - pgoff;
+    dst->buf.buf += dst->buf.off - pgoff;
 
     return 0;
 
@@ -168,10 +166,12 @@ err:
 static void
 dest_free(struct dest *dst)
 {
-    if (dst != NULL) {
-        munmap(dst->buf, dst->bufsize);
-        free(dst->zeroblock);
-    }
+    if (dst == NULL)
+        return;
+
+    if (dst->buf.buf != NULL)
+        munmap(dst->buf.buf, dst->buf.size);
+    free(dst->zeroblock);
 }
 
 static int
@@ -226,7 +226,7 @@ do_write(struct dest *dst, const void *buf, size_t count)
             if (memcmp(buf + byteswritten, dst->zeroblock, dst->blksize) == 0)
                 continue;
         }
-        memcpy(dst->buf + byteswritten, buf + byteswritten, blockbytes);
+        memcpy(dst->buf.buf + byteswritten, buf + byteswritten, blockbytes);
     }
 
     return 0;
@@ -241,7 +241,7 @@ do_copy(int fd1, int fd2, int hugetlbfs)
     ssize_t num_read;
     struct dest dsts;
 
-    if (dest_init(fd2, BUFSIZE, hugetlbfs, &dsts) == -1)
+    if (dest_init(fd2, hugetlbfs, &dsts) == -1)
         return -1;
 
     for (off = 0;; off += num_read) {
