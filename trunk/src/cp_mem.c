@@ -44,6 +44,8 @@ static int verbose;
 
 static int parse_cmdline(int, char **);
 
+static int get_dest_info(const char *);
+
 static off_t get_page_offset(off_t);
 
 static int dest_init(int, int, struct dest *);
@@ -84,6 +86,27 @@ parse_cmdline(int argc, char **argv)
     numsrcs = argc - numopts - 2;
     srcs = (const char **)&argv[1+numopts];
     dst = argv[argc-1];
+
+    return 0;
+}
+
+static int
+get_dest_info(const char *pathname)
+{
+    struct stat dstsb;
+
+    if ((numsrcs == 1) && (stat(pathname, &dstsb) == -1)) {
+        error(0, errno, "Couldn't stat destination");
+        return -1;
+    }
+
+    if ((numsrcs > 1) || S_ISDIR(dstsb.st_mode)) {
+        size_t slen = strlen(pathname);
+
+        if (pathname[slen-1] == '/')
+            *((char *)pathname+slen-1) = '\0';
+        dstdir = 1;
+    }
 
     return 0;
 }
@@ -384,18 +407,12 @@ main(int argc, char **argv)
 {
     int err = 0;
     int i;
-    struct stat dstsb;
 
     if (parse_cmdline(argc, argv) == -1)
         return EXIT_FAILURE;
 
-    if ((numsrcs > 1) || ((stat(dst, &dstsb) == 0) && S_ISDIR(dstsb.st_mode))) {
-        size_t slen = strlen(dst);
-
-        if (dst[slen-1] == '/')
-            *((char *)dst+slen-1) = '\0';
-        dstdir = 1;
-    }
+    if (get_dest_info(dst) == -1)
+        return EXIT_FAILURE;
 
     for (i = 0; i < numsrcs; i++) {
         if (copy(i) == -1) {
