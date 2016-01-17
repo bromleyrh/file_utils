@@ -176,7 +176,7 @@ get_page_offset(off_t off, int on_hugetlbfs)
 }
 
 static int
-dest_init(int fd, int hugetlbfs, struct dest *dst)
+dest_init(int fd, int on_hugetlbfs, struct dest *dst)
 {
     if (dst == NULL)
         return -1;
@@ -197,7 +197,7 @@ dest_init(int fd, int hugetlbfs, struct dest *dst)
     }
     memset(dst->zeroblock, 0, dst->blksize);
 
-    dst->hugetlbfs = hugetlbfs;
+    dst->hugetlbfs = on_hugetlbfs;
 
     return 0;
 }
@@ -307,13 +307,13 @@ do_write(struct dest *dst, const void *buf, size_t count)
 #define BUFSIZE (1024 * 1024)
 
 static int
-do_copy(int fd1, int fd2, int hugetlbfs)
+do_copy(int fd1, int fd2, int on_hugetlbfs)
 {
     off_t off;
     ssize_t num_read;
     struct dest dsts;
 
-    if (dest_init(fd2, hugetlbfs, &dsts) == -1)
+    if (dest_init(fd2, on_hugetlbfs, &dsts) == -1)
         return -1;
 
     for (off = 0;; off += num_read) {
@@ -337,7 +337,7 @@ do_copy(int fd1, int fd2, int hugetlbfs)
 
     dest_free(&dsts);
 
-    if (!hugetlbfs && (do_ftruncate(fd2, off) == -1)) {
+    if (!on_hugetlbfs && (do_ftruncate(fd2, off) == -1)) {
         error(0, errno, "Couldn't truncate destination file");
         return -1;
     }
