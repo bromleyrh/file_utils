@@ -118,7 +118,8 @@ get_dest_info(const char *pathname)
         struct stat dstsb;
 
         if (stat(pathname, &dstsb) == -1) {
-            ;
+            if (errno != ENOENT)
+                goto err;
         } else if (S_ISDIR(dstsb.st_mode))
             dstdir = 1;
     }
