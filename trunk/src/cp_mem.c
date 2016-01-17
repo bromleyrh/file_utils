@@ -4,7 +4,6 @@
 
 #define _GNU_SOURCE
 
-#include <alloca.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
