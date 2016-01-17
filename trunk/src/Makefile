@@ -25,11 +25,17 @@ all: $(progs) libdirectio
 libdirectio.o: libdirectio.c
 	gcc -c -fPIC -O2 -Wall -Wextra $^
 
-.PHONY:
+.PHONY: libdirectio install-progs install-libs clean
+
 libdirectio: libdirectio.o
 	gcc -o $(ldio_so) -shared \
 	-Wl,-soname,libdirectio.so.$(ldio_vmaj) $^ -lc -ldl
 
-.PHONY:
+install-progs: $(progs)
+	install -D -g root -o root -s $(progs) /usr/local/bin
+
+install-libs: libdirectio
+	install -D -g root -o root $(ldio_so) /usr/local/lib
+
 clean:
 	rm -f *.o $(progs) $(libs)
