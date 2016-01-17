@@ -39,13 +39,15 @@ static int verbose;
 
 static int parse_cmdline(int, char **);
 
+static off_t get_page_offset(off_t);
+
 static int dest_init(int, off_t, int, struct dest *);
-static int dest_buf_resize(off_t, struct dest *);
+static int dest_buf_reposition(off_t, off_t, struct dest *);
 static void dest_free(struct dest *);
 
 static int do_ftruncate(int, off_t);
 static ssize_t do_read(int, void *, size_t);
-static int do_write(struct dest *, const void *, size_t, off_t);
+static int do_write(struct dest *, const void *, size_t);
 
 static int do_copy(int, int, int);
 static int copy_mode(int, int);
@@ -79,6 +81,21 @@ parse_cmdline(int argc, char **argv)
     dst = argv[argc-1];
 
     return 0;
+}
+
+static off_t
+get_page_offset(off_t off)
+{
+    /* FIXME: get correct page size at runtime */
+    static int pagesize = 2 * 1024 * 1024;
+
+    if (pagesize == -1) {
+        pagesize = sysconf(_SC_PAGESIZE);
+        if (pagesize == -1)
+            return -1;
+    }
+
+    return off / pagesize * pagesize;
 }
 
 static int
@@ -119,25 +136,27 @@ err:
 }
 
 static int
-dest_buf_resize(off_t bufsize, struct dest *dst)
+dest_buf_reposition(off_t offset, off_t bufsize, struct dest *dst)
 {
+    off_t pgoff;
+
     if (dst == NULL)
         return -1;
 
-    if (!dst->hugetlbfs && (do_ftruncate(dst->fd, bufsize) == -1))
+    pgoff = get_page_offset(offset);
+    if (pgoff == -1)
+        return -1;
+
+    if (!dst->hugetlbfs && (do_ftruncate(dst->fd, offset + bufsize) == -1))
         goto err;
 
     munmap(dst->buf, dst->bufsize);
-    dst->buf = (char *)mmap(0, bufsize, PROT_READ | PROT_WRITE, MAP_SHARED,
-                            dst->fd, 0);
-    if (dst->buf == MAP_FAILED)
-        goto err;
-
-/*  dst->buf = mremap(dst->buf, dst->bufsize, bufsize, MREMAP_MAYMOVE);
-    if (dst->buf == MAP_FAILED)
-        goto err;
-*/
     dst->bufsize = bufsize;
+    dst->buf = (char *)mmap(0, offset - pgoff + dst->bufsize,
+                            PROT_READ | PROT_WRITE, MAP_SHARED, dst->fd, pgoff);
+    if (dst->buf == MAP_FAILED)
+        goto err;
+    dst->buf += offset - pgoff;
 
     return 0;
 
@@ -192,7 +211,7 @@ do_read(int fd, void *buf, size_t count)
 }
 
 static int
-do_write(struct dest *dst, const void *buf, size_t count, off_t offset)
+do_write(struct dest *dst, const void *buf, size_t count)
 {
     size_t blockbytes, byteswritten;
 
@@ -207,8 +226,7 @@ do_write(struct dest *dst, const void *buf, size_t count, off_t offset)
             if (memcmp(buf + byteswritten, dst->zeroblock, dst->blksize) == 0)
                 continue;
         }
-        memcpy(dst->buf + offset + byteswritten, buf + byteswritten,
-               blockbytes);
+        memcpy(dst->buf + byteswritten, buf + byteswritten, blockbytes);
     }
 
     return 0;
@@ -229,7 +247,7 @@ do_copy(int fd1, int fd2, int hugetlbfs)
     for (off = 0;; off += num_read) {
         char buf[BUFSIZE];
 
-        if (dest_buf_resize(off + sizeof(buf), &dsts) == -1)
+        if (dest_buf_reposition(off, sizeof(buf), &dsts) == -1)
             goto err;
 
         num_read = do_read(fd1, buf, sizeof(buf));
@@ -239,7 +257,7 @@ do_copy(int fd1, int fd2, int hugetlbfs)
             error(0, errno, "Couldn't read source file");
             goto err;
         }
-        if (do_write(&dsts, buf, num_read, off) == -1) {
+        if (do_write(&dsts, buf, num_read) == -1) {
             error(0, 0, "Couldn't write destination file");
             goto err;
         }
