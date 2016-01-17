@@ -27,6 +27,7 @@ struct dest {
     char    *buf;
     size_t  blksize;
     char    *zeroblock;
+    int     hugetlbfs;
 };
 
 static const char **srcs;
@@ -38,7 +39,7 @@ static int verbose;
 
 static int parse_cmdline(int, char **);
 
-static int dest_init(int, off_t, struct dest *);
+static int dest_init(int, off_t, int, struct dest *);
 static int dest_buf_resize(off_t, struct dest *);
 static void dest_free(struct dest *);
 
@@ -81,7 +82,7 @@ parse_cmdline(int argc, char **argv)
 }
 
 static int
-dest_init(int fd, off_t bufsize, struct dest *dst)
+dest_init(int fd, off_t bufsize, int hugetlbfs, struct dest *dst)
 {
     if (dst == NULL)
         return -1;
@@ -108,6 +109,8 @@ dest_init(int fd, off_t bufsize, struct dest *dst)
     }
     memset(dst->zeroblock, 0, dst->blksize);
 
+    dst->hugetlbfs = hugetlbfs;
+
     return 0;
 
 err:
@@ -121,15 +124,26 @@ dest_buf_resize(off_t bufsize, struct dest *dst)
     if (dst == NULL)
         return -1;
 
-    dst->buf = mremap(dst->buf, dst->bufsize, bufsize, 0);
-    if (dst->buf == NULL) {
-        error(0, errno, "Couldn't extend destination file");
-        return -1;
-    }
+    if (!dst->hugetlbfs && (do_ftruncate(dst->fd, bufsize) == -1))
+        goto err;
 
+    munmap(dst->buf, dst->bufsize);
+    dst->buf = (char *)mmap(0, bufsize, PROT_READ | PROT_WRITE, MAP_SHARED,
+                            dst->fd, 0);
+    if (dst->buf == MAP_FAILED)
+        goto err;
+
+/*  dst->buf = mremap(dst->buf, dst->bufsize, bufsize, MREMAP_MAYMOVE);
+    if (dst->buf == MAP_FAILED)
+        goto err;
+*/
     dst->bufsize = bufsize;
 
     return 0;
+
+err:
+    error(0, errno, "Couldn't extend destination file");
+    return -1;
 }
 
 static void
@@ -172,7 +186,9 @@ do_read(int fd, void *buf, size_t count)
         break;
     }
 
-    return ret;
+    if (ret == -1)
+        return -1;
+    return bytesread;
 }
 
 static int
@@ -204,12 +220,10 @@ static int
 do_copy(int fd1, int fd2, int hugetlbfs)
 {
     off_t off;
-    struct dest dsts;
     ssize_t num_read;
+    struct dest dsts;
 
-    (void)hugetlbfs;
-
-    if (dest_init(fd2, BUFSIZE, &dsts) == -1)
+    if (dest_init(fd2, BUFSIZE, hugetlbfs, &dsts) == -1)
         return -1;
 
     for (off = 0;; off += num_read) {
@@ -233,7 +247,7 @@ do_copy(int fd1, int fd2, int hugetlbfs)
 
     dest_free(&dsts);
 
-    if (do_ftruncate(fd2, off) == -1) {
+    if (!hugetlbfs && (do_ftruncate(fd2, off) == -1)) {
         error(0, errno, "Couldn't truncate destination file");
         return -1;
     }
