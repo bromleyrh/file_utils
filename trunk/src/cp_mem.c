@@ -45,7 +45,7 @@ static int verbose;
 
 static int parse_cmdline(int, char **);
 
-static int is_on_fs_of_type(const char *, int);
+static int is_on_fs_of_type(const char *, unsigned);
 static int get_dest_info(const char *);
 
 static off_t get_hugepage_size(void);
@@ -94,7 +94,7 @@ parse_cmdline(int argc, char **argv)
 }
 
 static int
-is_on_fs_of_type(const char *pathname, int fstype)
+is_on_fs_of_type(const char *pathname, unsigned fstype)
 {
     struct statfs buf;
 
