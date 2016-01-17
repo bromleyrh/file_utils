@@ -109,6 +109,7 @@ is_on_fs_of_type(const char *pathname, __fsword_t fstype)
 static int
 get_dest_info(const char *pathname)
 {
+    const char *dirpath;
     int dst_on_hugetlbfs;
     struct stat dstsb;
 
@@ -123,7 +124,9 @@ get_dest_info(const char *pathname)
         dstdir = 1;
     }
 
-    dst_on_hugetlbfs = is_on_fs_of_type(pathname, HUGETLBFS_MAGIC);
+    dirpath = dstdir ? pathname : dirname(strdupa(pathname));
+
+    dst_on_hugetlbfs = is_on_fs_of_type(dirpath, HUGETLBFS_MAGIC);
     if (dst_on_hugetlbfs == -1)
         goto err;
     if (dst_on_hugetlbfs)
