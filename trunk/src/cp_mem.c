@@ -159,7 +159,7 @@ get_hugepage_size(int fd)
     return (off_t)sb.st_blksize;
 }
 
-static off_t
+static inline off_t
 get_page_offset(off_t off, int hugetlbfs_fd)
 {
     static int pagesize = -1;
