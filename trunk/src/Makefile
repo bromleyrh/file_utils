@@ -33,6 +33,7 @@ libdirectio: libdirectio.o
 
 install-progs: $(progs)
 	install -D -g root -o root -s $(progs) /usr/local/bin
+	ln -fs open /usr/local/bin/delete_input
 
 install-libs: libdirectio
 	install -D -g root -o root $(ldio_so) /usr/local/lib
