@@ -50,7 +50,7 @@ static int parse_cmdline(int, char **);
 static int is_on_fs_of_type(const char *, __fsword_t);
 static int get_dest_info(const char *);
 
-static off_t get_hugepage_size(void);
+static off_t get_hugepage_size(int);
 static off_t get_page_offset(off_t, int);
 
 static int dest_init(int, int, struct dest *);
@@ -149,37 +149,24 @@ err:
 }
 
 static off_t
-get_hugepage_size()
+get_hugepage_size(int fd)
 {
-    char buf[64];
-    FILE *f;
-    int hugepgsize = -1;
+    struct stat sb;
 
-    f = fopen("/proc/meminfo", "r");
-    if (f == NULL) {
-        error(0, errno, "Couldn't get page size information");
+    if (fstat(fd, &sb) == -1)
         return -1;
-    }
 
-    while (fgets(buf, sizeof(buf), f) != NULL) {
-        if (sscanf(buf, "Hugepagesize: %d kB", &hugepgsize) == 1) {
-            hugepgsize *= 1024;
-            break;
-        }
-    }
-
-    fclose(f);
-
-    return (hugepgsize == -1) ? -1 : (off_t)hugepgsize;
+    return (off_t)sb.st_blksize;
 }
 
 static off_t
-get_page_offset(off_t off, int on_hugetlbfs)
+get_page_offset(off_t off, int hugetlbfs_fd)
 {
     static int pagesize = -1;
 
     if (pagesize == -1) {
-        pagesize = on_hugetlbfs ? get_hugepage_size() : sysconf(_SC_PAGESIZE);
+        pagesize = (hugetlbfs_fd == -1) ? sysconf(_SC_PAGESIZE)
+                   : get_hugepage_size(hugetlbfs_fd);
         if (pagesize == -1)
             return -1;
     }
@@ -222,7 +209,7 @@ dest_buf_reposition(off_t offset, off_t bufsize, struct dest *dst)
     if (dst == NULL)
         return -1;
 
-    pgoff = get_page_offset(offset, dst->hugetlbfs);
+    pgoff = get_page_offset(offset, dst->hugetlbfs ? dst->fd : -1);
     if (pgoff == -1)
         return -1;
 
