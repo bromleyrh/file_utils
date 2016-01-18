@@ -14,6 +14,10 @@ else
 CFLAGS=-O2 -s -Wall -Wextra
 endif
 
+prefix=/usr/local
+bindir=$(prefix)/bin
+libdir=$(prefix)/lib
+
 progs = cp_mem open open_pipes
 libs = $(ldio_so)
 
@@ -32,11 +36,11 @@ libdirectio: libdirectio.o
 	-Wl,-soname,libdirectio.so.$(ldio_vmaj) $^ -lc -ldl
 
 install-progs: $(progs)
-	install -D -g root -o root -s $(progs) /usr/local/bin
-	ln -fs open /usr/local/bin/delete_input
+	install -D -g root -o root -s $(progs) $(bindir)
+	ln -fs open $(bindir)/delete_input
 
 install-libs: libdirectio
-	install -D -g root -o root $(ldio_so) /usr/local/lib
+	install -D -g root -o root $(ldio_so) $(libdir)
 
 clean:
 	rm -f *.o $(progs) $(libs)
