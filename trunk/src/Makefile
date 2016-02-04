@@ -40,7 +40,9 @@ install-progs: $(progs)
 	ln -fs open $(bindir)/delete_input
 
 install-libs: libdirectio
-	install -D -g root -o root $(ldio_so) $(libdir)
+	install -D -g root -o root $(ldio_so) $(libdir)/$(ldio_so)
+	ln -fs $(libdir)/$(ldio_so) $(libdir)/libdirectio.so
+	ln -fs $(libdir)/$(ldio_so) $(libdir)/libdirectio.so.0
 
 clean:
 	rm -f *.o $(progs) $(libs)
