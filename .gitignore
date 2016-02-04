@@ -1,0 +1,7 @@
+*.o
+*.class
+
+*.jar
+trunk/src/cp_mem
+trunk/src/open
+trunk/src/open_pipes
