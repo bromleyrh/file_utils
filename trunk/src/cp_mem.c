@@ -73,11 +73,6 @@ parse_cmdline(int argc, char **argv)
     int i;
     int numopts;
 
-    if (argc < 3) {
-        error(0, 0, "Must specify a source file and destination");
-        return -1;
-    }
-
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-t") == 0)
             hugetlbfs = 1;
@@ -87,6 +82,11 @@ parse_cmdline(int argc, char **argv)
             break;
     }
     numopts = i - 1;
+
+    if (argc - numopts < 3) {
+        error(0, 0, "Must specify a source file and destination");
+        return -1;
+    }
 
     numsrcs = argc - numopts - 2;
     srcs = (const char **)&argv[1+numopts];
