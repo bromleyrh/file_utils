@@ -70,18 +70,27 @@ static int copy(int);
 static int
 parse_cmdline(int argc, char **argv)
 {
-    int i;
     int numopts;
+    int opt;
 
-    for (i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-t") == 0)
-            hugetlbfs = 1;
-        else if (strcmp(argv[i], "-v") == 0)
-            verbose = 1;
-        else
+    for (;;) {
+        opt = getopt(argc, argv, "tv");
+
+        if (opt == -1)
             break;
+
+        switch (opt) {
+        case 't':
+            hugetlbfs = 1;
+            break;
+        case 'v':
+            verbose = 1;
+            break;
+        default:
+            return -1;
+        }
     }
-    numopts = i - 1;
+    numopts = optind - 1;
 
     if (argc - numopts < 3) {
         error(0, 0, "Must specify a source file and destination");
