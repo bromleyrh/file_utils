@@ -11,6 +11,8 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,6 +47,12 @@ static int hugetlbfs;
 static int numsrcs;
 static int verbose;
 
+static int bus_err;
+static sigjmp_buf env;
+
+static void buserr_handler(int);
+
+static int set_sigbus_handler(void);
 static int parse_cmdline(int, char **);
 
 static int is_on_fs_of_type(const char *, __fsword_t);
@@ -58,6 +66,7 @@ static int dest_buf_reposition(off_t, off_t, struct dest *);
 static void dest_free(struct dest *);
 
 static int do_ftruncate(int, off_t);
+static int do_memcpy(void *, const void *, size_t);
 static ssize_t do_read(int, void *, size_t);
 static int do_write(struct dest *, const void *, size_t);
 
@@ -66,6 +75,26 @@ static int copy_mode(int, int);
 static int do_link(int, const char *);
 
 static int copy(int);
+
+static void
+buserr_handler(int signum)
+{
+    (void)signum;
+
+    bus_err = 1;
+    siglongjmp(env, -1);
+}
+
+static int
+set_sigbus_handler()
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = &buserr_handler;
+
+    return sigaction(SIGBUS, &sa, NULL);
+}
 
 static int
 parse_cmdline(int argc, char **argv)
@@ -265,6 +294,17 @@ do_ftruncate(int fd, off_t length)
     return 0;
 }
 
+static int
+do_memcpy(void *dest, const void *src, size_t n)
+{
+    if (sigsetjmp(env, 1) != 0)
+        return -1;
+
+    memcpy(dest, src, n);
+
+    return 0;
+}
+
 static ssize_t
 do_read(int fd, void *buf, size_t count)
 {
@@ -306,7 +346,9 @@ do_write(struct dest *dst, const void *buf, size_t count)
             if (memcmp(buf + byteswritten, dst->zeroblock, dst->blksize) == 0)
                 continue;
         }
-        memcpy(dst->buf.buf + byteswritten, buf + byteswritten, blockbytes);
+        if (do_memcpy(dst->buf.buf + byteswritten, buf + byteswritten,
+                      blockbytes) == -1)
+            return -1;
     }
 
     return 0;
@@ -464,6 +506,9 @@ main(int argc, char **argv)
 {
     int err = 0;
     int i;
+
+    if (set_sigbus_handler() == -1)
+        error(EXIT_FAILURE, errno, "Couldn't set signal handler");
 
     if (parse_cmdline(argc, argv) == -1)
         return EXIT_FAILURE;
