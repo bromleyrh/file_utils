@@ -26,9 +26,10 @@ while true; do
     esac
 done
 
+vfile=$dir/.version
 [[ $sign == 1 ]] && tagopts="-s"
 if [[ $inc == 1 ]]; then
-    version=$(cat $dir/.version)
+    version=$(cat $vfile)
     maj=$(echo $version | cut -d . -f 1)
     min=$(echo $version | cut -d . -f 2)
     version=$maj.$((min+1))
@@ -37,6 +38,8 @@ else
 fi
 tagopts="$tagopts -m \"Version $version\""
 
-echo "$version" > $dir/.version || exit 1
+echo "$version" > $vfile || exit 1
+git add $vfile || exit 1
+git commit --amend || exit 1
 eval git tag $tagopts v$version || exit 1
 echo "Version $version"
