@@ -1,0 +1,41 @@
+#!/bin/sh
+
+if [[ ! -d .git ]] && [[ ! -f .git ]]; then
+    echo "Current directory is not root of a git repository" 1>&2
+    exit 1
+fi
+
+dir=.
+
+temp=$(getopt d:is "$@")
+eval set -- "$temp"
+while true; do
+    case "$1" in
+        -d)
+            dir=$2
+            shift 2;;
+        -i)
+            inc=1
+            shift;;
+        -s)
+            sign=1
+            shift;;
+        --)
+            shift
+            break;;
+    esac
+done
+
+[[ $sign == 1 ]] && tagopts="-s"
+if [[ $inc == 1 ]]; then
+    version=$(git tag --sort v:refname | tail -n 1 | cut -d v -f 2)
+    maj=$(echo $version | cut -d . -f 1)
+    min=$(echo $version | cut -d . -f 2)
+    version=$maj.$((min+1))
+else
+    version=$1
+fi
+
+echo "$version" > $dir/.version || exit 1
+git tag $tagopts v$version || exit 1
+echo "Version $version"
