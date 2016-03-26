@@ -28,14 +28,15 @@ done
 
 [[ $sign == 1 ]] && tagopts="-s"
 if [[ $inc == 1 ]]; then
-    version=$(git tag --sort v:refname | tail -n 1 | cut -d v -f 2)
+    version=$(cat $dir/.version)
     maj=$(echo $version | cut -d . -f 1)
     min=$(echo $version | cut -d . -f 2)
     version=$maj.$((min+1))
 else
     version=$1
 fi
+tagopts="$tagopts -m \"Version $version\""
 
 echo "$version" > $dir/.version || exit 1
-git tag $tagopts v$version || exit 1
+eval git tag $tagopts v$version || exit 1
 echo "Version $version"
