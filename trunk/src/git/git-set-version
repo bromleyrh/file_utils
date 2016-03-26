@@ -27,15 +27,23 @@ while true; do
 done
 
 vfile=$dir/.version
+
 [[ $sign == 1 ]] && tagopts="-s"
+
 if [[ $inc == 1 ]]; then
     version=$(cat $vfile)
+    [[ $? != 0 ]] && exit 1
     maj=$(echo $version | cut -d . -f 1)
     min=$(echo $version | cut -d . -f 2)
     version=$maj.$((min+1))
 else
     version=$1
 fi
+if [[ -z $version ]]; then
+    echo "Nonempty version string required"
+    exit 1
+fi
+
 tagopts="$tagopts -m \"Version $version\""
 
 echo "$version" > $vfile || exit 1
