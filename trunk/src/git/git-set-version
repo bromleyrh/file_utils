@@ -48,6 +48,6 @@ tagopts="$tagopts -m \"Version $version\""
 
 echo "$version" > $vfile || exit 1
 git add $vfile || exit 1
-git commit --amend || exit 1
+git commit --amend --no-edit || exit 1
 eval git tag $tagopts v$version || exit 1
 echo "Version $version"

@@ -26,7 +26,7 @@ while true; do
         break
     fi
 done
-[[ $amend == 1 ]] && commitopts="--amend"
+[[ $amend == 1 ]] && commitopts="--amend --no-edit"
 archive=$dstdir$reponame.tar.xz
 
 trap restore_files EXIT
