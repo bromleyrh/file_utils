@@ -35,6 +35,9 @@ libdirectio: libdirectio.o
 	gcc -o $(ldio_so) -shared \
 	-Wl,-soname,libdirectio.so.$(ldio_vmaj) $^ -lc -ldl
 
+install-git-helpers:
+	make -C git install
+
 install-progs: $(progs)
 	install -D -g root -o root -s $(progs) $(bindir)
 	ln -fs open $(bindir)/delete_input
@@ -46,3 +49,4 @@ install-libs: libdirectio
 
 clean:
 	rm -f *.o $(progs) $(libs)
+	make -C git clean
