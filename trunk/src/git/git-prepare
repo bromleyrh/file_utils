@@ -53,7 +53,7 @@ fi
 
 echo "$version" > $vfile || exit 1
 git commit-archive --amend -d $distdir $commitarchopts $trunkdir
-git set-version -d $trunkdir $setversopts $version
+git set-version -d $trunkdir -t $setversopts $version
 
 if [[ ($sign == 1) && ($agent == 1) ]]; then
     killall gpg-agent
