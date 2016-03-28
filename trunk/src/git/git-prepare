@@ -52,6 +52,8 @@ if [[ $inc == 1 ]]; then
 fi
 
 echo "$version" > $vfile || exit 1
+git add $vfile
+git commit --amend --no-edit
 git commit-archive --amend -d $distdir $commitarchopts $trunkdir
 git set-version -d $trunkdir -t $setversopts $version
 
