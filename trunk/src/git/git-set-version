@@ -6,8 +6,9 @@ if [[ ! -d .git ]] && [[ ! -f .git ]]; then
 fi
 
 dir=.
+tagonly=0
 
-temp=$(getopt d:is "$@")
+temp=$(getopt d:ist "$@")
 eval set -- "$temp"
 while true; do
     case "$1" in
@@ -19,6 +20,9 @@ while true; do
             shift;;
         -s)
             sign=1
+            shift;;
+        -t)
+            tagonly=1
             shift;;
         --)
             shift
@@ -46,8 +50,10 @@ fi
 
 tagopts="$tagopts -m \"Version $version\""
 
-echo "$version" > $vfile || exit 1
-git add $vfile || exit 1
-git commit --amend --no-edit || exit 1
+if [[ $tagonly == 0 ]]; then
+    echo "$version" > $vfile || exit 1
+    git add $vfile || exit 1
+    git commit --amend --no-edit || exit 1
+fi
 eval git tag $tagopts v$version || exit 1
 echo "Version $version"
