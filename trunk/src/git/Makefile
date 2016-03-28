@@ -10,7 +10,7 @@ bindir=$(prefix)/bin
 all:
 
 install:
-	for i in git-commit-archive git-set-version git-verify; \
+	for i in git-commit-archive git-prepare git-set-version git-verify; \
 		do install -D -g root -o root -m 0755 $$i $(bindir)/$$i; \
 	done
 
