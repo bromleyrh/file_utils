@@ -8,10 +8,13 @@ fi
 distdir=dist
 trunkdir=trunk
 
-temp=$(getopt d:ist: "$@")
+temp=$(getopt ad:ist: "$@")
 eval set -- "$temp"
 while true; do
     case "$1" in
+        -a)
+            agent=1
+            shift;;
         -d)
             distdir=$2
             shift 2;;
@@ -32,7 +35,13 @@ done
 
 vfile=$trunkdir/.version
 
-[[ $sign == 1 ]] && commitarchopts="-s" && setversopts="-s"
+if [[ $sign == 1 ]]; then
+    commitarchopts="-s"
+    setversopts="-s"
+    if [[ $agent == 1 ]]; then
+        gpg-agent --daemon --use-standard-socket || exit 1
+    fi
+fi
 
 version=$(cat $vfile)
 if [[ $inc == 1 ]]; then
@@ -45,3 +54,7 @@ fi
 echo "$version" > $vfile || exit 1
 git commit-archive --amend -d $distdir $commitarchopts $trunkdir
 git set-version -d $trunkdir $setversopts
+
+if [[ $sign == 1 ]] && [[ $agent == 1 ]]; then
+    killall gpg-agent
+fi
