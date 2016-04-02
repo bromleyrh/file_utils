@@ -8,13 +8,17 @@ if [[ ! -d .git ]] && [[ ! -f .git ]]; then
 fi
 reponame=$(basename $(pwd))
 
+temp=$(getopt p: "$@")
+eval set -- "$temp"
 while true; do
-    if [[ ($1 == "-p") && $2 ]]; then
-        path=$2
-        shift 2
-    else
-        break
-    fi
+    case "$1" in
+        -p)
+            path=$2
+            shift 2;;
+        --)
+            shift
+            break;;
+    esac
 done
 archive=$1
 

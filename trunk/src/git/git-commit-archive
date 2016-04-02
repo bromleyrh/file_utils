@@ -12,19 +12,23 @@ if [[ ! -d .git ]] && [[ ! -f .git ]]; then
 fi
 reponame=$(basename $(pwd))
 
+temp=$(getopt -l amend d:s "$@")
+eval set -- "$temp"
 while true; do
-    if [[ $1 == "--amend" ]]; then
-        amend=1
-        shift
-    elif [[ ($1 == "-d") && $2 ]]; then
-        dstdir=$2/
-        shift 2
-    elif [[ $1 == "-s" ]]; then
-        sign=1
-        shift
-    else
-        break
-    fi
+    case "$1" in
+        --amend)
+            amend=1
+            shift;;
+        -d)
+            dstdir=$2/
+            shift 2;;
+        -s)
+            sign=1
+            shift;;
+        --)
+            shift
+            break;;
+    esac
 done
 [[ $amend == 1 ]] && commitopts="--amend --no-edit"
 archive=$dstdir$reponame.tar.xz
