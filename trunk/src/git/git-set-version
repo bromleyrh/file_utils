@@ -1,11 +1,13 @@
 #!/bin/sh
 
-if [[ ! -d .git ]] && [[ ! -f .git ]]; then
+if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
 fi
 
 dir=.
+inc=0
+sign=0
 tagonly=0
 
 temp=$(getopt d:ist "$@")
@@ -32,25 +34,25 @@ done
 
 vfile=$dir/.version
 
-[[ $sign == 1 ]] && tagopts="-s"
+[ $sign = 1 ] && tagopts="-s"
 
-if [[ $inc == 1 ]]; then
+if [ $inc = 1 ]; then
     version=$(cat $vfile)
-    [[ $? != 0 ]] && exit 1
+    [ $? != 0 ] && exit 1
     maj=$(echo $version | cut -d . -f 1)
     min=$(echo $version | cut -d . -f 2)
     version=$maj.$((min+1))
 else
     version=$1
 fi
-if [[ -z $version ]]; then
+if [ -z $version ]; then
     echo "Nonempty version string required"
     exit 1
 fi
 
 tagopts="$tagopts -m \"Version $version\""
 
-if [[ $tagonly == 0 ]]; then
+if [ $tagonly = 0 ]; then
     echo "$version" > $vfile || exit 1
     git add $vfile || exit 1
     git commit --amend --no-edit || exit 1

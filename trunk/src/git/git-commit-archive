@@ -2,15 +2,18 @@
 
 restore_files()
 {
-    mv $archive.save $archive &>/dev/null
-    mv $archive.asc.save $archive.asc &>/dev/null
+    mv $archive.save $archive 2>/dev/null 1>&2
+    mv $archive.asc.save $archive.asc 2>/dev/null 1>&2
 }
 
-if [[ ! -d .git ]] && [[ ! -f .git ]]; then
+if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
 fi
 reponame=$(basename $(pwd))
+
+amend=0
+sign=0
 
 temp=$(getopt -l amend d:s "$@")
 eval set -- "$temp"
@@ -30,17 +33,17 @@ while true; do
             break;;
     esac
 done
-[[ $amend == 1 ]] && commitopts="--amend --no-edit"
+[ $amend = 1 ] && commitopts="--amend --no-edit"
 archive=$dstdir$reponame.tar.xz
 
 trap restore_files EXIT
-mv $archive $archive.save &>/dev/null
-mv $archive.asc $archive.asc.save &>/dev/null
+mv $archive $archive.save 2>/dev/null 1>&2
+mv $archive.asc $archive.asc.save 2>/dev/null 1>&2
 
 git config tar.tar.xz.command "xz -9c" || exit 1
 git archive -o $archive HEAD $@ || exit 1
 git add $archive || exit 1
-if [[ $sign == 1 ]]; then
+if [ $sign = 1 ]; then
     gpg -a --detach-sign -o $archive.asc $archive || exit 1
     git add $archive.asc || exit 1
 fi

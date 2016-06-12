@@ -1,11 +1,14 @@
 #!/bin/sh
 
-if [[ ! -d .git ]] && [[ ! -f .git ]]; then
+if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
 fi
 
+agent=0
 distdir=dist
+inc=0
+sign=0
 trunkdir=trunk
 
 temp=$(getopt ad:ist: "$@")
@@ -35,17 +38,17 @@ done
 
 vfile=$trunkdir/.version
 
-if [[ $sign == 1 ]]; then
+if [ $sign = 1 ]; then
     commitarchopts="-s"
     setversopts="-s"
-    if [[ $agent == 1 ]]; then
+    if [ $agent = 1 ]; then
         gpg-agent --daemon --use-standard-socket || exit 1
     fi
 fi
 
 version=$(cat $vfile)
-if [[ $inc == 1 ]]; then
-    [[ $? != 0 ]] && exit 1
+if [ $inc = 1 ]; then
+    [ $? != 0 ] && exit 1
     maj=$(echo $version | cut -d . -f 1)
     min=$(echo $version | cut -d . -f 2)
     version=$maj.$((min+1))
@@ -57,6 +60,6 @@ git commit --amend --no-edit
 git commit-archive --amend -d $distdir $commitarchopts $trunkdir
 git set-version -d $trunkdir -t $setversopts $version
 
-if [[ ($sign == 1) && ($agent == 1) ]]; then
+if [ $sign = 1 ] && [ $agent = 1 ]; then
     killall gpg-agent
 fi
