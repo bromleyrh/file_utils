@@ -2,8 +2,8 @@
 
 restore_files()
 {
-    mv $archive.save $archive 2>/dev/null 1>&2
-    mv $archive.asc.save $archive.asc 2>/dev/null 1>&2
+    mv "$archive.save" "$archive" 2>/dev/null 1>&2
+    mv "$archive.asc.save" "$archive.asc" 2>/dev/null 1>&2
 }
 
 if [ ! -d .git ] && [ ! -f .git ]; then
@@ -34,20 +34,20 @@ while true; do
     esac
 done
 [ $amend = 1 ] && commitopts="--amend --no-edit"
-archive=$dstdir$reponame.tar.xz
+archive="$dstdir$reponame.tar.xz"
 
 trap restore_files EXIT
-mv $archive $archive.save 2>/dev/null 1>&2
-mv $archive.asc $archive.asc.save 2>/dev/null 1>&2
+mv "$archive" "$archive.save" 2>/dev/null 1>&2
+mv "$archive.asc" "$archive.asc.save" 2>/dev/null 1>&2
 
 git config tar.tar.xz.command "xz -9c" || exit 1
-git archive -o $archive HEAD $@ || exit 1
-git add $archive || exit 1
+git archive -o "$archive" HEAD "$@" || exit 1
+git add "$archive" || exit 1
 if [ $sign = 1 ]; then
-    gpg -a --detach-sign -o $archive.asc $archive || exit 1
-    git add $archive.asc || exit 1
+    gpg -a --detach-sign -o "$archive.asc" "$archive" || exit 1
+    git add "$archive.asc" || exit 1
 fi
 git commit $commitopts || exit 1
 
 trap '' EXIT
-rm $archive.save $archive.asc.save
+rm "$archive.save" "$archive.asc.save"

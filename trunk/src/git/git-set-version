@@ -37,7 +37,7 @@ vfile=$dir/.version
 [ $sign = 1 ] && tagopts="-s"
 
 if [ $inc = 1 ]; then
-    version=$(cat $vfile)
+    version=$(cat "$vfile")
     [ $? != 0 ] && exit 1
     maj=$(echo $version | cut -d . -f 1)
     min=$(echo $version | cut -d . -f 2)
@@ -53,8 +53,8 @@ fi
 tagopts="$tagopts -m \"Version $version\""
 
 if [ $tagonly = 0 ]; then
-    echo "$version" > $vfile || exit 1
-    git add $vfile || exit 1
+    echo "$version" > "$vfile" || exit 1
+    git add "$vfile" || exit 1
     git commit --amend --no-edit || exit 1
 fi
 eval git tag $tagopts v$version || exit 1

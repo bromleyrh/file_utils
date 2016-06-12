@@ -23,8 +23,8 @@ done
 archive=$1
 
 mkdir -p $tmpdir || exit 1
-tar -x -C $tmpdir -f $archive || exit 1
+tar -x -C $tmpdir -f "$archive" || exit 1
 echo "Differences between archive and repository:"
-diff -r $tmpdir/$path ./$path
+diff -r "$tmpdir/$path" "./$path"
 rm -r $tmpdir
-gpg --verify $archive.asc
+gpg --verify "$archive.asc"

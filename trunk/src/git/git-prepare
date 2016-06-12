@@ -46,7 +46,7 @@ if [ $sign = 1 ]; then
     fi
 fi
 
-version=$(cat $vfile)
+version=$(cat "$vfile")
 if [ $inc = 1 ]; then
     [ $? != 0 ] && exit 1
     maj=$(echo $version | cut -d . -f 1)
@@ -54,11 +54,11 @@ if [ $inc = 1 ]; then
     version=$maj.$((min+1))
 fi
 
-echo "$version" > $vfile || exit 1
-git add $vfile
+echo "$version" > "$vfile" || exit 1
+git add "$vfile"
 git commit --amend --no-edit
-git commit-archive --amend -d $distdir $commitarchopts $trunkdir
-git set-version -d $trunkdir -t $setversopts $version
+git commit-archive --amend -d "$distdir" $commitarchopts "$trunkdir"
+git set-version -d "$trunkdir" -t $setversopts $version
 
 if [ $sign = 1 ] && [ $agent = 1 ]; then
     killall gpg-agent
