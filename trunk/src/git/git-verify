@@ -6,7 +6,6 @@ if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
 fi
-reponame=$(basename $(pwd))
 
 temp=$(getopt p: "$@")
 eval set -- "$temp"
