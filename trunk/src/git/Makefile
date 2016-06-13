@@ -10,9 +10,15 @@ bindir=$(prefix)/bin
 all:
 
 install:
-	for i in git-commit-archive git-prepare git-set-version git-verify; \
-		do install -D -g root -o root -m 0755 $$i $(bindir)/$$i; \
-	done
+	if [ `uname` = "FreeBSD" ]; then \
+		for i in git-commit-archive git-prepare git-set-version git-verify; \
+			do install -g wheel -o root -m 0755 $$i $(bindir); \
+		done; \
+	else \
+		for i in git-commit-archive git-prepare git-set-version git-verify; \
+			do install -D -g root -o root -m 0755 $$i $(bindir)/$$i; \
+		done; \
+	fi
 
 clean:
 
