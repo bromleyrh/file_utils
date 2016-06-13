@@ -15,11 +15,11 @@ reponame=$(basename $(pwd))
 amend=0
 sign=0
 
-temp=$(getopt -l amend d:s "$@")
+temp=$(getopt ad:s "$@")
 eval set -- "$temp"
 while true; do
     case "$1" in
-        --amend)
+        -a)
             amend=1
             shift;;
         -d)
