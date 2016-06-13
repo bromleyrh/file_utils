@@ -1,5 +1,11 @@
 #!/bin/sh
 
+do_exit()
+{
+    [ $sign = 1 ] && [ $agent = 1 ] && killall gpg-agent
+    exit $1
+}
+
 if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
@@ -54,12 +60,12 @@ if [ $inc = 1 ]; then
     version=$maj.$((min+1))
 fi
 
-echo "$version" > "$vfile" || exit 1
-git add "$vfile"
-git commit --amend --no-edit
-git commit-archive --amend -d "$distdir" $commitarchopts "$trunkdir"
-git set-version -d "$trunkdir" -t $setversopts $version
+echo "$version" > "$vfile" || do_exit 1
+git add "$vfile" || do_exit 1
+git commit --amend --no-edit || do_exit 1
+git commit-archive --amend -d "$distdir" $commitarchopts "$trunkdir" \
+    || do_exit 1
+git set-version -d "$trunkdir" -t $setversopts $version || do_exit 1
 
-if [ $sign = 1 ] && [ $agent = 1 ]; then
-    killall gpg-agent
-fi
+do_exit 0
+
