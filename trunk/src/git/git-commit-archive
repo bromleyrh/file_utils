@@ -16,6 +16,7 @@ amend=0
 sign=0
 
 temp=$(getopt ad:s "$@")
+[ $? != 0 ] && exit 1
 eval set -- "$temp"
 while true; do
     case "$1" in
