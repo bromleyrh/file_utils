@@ -12,12 +12,13 @@ if [ ! -d .git ] && [ ! -f .git ]; then
 fi
 
 agent=0
+automake=0
 distdir=dist
 inc=0
 sign=0
 trunkdir=trunk
 
-temp=$(getopt ad:ist: "$@")
+temp=$(getopt ad:imst: "$@")
 [ $? != 0 ] && exit 1
 eval set -- "$temp"
 while true; do
@@ -30,6 +31,9 @@ while true; do
             shift 2;;
         -i)
             inc=1
+            shift;;
+        -m)
+            automake=1
             shift;;
         -s)
             sign=1
@@ -45,8 +49,12 @@ done
 
 vfile=$trunkdir/.version
 
+if [ $automake = 1 ]; then
+    commitarchopts="-m"
+fi
+
 if [ $sign = 1 ]; then
-    commitarchopts="-s"
+    commitarchopts="$commitarchopts -s"
     setversopts="-s"
     if [ $agent = 1 ]; then
         gpg-agent --daemon --use-standard-socket || exit 1

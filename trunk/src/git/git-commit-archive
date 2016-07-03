@@ -1,5 +1,20 @@
 #!/bin/sh
 
+do_make_dist()
+{
+    cd $1 || return 1
+
+    autoreconf || return 1
+    ./configure || return 1
+    make dist-xz || return 1
+    mv *.xz "../$archive" || return 1
+    make distclean || return 1
+    git clean -fx || return 1
+    rm -frv autom4te.cache || return 1
+
+    cd .. || return 1
+}
+
 restore_files()
 {
     mv "$archive.save" "$archive" 2>/dev/null 1>&2
@@ -13,9 +28,10 @@ fi
 reponame=$(basename $(pwd))
 
 amend=0
+automake=0
 sign=0
 
-temp=$(getopt ad:s "$@")
+temp=$(getopt ad:ms "$@")
 [ $? != 0 ] && exit 1
 eval set -- "$temp"
 while true; do
@@ -26,6 +42,9 @@ while true; do
         -d)
             dstdir=$2/
             shift 2;;
+        -m)
+            automake=1
+            shift;;
         -s)
             sign=1
             shift;;
@@ -42,7 +61,11 @@ mv "$archive" "$archive.save" 2>/dev/null 1>&2
 mv "$archive.asc" "$archive.asc.save" 2>/dev/null 1>&2
 
 git config tar.tar.xz.command "xz -9c" || exit 1
-git archive -o "$archive" HEAD "$@" || exit 1
+if [ $automake = 1 ]; then
+    do_make_dist "$@" || exit 1
+else
+    git archive -o "$archive" HEAD "$@" || exit 1
+fi
 git add "$archive" || exit 1
 if [ $sign = 1 ]; then
     gpg -a --detach-sign -o "$archive.asc" "$archive" || exit 1
