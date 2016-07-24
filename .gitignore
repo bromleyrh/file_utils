@@ -2,6 +2,7 @@
 *.class
 
 *.jar
+trunk/src/attr_idx
 trunk/src/cp_mem
 trunk/src/open
 trunk/src/open_pipes

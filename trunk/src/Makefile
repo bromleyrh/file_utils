@@ -18,13 +18,19 @@ prefix=/usr/local
 bindir=$(prefix)/bin
 libdir=$(prefix)/lib
 
-progs = cp_mem open open_pipes
+progs = attr_idx cp_mem open open_pipes
 libs = $(ldio_so)
 
 all: $(progs) libdirectio
 
 %: %.c
 	gcc $(CFLAGS) -o $@ $^
+
+attr_idx: attr_idx.o
+	gcc -o $@ `pkg-config --libs libutil` $^
+
+attr_idx.o: attr_idx.c
+	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
 libdirectio.o: libdirectio.c
 	gcc -c -fPIC -O2 -Wall -Wextra $^
