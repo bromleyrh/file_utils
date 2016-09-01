@@ -17,10 +17,12 @@ install:
 		for i in $(helpers); \
 			do install -g wheel -o root -m 0755 $$i $(bindir); \
 		done; \
+		ln -fs git-make-bundle $(bindir)/git-make-bundles; \
 	else \
 		for i in $(helpers); \
 			do install -D -g root -o root -m 0755 $$i $(bindir)/$$i; \
 		done; \
+		ln -fs git-make-bundle $(bindir)/git-make-bundles; \
 	fi
 
 clean:

@@ -22,6 +22,9 @@ get_branches()
     done < <(echo "$tmp")
 }
 
+branch_bundles=0
+[[ $(basename $0) == "git-make-bundles" ]] && branch_bundles=1
+
 rootdir=$(git rev-parse --show-toplevel)
 [[ $? != 0 ]] && exit 1
 reponame=$(basename $rootdir)
@@ -38,7 +41,10 @@ get_branches || exit 1
 ret=0
 for b in $branches; do
     bname="$reponame"
-    [[ $b = "master" ]] || bname+=".$b"
+    if [[ $b != "master" ]]; then
+        [[ $branch_bundles = 0 ]] && continue
+        bname+=".$b"
+    fi
     git bundle create $prefix/$bname.bundle $commit..$b || ret=1
 done
 
