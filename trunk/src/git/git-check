@@ -10,6 +10,7 @@ get_commands()
 
 get_commands || exit 1
 
+ret=0
 IFS=";"
 first=1
 for c in $commands; do
@@ -18,7 +19,10 @@ for c in $commands; do
     else
         echo "--More--"
         IFS= read -n 1 -s tmp
-        [[ $tmp != " " ]] && break
+        if [[ $tmp != " " ]]; then
+            ret=1
+            break
+        fi
         IFS=";"
     fi
     cmd=$(eval echo "$c" | sed -e "s/^[[:space:]][[:space:]]*//")
@@ -26,3 +30,5 @@ for c in $commands; do
     eval $cmd
     echo "\`- $?"
 done
+
+exit $ret
