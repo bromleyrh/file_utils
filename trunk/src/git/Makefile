@@ -5,8 +5,8 @@
 prefix=/usr/local
 bindir=$(prefix)/bin
 
-helpers=git-check git-commit-archive git-make-bundle git-prepare \
-git-set-version git-verify
+helpers=git-ck git-commit-archive git-make-bundle git-prepare git-set-version \
+git-verify
 
 .PHONY: install clean
 
