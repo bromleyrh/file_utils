@@ -11,7 +11,7 @@ mkdir -v $tmpdir || exit 1
 tar -x -f $distdir/*.xz -C $tmpdir -v || exit 1
 
 cd $tmpdir/* || exit 1
-./configure || exit 1 # TODO: add option to provide configure parameters
+./configure "$@" || exit 1 # TODO: add option to provide configure parameters
 make check || exit 1 # TODO: make building tests optional
 echo "Enter root password to install"
 sudo make install || exit 1
