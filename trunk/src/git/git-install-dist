@@ -3,6 +3,13 @@
 rootdir=$(git rev-parse --show-toplevel)
 [[ $? != 0 ]] && exit 1
 
+if [[ $1 = "-r" ]]; then
+    noroot=1
+    shift
+else
+    noroot=0
+fi
+
 distdir=$rootdir/dist
 tmpdir=$distdir/tmp
 
@@ -13,8 +20,12 @@ tar -x -f $distdir/*.xz -C $tmpdir -v || exit 1
 cd $tmpdir/* || exit 1
 ./configure "$@" || exit 1 # TODO: add option to provide configure parameters
 make check || exit 1 # TODO: make building tests optional
-echo "Enter root password to install"
-sudo make install || exit 1
+if [[ $noroot = 0 ]]; then
+    echo "Enter root password to install"
+    sudo make install || exit 1
+else
+    make install || exit 1
+fi
 make distclean || exit 1
 cd - || exit 1
 
