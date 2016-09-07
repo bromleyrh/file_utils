@@ -27,6 +27,6 @@ else
     make install || exit 1
 fi
 make distclean || exit 1
-cd - || exit 1
+cd - 1>/dev/null || exit 1
 
 rm -frv $tmpdir
