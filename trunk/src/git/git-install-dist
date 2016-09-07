@@ -3,7 +3,11 @@
 rootdir=$(git rev-parse --show-toplevel)
 [[ $? != 0 ]] && exit 1
 
-ncpus=$(nproc)
+if [[ $(uname) = "FreeBSD" ]]; then
+    ncpus=$(sysctl hw.ncpu | cut -d ' ' -f 2)
+else
+    ncpus=$(nproc)
+fi
 [[ $? != 0 ]] && exit 1
 
 if [[ $1 = "-r" ]]; then
