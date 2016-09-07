@@ -22,7 +22,7 @@ tar -x -f $distdir/*.xz -C $tmpdir -v || exit 1
 
 cd $tmpdir/* || exit 1
 ./configure "$@" || exit 1 # TODO: add option to provide configure parameters
-make -j$(ncpus) check || exit 1 # TODO: make building tests optional
+make -j$ncpus check || exit 1 # TODO: make building tests optional
 if [[ $noroot = 0 ]]; then
     echo "Enter root password to install"
     sudo make install || exit 1
