@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+get_prefix()
+{
+    prefix=$(git config user.bundleIn)
+    if [[ $? != 0 ]]; then
+        return 1
+    fi
+}
+
+rootdir=$(git rev-parse --show-toplevel)
+[[ $? != 0 ]] && exit 1
+reponame=$(basename $rootdir)
+
+get_prefix || exit 1
+
+repobundles=$(ls $prefix/$reponame* 2>/dev/null)
+[[ $? != 0 ]] && exit 1
+
+echo $repobundles
+for i in $repobundles; do
+    f=$(basename $i)
+    if [[ $f == "$reponame.bundle" ]]; then
+        echo "Importing bundle $f"
+        mv $i $rootdir/../.$f || exit 1
+        git fetch bundle || exit 1
+    else
+        echo "Importing branch bundle $f"
+        mv $i $rootdir/.. || exit 1
+        bname=$(echo $f | cut -d '.' -f 2)
+        [[ ($? == 0) && (-n $bname) ]] || exit 1
+        echo "Creating remote bundle_$bname"
+        git remote add bundle_$bname ../$f || exit 1
+        git fetch bundle_$bname || exit 1
+    fi
+done
