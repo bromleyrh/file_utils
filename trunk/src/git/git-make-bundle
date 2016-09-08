@@ -11,6 +11,12 @@ parse_cmdline()
     fi
     commit=$1
     shift
+
+    if [[ -n $1 ]]; then
+        branch=$1
+    else
+        branch="master"
+    fi
 }
 
 get_repo_name()
@@ -26,7 +32,7 @@ get_branches()
     local tmp
 
     if [[ $all_branches = 0 ]]; then
-        branches="master"
+        branches="$branch"
         return
     fi
 
