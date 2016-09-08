@@ -1,16 +1,34 @@
 #!/usr/bin/env bash
 
-get_prefix()
+parse_cmdline()
 {
-    prefix=$(git config user.bundleOut)
-    if [[ $? != 0 ]]; then
+    all_branches=0
+    [[ $(basename $0) == "git-make-bundles" ]] && all_branches=1
+
+    if [[ -z $1 ]]; then
+        echo "Must specify commit ID"
         return 1
     fi
+    commit=$1
+    shift
+}
+
+get_repo_name()
+{
+    local rootdir=$(git rev-parse --show-toplevel)
+    [[ $? != 0 ]] && return 1
+
+    reponame=$(basename $rootdir)
 }
 
 get_branches()
 {
     local tmp
+
+    if [[ $all_branches = 0 ]]; then
+        branches="master"
+        return
+    fi
 
     tmp=$(git branch)
     if [[ $? != 0 ]]; then
@@ -22,30 +40,25 @@ get_branches()
     done < <(echo "$tmp")
 }
 
-branch_bundles=0
-[[ $(basename $0) == "git-make-bundles" ]] && branch_bundles=1
+get_bundle_path()
+{
+    bundle_path=$(git config user.bundleOut)
+    if [[ $? != 0 ]]; then
+        return 1
+    fi
+}
 
-rootdir=$(git rev-parse --show-toplevel)
-[[ $? != 0 ]] && exit 1
-reponame=$(basename $rootdir)
+parse_cmdline "$@" || exit 1
 
-if [[ -z $1 ]]; then
-    echo "Must specify commit ID"
-    exit 1
-fi
-commit=$1
-
-get_prefix || exit 1
+get_repo_name || exit 1
 get_branches || exit 1
+get_bundle_path || exit 1
 
 ret=0
 for b in $branches; do
     bname="$reponame"
-    if [[ $b != "master" ]]; then
-        [[ $branch_bundles = 0 ]] && continue
-        bname+=".$b"
-    fi
-    git bundle create $prefix/$bname.bundle $commit..$b || ret=1
+    [[ $b != "master" ]] && bname+=".$b"
+    git bundle create $bundle_path/$bname.bundle $commit..$b || ret=1
 done
 
 exit $ret

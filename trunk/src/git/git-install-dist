@@ -1,39 +1,58 @@
 #!/usr/bin/env bash
 
-rootdir=$(git rev-parse --show-toplevel)
-[[ $? != 0 ]] && exit 1
+get_ncpus()
+{
+    local platform=$(uname)
 
-if [[ $(uname) = "FreeBSD" ]]; then
-    ncpus=$(sysctl hw.ncpu | cut -d ' ' -f 2)
-else
-    ncpus=$(nproc)
-fi
-[[ $? != 0 ]] && exit 1
+    case $platform in
+        "FreeBSD")
+            ncpus=$(sysctl hw.ncpu | cut -d ' ' -f 2);;
+        *)
+            ncpus=$(nproc);;
+    esac
+    if [[ $? != 0 ]]; then
+        return 1
+    fi
+}
 
+get_dirs()
+{
+    local rootdir=$(git rev-parse --show-toplevel)
+    [[ $? != 0 ]] && return 1
+
+    distdir=$rootdir/dist
+    tmpdir=$distdir/tmp
+}
+
+do_build()
+{
+    ./configure "$@" || return 1 # TODO: add option to set configure parameters
+
+    make -j$ncpus check || return 1 # TODO: make building tests optional
+    if [[ $noroot = 0 ]]; then
+        echo "Root privilege required to install"
+        sudo make install || return 1
+    else
+        make install || return 1
+    fi
+
+    make distclean || return 1
+}
+
+noroot=0
 if [[ $1 = "-r" ]]; then
     noroot=1
     shift
-else
-    noroot=0
 fi
 
-distdir=$rootdir/dist
-tmpdir=$distdir/tmp
+get_ncpus || exit 1
+get_dirs || exit 1
 
 mkdir -v $tmpdir || exit 1
-
 tar -x -f $distdir/*.xz -C $tmpdir -v || exit 1
 
 cd $tmpdir/* || exit 1
-./configure "$@" || exit 1 # TODO: add option to provide configure parameters
-make -j$ncpus check || exit 1 # TODO: make building tests optional
-if [[ $noroot = 0 ]]; then
-    echo "Enter root password to install"
-    sudo make install || exit 1
-else
-    make install || exit 1
-fi
-make distclean || exit 1
+do_build "$@" || exit 1
 cd - 1>/dev/null || exit 1
 
 rm -frv $tmpdir
