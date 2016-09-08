@@ -41,6 +41,9 @@ do_build()
     make distclean || return 1
 }
 
+opts=$(git config user.installDistOpts)
+[[ $? == 0 ]] && set -- $opts $@
+
 noroot=0
 if [[ $1 = "-r" ]]; then
     noroot=1
