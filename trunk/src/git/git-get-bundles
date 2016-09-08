@@ -16,17 +16,11 @@ get_bundles()
     fi
 }
 
-get_repo_name()
-{
-    local rootdir=$(git rev-parse --show-toplevel)
-    [[ $? != 0 ]] && return 1
-
-    reponame=$(basename $rootdir)
-}
-
 get_bundle_path || exit 1
 get_bundles $bundle_path || exit 1
-get_repo_name || exit 1
+rootdir=$(git rev-parse --show-toplevel)
+[[ $? != 0 ]] && return 1
+reponame=$(basename $rootdir)
 
 for b in $bundles; do
     f=$(basename $b)
