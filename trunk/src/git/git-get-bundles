@@ -26,7 +26,6 @@ get_bundle_path || exit 1
 get_bundles $bundle_path || exit 1
 get_repo_name || exit 1
 
-echo $repobundles
 for b in $bundles; do
     f=$(basename $b)
     if [[ $f == "$reponame.bundle" ]]; then
