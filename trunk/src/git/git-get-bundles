@@ -11,7 +11,9 @@ get_bundle_path()
 get_bundles()
 {
     bundles=$(ls $1/$reponame.* 2>/dev/null)
-    [[ $? != 0 ]] && return 1
+    if [[ $? != 0 ]]; then
+        return 1
+    fi
 }
 
 get_repo_name()
