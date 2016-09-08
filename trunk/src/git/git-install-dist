@@ -5,10 +5,12 @@ get_ncpus()
     local platform=$(uname)
 
     case $platform in
-        "FreeBSD")
+        "Darwin" | "FreeBSD")
             ncpus=$(sysctl hw.ncpu | cut -d ' ' -f 2);;
-        *)
+        "Linux")
             ncpus=$(nproc);;
+        *)
+            ncpus=1;;
     esac
     if [[ $? != 0 ]]; then
         return 1
