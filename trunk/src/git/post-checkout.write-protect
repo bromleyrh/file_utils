@@ -1,0 +1,10 @@
+#!/bin/sh
+
+rootdir=$(git rev-parse --show-toplevel)
+[[ $? != 0 ]] && exit 1
+
+# TODO: allow specifying files and directories to exclude via a git config
+# parameter
+find $rootdir \
+\( \( -name .git -o -name .gitmodules -o -name dist \) -prune \) \
+-o \( -type f -exec chmod -w '{}' \; \)
