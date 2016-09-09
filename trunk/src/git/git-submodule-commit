@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+get_submodules()
+{
+    while IFS= read -r line; do
+        if [[ $line = +* ]]; then
+            echo $line | cut -d '+' -f 2 | cut -d ' ' -f 2
+        fi
+    done < <(git submodule status)
+}
+
+get_commit_message()
+{
+    printf "Committed to submodules\n\nCommit IDs:\n"
+
+    for m in $1; do
+        cd $m || return 1
+        git rev-parse HEAD || return 1
+        cd - 1>/dev/null || return 1
+    done
+}
+
+submodules=$(get_submodules)
+[[ $? != 0 ]] && exit 1
+
+msg=$(get_commit_message "$submodules")
+[[ $? != 0 ]] && exit 1
+
+git add $submodules || exit 1
+git commit -F - <<< "$msg"
