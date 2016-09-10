@@ -1,5 +1,21 @@
 #!/usr/bin/env bash
 
+set_up_env()
+{
+    local old_ifs
+
+    env=$(git config user.installDistEnv)
+    [[ $? != 0 ]] && return
+
+    old_ifs=$IFS
+    IFS=";"
+    for e in $env; do
+        e=$(echo $e | sed -e 's/^[[:space:]][[:space:]]*//')
+        eval export $e
+    done
+    IFS=$old_ifs
+}
+
 get_ncpus()
 {
     local platform=$(uname)
@@ -41,6 +57,7 @@ do_build()
     make distclean || return 1
 }
 
+set_up_env
 opts=$(git config user.installDistOpts)
 [[ $? == 0 ]] && set -- $opts $@
 
