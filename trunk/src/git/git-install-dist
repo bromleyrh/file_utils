@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+get_cmds()
+{
+    cmdpre=$(git config user.installDistCmdPre)
+    cmdpost=$(git config user.installDistCmdPost)
+}
+
 set_up_env()
 {
     local old_ifs
@@ -57,6 +63,7 @@ do_build()
     make distclean || return 1
 }
 
+get_cmds
 set_up_env
 opts=$(git config user.installDistOpts)
 [[ $? == 0 ]] && set -- $opts $@
@@ -74,7 +81,15 @@ mkdir -v $tmpdir || exit 1
 tar -x -f $distdir/*.xz -C $tmpdir -v || exit 1
 
 cd $tmpdir/* || exit 1
+if [[ -n $cmdpre ]]; then
+    echo "Running \"$cmdpre\""
+    eval $cmdpre
+fi
 do_build "$@" || exit 1
+if [[ -n $cmdpost ]]; then
+    echo "Running \"$cmdpost\""
+    eval $cmdpost
+fi
 cd - 1>/dev/null || exit 1
 
 rm -frv $tmpdir
