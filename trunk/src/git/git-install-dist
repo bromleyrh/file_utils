@@ -45,7 +45,7 @@ get_dirs()
     [[ $? != 0 ]] && return 1
 
     distdir=$rootdir/dist
-    tmpdir=$distdir/tmp
+    tmpdir=/tmp/tmp
 }
 
 do_build()
