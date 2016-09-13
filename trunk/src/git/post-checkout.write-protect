@@ -1,6 +1,6 @@
 #!/bin/sh
 
-[[ $3 = 0 ]] && exit 0
+[ $3 = 0 ] && exit 0
 
 rootdir=$(git rev-parse --show-toplevel)
 [ $? != 0 ] && exit 1
