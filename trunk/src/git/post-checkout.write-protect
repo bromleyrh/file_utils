@@ -5,8 +5,20 @@
 rootdir=$(git rev-parse --show-toplevel)
 [ $? != 0 ] && exit 1
 
-# TODO: allow specifying files and directories to exclude via a git config
-# parameter
-find $rootdir \
-\( \( -name .git -o -name .gitmodules \) -prune \) \
--o \( -type f -exec chmod -w '{}' \; \)
+excludefiles=$(git config user.writeProtectExclude)
+
+excl=".git, .gitmodules"
+[ "x$excludefiles" != "x" ] && excl="$excl, $excludefiles"
+IFS=","
+for f in $excl; do
+    f=$(echo $f | sed -e 's/^[[:space:]][[:space:]]*//')
+    if [ -z $exclexpr ]; then
+        exclexpr="-name $f"
+    else
+        exclexpr="$exclexpr -o -name $f"
+    fi
+done
+
+findcmd="find $rootdir \( \( $exclexpr \) -prune \) "
+findcmd="$findcmd -o \( -type f -exec chmod -w \{\} \; \)"
+eval $findcmd
