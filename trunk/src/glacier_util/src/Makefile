@@ -2,8 +2,8 @@
 # Makefile
 #
 
-all: glacier_util.jar
+all: GlacierUtil.jar
 
-glacier_util.jar: glacier_util.java
+GlacierUtil.jar: GlacierUtil.java
 	javac $^
-	jar cef glacier_util $@ *.class
+	jar cef GlacierUtil $@ *.class

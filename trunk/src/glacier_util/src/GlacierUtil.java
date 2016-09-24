@@ -1,21 +1,20 @@
 /*
- * glacier_util.java
+ * GlacierUtil.java
  */
 
 import java.io.*;
 import java.nio.file.*;
 import java.util.Arrays;
 
-final class parser {
+
+final class Parser {
     private int indent;
     
-    public parser()
-    {
+    public Parser() {
         this.reset();
     }
 
-    public String parse(String s)
-    {
+    public String parse(String s) {
         int i, j;
         StringBuilder strb = new StringBuilder();
 
@@ -52,18 +51,17 @@ final class parser {
         return strb.toString();
     }
     
-    public void reset()
-    {
+    public void reset() {
         indent = 0;
     }
 }
 
-final class inventory_file {
+
+final class InventoryFile {
     private final String pathname;
     private final BufferedReader f;
 
-    public inventory_file(String _pathname) throws IOException
-    {
+    public InventoryFile(String _pathname) throws IOException {
         InputStream is;
 
         pathname = _pathname;
@@ -71,15 +69,13 @@ final class inventory_file {
         f = new BufferedReader(new InputStreamReader(is));
     }
     
-    public String getPath()
-    {
+    public String getPath() {
         return pathname;
     }
 
-    public void parse() throws IOException
-    {
+    public void parse() throws IOException {
         char[] buf = new char[4096];
-        parser p = new parser();
+        Parser p = new Parser();
 
         for (;;) {
             boolean end = false;
@@ -102,61 +98,54 @@ final class inventory_file {
     }
 }
 
-interface glacier_util_cmd_iface {
-    abstract public boolean parse_cmdline();
-    abstract public int run_cmd();
+
+interface GlacierUtilCmdIface {
+    abstract public boolean parseCmdline();
+    abstract public int runCmd();
 }
 
-abstract class glacier_util_cmd implements glacier_util_cmd_iface {
-    boolean parsed_cmdline = false;
+
+abstract class GlacierUtilCmd implements GlacierUtilCmdIface {
+    boolean parsedCmdline = false;
     String[] args;
     String cmdname;
     
-    public glacier_util_cmd(String[] _args)
-    {
+    public GlacierUtilCmd(String[] _args) {
         cmdname = this.getClass().getSimpleName();
         args = _args;
     }
 
-    boolean do_parse_cmdline()
-    {
+    boolean doParseCmdline() {
         return true;
     }
     
-    final @Override public boolean parse_cmdline()
-    {
-        boolean ret = do_parse_cmdline();
-        parsed_cmdline = true;
+    @Override public final boolean parseCmdline() {
+        boolean ret = doParseCmdline();
+        parsedCmdline = true;
 
         return ret;
     }
     
-    int do_run_cmd()
-    {
+    int doRunCmd() {
         return 0;
     }
     
-    final @Override public int run_cmd()
-    {
-        if (!parsed_cmdline)
-            return -1;
-
-        return do_run_cmd();
+    @Override public final int runCmd() {
+        return parsedCmdline ? doRunCmd() : -1;
     }
 }
 
-abstract class glacier_util_supercmd extends glacier_util_cmd {
-    glacier_util_cmd subcmd;
+
+abstract class GlacierUtilSupercmd extends GlacierUtilCmd {
+    GlacierUtilCmd subcmd;
     String[] subcmdargs;
     String subcmdstr;
 
-    public glacier_util_supercmd(String[] _args)
-    {
+    public GlacierUtilSupercmd(String[] _args) {
         super(_args);
     }
 
-    private boolean get_subcmd()
-    {
+    private boolean getSubcmd() {
         if ((args == null) || (args.length == 0)) {
             System.err.print("\"" + cmdname + "\" command requires subcommand "
                              + "argument\n");
@@ -170,27 +159,24 @@ abstract class glacier_util_supercmd extends glacier_util_cmd {
         return true;
     }
 
-    boolean finish_parse_cmdline()
-    {
+    boolean finishParseCmdline() {
         return true;
     }
   
-    final @Override public boolean do_parse_cmdline()
-    {
-        return (get_subcmd() && finish_parse_cmdline());
+    @Override public final boolean doParseCmdline() {
+        return (getSubcmd() && finishParseCmdline());
     }
 }
 
-final class format extends glacier_util_cmd {
+
+final class Format extends GlacierUtilCmd {
     private String file;
 
-    public format(String[] _args)
-    {
+    public Format(String[] _args) {
         super(_args);
     }
 
-    @Override public boolean do_parse_cmdline()
-    {
+    @Override public boolean doParseCmdline() {
         if ((args == null) || (args.length == 0)) {
             System.err.print("Must specify file\n");
             return false;
@@ -200,12 +186,11 @@ final class format extends glacier_util_cmd {
         return true;
     }
 
-    @Override public int do_run_cmd()
-    {
-        inventory_file i;
+    @Override public int doRunCmd() {
+        InventoryFile i;
 
         try {
-            i = new inventory_file(file);
+            i = new InventoryFile(file);
             i.parse();
         } catch (IOException e) {
             return -1;
@@ -215,16 +200,15 @@ final class format extends glacier_util_cmd {
     }
 }
 
-final class inventory extends glacier_util_supercmd {
+
+final class Inventory extends GlacierUtilSupercmd {
     private char mode;
 
-    public inventory(String[] _args)
-    {
+    public Inventory(String[] _args) {
         super(_args);
     }
 
-    @Override boolean finish_parse_cmdline()
-    {
+    @Override boolean finishParseCmdline() {
         if (!subcmdstr.equals("format")) {
             System.err.print("Invalid subcommand \"" + subcmdstr + "\"\n");
             return false;
@@ -232,24 +216,22 @@ final class inventory extends glacier_util_supercmd {
         return true;
     }
 
-    @Override public int do_run_cmd()
-    {
-        format fc = new format(subcmdargs);
+    @Override public int doRunCmd() {
+        Format fc = new Format(subcmdargs);
 
-        if (fc.parse_cmdline() == false)
+        if (fc.parseCmdline() == false)
             return -1;
-        return fc.run_cmd();
+        return fc.runCmd();
     }
 }
 
-public final class glacier_util extends glacier_util_supercmd {
-    public glacier_util(String[] _args)
-    {
+
+public final class GlacierUtil extends GlacierUtilSupercmd {
+    public GlacierUtil(String[] _args) {
         super(_args);
     }
 
-    @Override public boolean finish_parse_cmdline()
-    {
+    @Override public boolean finishParseCmdline() {
         if (!subcmdstr.equals("inventory")) {
             System.err.format("Invalid subcommand \"" + subcmdstr + "\"\n");
             return false;
@@ -257,22 +239,20 @@ public final class glacier_util extends glacier_util_supercmd {
         return true;
     }
     
-    @Override public int do_run_cmd()
-    {
-        inventory ic = new inventory(subcmdargs);
+    @Override public int doRunCmd() {
+        Inventory ic = new Inventory(subcmdargs);
         
-        if (ic.parse_cmdline() == false)
+        if (ic.parseCmdline() == false)
             return -1;
-        return ic.run_cmd();
+        return ic.runCmd();
     }
 
-    public static void main(String[] args)
-    {
-        glacier_util gu = new glacier_util(args);
+    public static void main(String[] args) {
+        GlacierUtil gu = new GlacierUtil(args);
         
-        if (gu.parse_cmdline() == false)
+        if (gu.parseCmdline() == false)
             System.exit(1);
-        if (gu.run_cmd() != 0)
+        if (gu.runCmd() != 0)
             System.exit(1);
         System.exit(0);
     }
