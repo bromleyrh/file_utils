@@ -17,7 +17,7 @@ get_bundles()
 }
 
 rootdir=$(git rev-parse --show-toplevel)
-[[ $? != 0 ]] && return 1
+[[ $? != 0 ]] && exit 1
 reponame=$(basename $rootdir)
 
 get_bundle_path || exit 1
