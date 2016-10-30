@@ -43,11 +43,12 @@ function addsep(line, sep)
 
 function remsep(line, sep)
 {
+    linelen = length(line);
     seplen = length(sep);
 
     split(line, linearr, "");
     res = "";
-    for (i = 1; i < len - 2; i += seplen + 1)
+    for (i = 1; i < linelen; i += seplen + 1)
         res = res sprintf("%s", linearr[i+seplen]);
 
     return res;
