@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 rootdir=$(git rev-parse --show-toplevel)
-[[ $? != 0 ]] && return 1
+[[ $? != 0 ]] && exit 1
 pushd $rootdir > /dev/null || exit 1
 
 pushd / > /dev/null || exit 1
