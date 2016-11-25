@@ -18,7 +18,7 @@ prefix=/usr/local
 bindir=$(prefix)/bin
 libdir=$(prefix)/lib
 
-progs = attr_idx cp_mem open open_pipes
+progs = attr_idx cp_mem open open_pipes tmpfile
 libs = $(ldio_so)
 
 all: $(progs) libdirectio
