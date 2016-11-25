@@ -4,5 +4,7 @@
 *.jar
 trunk/src/attr_idx
 trunk/src/cp_mem
+trunk/src/libdirectio.so*
 trunk/src/open
 trunk/src/open_pipes
+trunk/src/tmpfile
