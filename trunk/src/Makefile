@@ -55,4 +55,3 @@ install-libs: libdirectio
 
 clean:
 	rm -f *.o $(progs) $(libs)
-	make -C git clean
