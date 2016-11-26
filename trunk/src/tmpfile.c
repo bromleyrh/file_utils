@@ -184,7 +184,7 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
             if (ret < 1)
                 break;
             ret = do_splice(stdout_pipe[0], STDOUT_FILENO);
-            if (ret < 1)
+            if (ret < 0)
                 break;
 
             ret = do_splice(fd_in, fd_out);
@@ -197,7 +197,7 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
             if (ret < 1)
                 break;
             ret = do_copy(stdout_pipe[0], STDOUT_FILENO);
-            if (ret < 1)
+            if (ret < 0)
                 break;
 
             ret = do_splice(fd_in, fd_out);
