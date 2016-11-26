@@ -422,20 +422,20 @@ copy_mode(int fd1, int fd2)
 static int
 do_link(int fd, const char *name)
 {
-    const char *oldpath;
+    const char *path;
 
-    if (asprintf((char **)&oldpath, "/proc/self/fd/%d", fd) == -1) {
+    if (asprintf((char **)&path, "/proc/self/fd/%d", fd) == -1) {
         error(0, 0, "Out of memory");
         return -1;
     }
 
-    if (linkat(fd, oldpath, 0, name, AT_SYMLINK_FOLLOW) == -1) {
+    if (linkat(AT_FDCWD, path, AT_FDCWD, name, AT_SYMLINK_FOLLOW) == -1) {
         error(0, errno, "Couldn't link %s", name);
-        free((void *)oldpath);
+        free((void *)path);
         return -1;
     }
 
-    free((void *)oldpath);
+    free((void *)path);
 
     return 0;
 }
