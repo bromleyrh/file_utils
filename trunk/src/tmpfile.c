@@ -19,12 +19,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static int parse_cmdline(int, char **, char *);
+static int parse_cmdline(int, char **, char *, int *);
 
 static size_t dirname_len(const char *);
 
 static int open_file(char *);
-static int copy_file(int, int);
+static int copy_file(int, int, int);
 static int link_file(int, const char *);
 
 static size_t
@@ -36,7 +36,7 @@ dirname_len(const char *path)
 }
 
 static int
-parse_cmdline(int argc, char **argv, char *file)
+parse_cmdline(int argc, char **argv, char *file, int *write_to_stdout)
 {
     char cwd[PATH_MAX];
     char *path;
@@ -58,6 +58,9 @@ parse_cmdline(int argc, char **argv, char *file)
         if (snprintf(file, PATH_MAX, "%s/%s", cwd, path) >= PATH_MAX)
             return -1;
     }
+
+    if ((argc > 2) && (strcmp(argv[2], "-t") == 0))
+        *write_to_stdout = 1;
 
     return 0;
 }
@@ -82,20 +85,29 @@ open_file(char *path)
 #define MAX_LEN 4096
 
 static int
-copy_file(int fd_in, int fd_out)
+copy_file(int fd_in, int fd_out, int write_to_stdout)
 {
-    for (;;) {
-        ssize_t ret;
+    ssize_t ret;
 
-        ret = splice(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
-        if (ret < 1) {
-            if (ret == 0)
+    if (write_to_stdout) {
+        for (;;) {
+            ret = tee(fd_in, STDOUT_FILENO, MAX_LEN, 0);
+            if (ret < 1)
                 break;
-            return -errno;
+
+            ret = splice(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
+            if (ret < 1)
+                break;
+        }
+    } else {
+        for (;;) {
+            ret = splice(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
+            if (ret < 1)
+                break;
         }
     }
 
-    return 0;
+    return (ret == 0) ? 0 : -errno;
 }
 
 #undef MAX_LEN
@@ -119,15 +131,16 @@ main(int argc, char **argv)
     char file[PATH_MAX];
     int err;
     int fd;
+    int write_to_stdout = 0;
 
-    if (parse_cmdline(argc, argv, file) == -1)
+    if (parse_cmdline(argc, argv, file, &write_to_stdout) == -1)
         return EXIT_FAILURE;
 
     fd = open_file(file);
     if (fd < 0)
         error(EXIT_FAILURE, -fd, "Error opening %s", file);
 
-    err = copy_file(STDIN_FILENO, fd);
+    err = copy_file(STDIN_FILENO, fd, write_to_stdout);
     if (err) {
         error(0, -err, "Error copying %s", file);
         goto err;
