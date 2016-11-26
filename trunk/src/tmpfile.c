@@ -19,12 +19,21 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static int parse_cmdline(int, char **, char *, int *);
-
 static size_t dirname_len(const char *);
 
+static int parse_cmdline(int, char **, char *, int *);
+
+static int get_stdout(int [2], int *);
+static int close_stdout_pipe(int [2]);
+
 static int open_file(char *);
-static int copy_file(int, int, int);
+
+static ssize_t do_copy(int, int);
+static ssize_t do_tee(int, int);
+static ssize_t do_splice(int, int);
+
+static int copy_file(int, int, int [2], int);
+
 static int link_file(int, const char *);
 
 static size_t
@@ -66,6 +75,43 @@ parse_cmdline(int argc, char **argv, char *file, int *write_to_stdout)
 }
 
 static int
+get_stdout(int pipefd[2], int *stdout_splice)
+{
+    struct stat s;
+
+    if (fstat(STDOUT_FILENO, &s) == -1)
+        return -errno;
+
+    if (S_ISFIFO(s.st_mode)) {
+        pipefd[0] = STDOUT_FILENO;
+        pipefd[1] = -1;
+        *stdout_splice = 0;
+        return 0;
+    }
+
+    if (pipe(pipefd) == -1)
+        return -errno;
+    *stdout_splice = S_ISREG(s.st_mode);
+    return 0;
+}
+
+static int
+close_stdout_pipe(int pipefd[2])
+{
+    int ret, tmp;
+
+    if ((pipefd[0] == STDOUT_FILENO) || (pipefd[0] == -1))
+        return 0;
+
+    ret = close(pipefd[0]);
+    tmp = close(pipefd[1]);
+    if (tmp != 0)
+        ret = tmp;
+
+    return ret;
+}
+
+static int
 open_file(char *path)
 {
     int ret;
@@ -84,24 +130,83 @@ open_file(char *path)
 
 #define MAX_LEN 4096
 
+static ssize_t
+do_copy(int fd_in, int fd_out)
+{
+    char buf[MAX_LEN];
+    ssize_t num_written, ret, to_write;
+
+    ret = read(fd_in, buf, sizeof(buf));
+    if (ret < 0)
+        return ret;
+
+    for (to_write = ret; to_write > 0; to_write -= num_written) {
+        num_written = write(fd_out, buf, to_write);
+        if (num_written < 0)
+            return num_written;
+    }
+
+    return ret;
+}
+
+static ssize_t
+do_tee(int fd_in, int fd_out)
+{
+    return tee(fd_in, fd_out, MAX_LEN, 0);
+}
+
+static ssize_t
+do_splice(int fd_in, int fd_out)
+{
+    return splice(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
+}
+
+#undef MAX_LEN
+
 static int
-copy_file(int fd_in, int fd_out, int write_to_stdout)
+copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
 {
     ssize_t ret;
 
-    if (write_to_stdout) {
+    if (stdout_pipe[0] == STDOUT_FILENO) {
         for (;;) {
-            ret = tee(fd_in, STDOUT_FILENO, MAX_LEN, 0);
+            ret = do_tee(fd_in, STDOUT_FILENO);
             if (ret < 1)
                 break;
 
-            ret = splice(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
+            ret = do_splice(fd_in, fd_out);
+            if (ret < 1)
+                break;
+        }
+    } else if (stdout_splice) {
+        for (;;) {
+            ret = do_tee(fd_in, stdout_pipe[1]);
+            if (ret < 1)
+                break;
+            ret = do_splice(stdout_pipe[0], STDOUT_FILENO);
+            if (ret < 1)
+                break;
+
+            ret = do_splice(fd_in, fd_out);
+            if (ret < 1)
+                break;
+        }
+    } else if (stdout_pipe[0] >= 0) {
+        for (;;) {
+            ret = do_tee(fd_in, stdout_pipe[1]);
+            if (ret < 1)
+                break;
+            ret = do_copy(stdout_pipe[0], STDOUT_FILENO);
+            if (ret < 1)
+                break;
+
+            ret = do_splice(fd_in, fd_out);
             if (ret < 1)
                 break;
         }
     } else {
         for (;;) {
-            ret = splice(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
+            ret = do_splice(fd_in, fd_out);
             if (ret < 1)
                 break;
         }
@@ -109,8 +214,6 @@ copy_file(int fd_in, int fd_out, int write_to_stdout)
 
     return (ret == 0) ? 0 : -errno;
 }
-
-#undef MAX_LEN
 
 static int
 link_file(int fd, const char *name)
@@ -130,7 +233,8 @@ main(int argc, char **argv)
 {
     char file[PATH_MAX];
     int err;
-    int fd;
+    int fd, stdout_pipe[2] = {-1, -1};
+    int stdout_splice = 0;
     int write_to_stdout = 0;
 
     if (parse_cmdline(argc, argv, file, &write_to_stdout) == -1)
@@ -140,24 +244,32 @@ main(int argc, char **argv)
     if (fd < 0)
         error(EXIT_FAILURE, -fd, "Error opening %s", file);
 
-    err = copy_file(STDIN_FILENO, fd, write_to_stdout);
+    if (write_to_stdout) {
+        if (get_stdout(stdout_pipe, &stdout_splice) < 0)
+            goto err1;
+    }
+
+    err = copy_file(STDIN_FILENO, fd, stdout_pipe, stdout_splice);
     if (err) {
         error(0, -err, "Error copying %s", file);
-        goto err;
+        goto err2;
     }
 
     err = link_file(fd, file);
     if (err) {
         error(0, -err, "Error linking %s", file);
-        goto err;
+        goto err2;
     }
 
     if (close(fd) == -1)
         error(EXIT_FAILURE, errno, "Error closing %s", file);
+    close_stdout_pipe(stdout_pipe);
 
     return EXIT_SUCCESS;
 
-err:
+err2:
+    close_stdout_pipe(stdout_pipe);
+err1:
     close(fd);
     return EXIT_FAILURE;
 }
