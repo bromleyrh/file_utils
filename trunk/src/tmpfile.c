@@ -244,10 +244,8 @@ main(int argc, char **argv)
     if (fd < 0)
         error(EXIT_FAILURE, -fd, "Error opening %s", file);
 
-    if (write_to_stdout) {
-        if (get_stdout(stdout_pipe, &stdout_splice) < 0)
-            goto err1;
-    }
+    if (write_to_stdout && (get_stdout(stdout_pipe, &stdout_splice) < 0))
+        goto err1;
 
     err = copy_file(STDIN_FILENO, fd, stdout_pipe, stdout_splice);
     if (err) {
