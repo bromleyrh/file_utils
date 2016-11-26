@@ -48,7 +48,7 @@ static int hugetlbfs;
 static int numsrcs;
 static int verbose;
 
-static int bus_err;
+static volatile sig_atomic_t bus_err;
 static sigjmp_buf env;
 
 static void buserr_handler(int);
