@@ -7,4 +7,7 @@ trunk/src/cp_mem
 trunk/src/libdirectio.so*
 trunk/src/open
 trunk/src/open_pipes
+trunk/src/replicate
 trunk/src/tmpfile
+
+replicate.conf

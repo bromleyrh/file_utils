@@ -1,0 +1,19 @@
+{
+    "transfers":[
+        {
+            "src":"/mnt/data/data1",
+            "dest":"/dev/sde1",
+            "format_cmd":"mkfs.xfs -f -L external $dest"
+        },
+        {
+            "src":"/mnt/data/data2",
+            "dest":"/dev/sde2",
+            "format_cmd":"mkfs.xfs -f -L external $dest"
+        },
+        {
+            "src":"/mnt/data/data3",
+            "dest":"/dev/sde3",
+            "format_cmd":"mkfs.xfs -f -L external $dest"
+        }
+    ]
+}

@@ -18,7 +18,7 @@ prefix=/usr/local
 bindir=$(prefix)/bin
 libdir=$(prefix)/lib
 
-progs = attr_idx cp_mem open open_pipes tmpfile
+progs = attr_idx cp_mem open open_pipes replicate tmpfile
 libs = $(ldio_so)
 
 all: $(progs) libdirectio
@@ -31,6 +31,12 @@ attr_idx: attr_idx.o
 
 attr_idx.o: attr_idx.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
+
+replicate: replicate.o
+	gcc -o $@ `pkg-config --libs libjson` $^
+
+replicate.o: replicate.c
+	gcc -c $(CFLAGS) `pkg-config --cflags libjson` $^
 
 libdirectio.o: libdirectio.c
 	gcc -c -fPIC -O2 -Wall -Wextra $^
