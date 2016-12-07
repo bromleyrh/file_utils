@@ -52,8 +52,8 @@ xattrs - Perl extension providing an interface to file extended attributes
 
 =head1 DESCRIPTION
 
-See the manual pages in the following section for documentation for these
-routines.
+See the manual pages in the following section for further documentation for
+these routines.
 
 Errors returned by these functions are errno.h error numbers that can be
 interpreted using POSIX::strerror(). All functions return a negative error
