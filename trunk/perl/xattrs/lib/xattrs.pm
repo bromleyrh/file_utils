@@ -8,13 +8,6 @@ require Exporter;
 
 our @ISA = qw(Exporter);
 
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use xattrs ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
 our %EXPORT_TAGS = ( 'all' => [ qw(
 	
 ) ] );
@@ -42,44 +35,52 @@ xattrs - Perl extension providing an interface to file extended attributes
 =head1 SYNOPSIS
 
   use xattrs;
-  blah blah blah
+
+  $err = setxattr($path, $name, $value, $options);
+  $err = fsetxattr($fileno, $name, $value, $options);
+
+  $err = getxattr($path, $name, $value, $options);
+  $err = fgetxattr($fileno, $name, $value, $options);
+
+  $nattrs = listxattr($path, \@namebuf, $options);
+  $nattrs = flistxattr($fileno, \@namebuf, $options);
+
+  $err = removexattr($path, $name, $options);
+  $err = fremovexattr($path, $name, $options);
+
+  $option = xattrs::constant($name);
 
 =head1 DESCRIPTION
 
-Stub documentation for xattrs, created by h2xs. It looks like the
-author of the extension was negligent enough to leave the stub
-unedited.
+See the manual pages in the following section for documentation for these
+routines.
 
-Blah blah blah.
+Errors returned by these functions are errno.h error numbers that can be
+interpreted using POSIX::strerror(). All functions return a negative error
+number on failure and, with the exception of listxattr() and flistxattr(),
+return 0 on success.
 
-=head2 EXPORT
+The listxattr() and flistxattr() functions return the names of the referenced
+file's extended attributes in the array of strings referenced by namebuf. On
+success, these functions return the number of extended attributes retrieved.
 
-None by default.
+The fsetxattr(), fgetxattr(), flistxattr(), and fremovexattr() functions
+operate on a file number returned by fileno(), whose argument is a file handle
+returned by open(), instead of a path name.
 
+The options flag to these functions is the bitwise or of one or more option
+constants, retrieved using the constant() function, whose argument is a string
+containing an option's name. The available options are:
 
+  XATTR_CREATE            setxattr(), fsetxattr()
+  XATTR_REPLACE           setxattr(), fsetxattr()
+  XATTR_NOFOLLOW          all functions
+  XATTR_SHOWCOMPRESSION   all functions
+
+For documentation of these options' effects, see the manual pages below.
 
 =head1 SEE ALSO
 
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
-
-=head1 AUTHOR
-
-Richard H. Bromley, E<lt>bromleyrh@gmail.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2016 by Richard H. Bromley
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.22.2 or,
-at your option, any later version of Perl 5 you may have available.
-
+setxattr(2), getxattr(2), listxattr(2), removexattr(2)
 
 =cut
