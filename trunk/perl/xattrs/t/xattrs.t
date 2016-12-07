@@ -9,7 +9,7 @@ use warnings;
 
 use POSIX qw(:errno_h);
 
-use Test::More tests => 32;
+use Test::More tests => 42;
 
 use ExtUtils::testlib;
 use xattrs;
