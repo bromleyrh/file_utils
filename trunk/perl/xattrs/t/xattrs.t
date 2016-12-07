@@ -10,8 +10,8 @@ use warnings;
 use POSIX qw(:errno_h);
 
 use Test::More tests => 42;
-
 use ExtUtils::testlib;
+
 use xattrs;
 
 my $testfile = "testfile";
@@ -21,6 +21,9 @@ sub print_err;
 sub print_xattr_flags;
 
 sub test_setxattr;
+sub test_getxattr;
+sub test_listxattr;
+sub test_removexattr;
 
 sub print_err {
     my ($msg, $err) = @_;
