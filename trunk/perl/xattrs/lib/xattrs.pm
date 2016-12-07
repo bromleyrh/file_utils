@@ -46,7 +46,7 @@ xattrs - Perl extension providing an interface to file extended attributes
   $nattrs = xattrs::flistxattr($fileno, \@namebuf, $options);
 
   $err = xattrs::removexattr($path, $name, $options);
-  $err = xattrs::fremovexattr($path, $name, $options);
+  $err = xattrs::fremovexattr($fileno, $name, $options);
 
   $option = xattrs::constant($name);
 
