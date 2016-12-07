@@ -62,7 +62,8 @@ return 0 on success.
 
 The listxattr() and flistxattr() functions return the names of the referenced
 file's extended attributes in the array of strings referenced by namebuf. On
-success, these functions return the number of extended attributes retrieved.
+success, these functions return the number of extended attribute names
+retrieved.
 
 The fsetxattr(), fgetxattr(), flistxattr(), and fremovexattr() functions
 operate on a file number returned by fileno(), whose argument is a file handle
