@@ -146,8 +146,10 @@ my $keyvals = {
 
 print_xattr_flags();
 
-open(my $f, ">>", $testfile);
-exit(1) if not defined($f);
+open(my $f, ">>", $testfile) or do {
+    warn("Couldn't open $testfile: $!\n");
+    exit(1);
+};
 
 test_setxattr($f, $testfile, $keyvals);
 test_getxattr($f, $testfile, $keyvals);
