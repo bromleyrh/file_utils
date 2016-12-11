@@ -10,4 +10,5 @@ trunk/src/open_pipes
 trunk/src/replicate
 trunk/src/tmpfile
 
+replicate.h
 replicate.conf

@@ -15,5 +15,6 @@
             "dest":"/dev/sde3",
             "format_cmd":"mkfs.xfs -f -L external $dest"
         }
-    ]
+    ],
+    "debug":false
 }

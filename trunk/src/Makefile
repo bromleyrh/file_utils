@@ -33,10 +33,16 @@ attr_idx.o: attr_idx.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
 replicate: replicate.o
-	gcc -o $@ `pkg-config --libs libjson` $^
+	gcc -o $@ `pkg-config --libs libutil` `pkg-config --libs libjson` $^
 
 replicate.o: replicate.c
-	gcc -c $(CFLAGS) `pkg-config --cflags libjson` $^
+	gcc -c $(CFLAGS) `pkg-config --cflags libutil` \
+	`pkg-config --cflags libjson` $^
+
+replicate.c: replicate.h
+
+replicate.h: replicate.spec
+	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
 libdirectio.o: libdirectio.c
 	gcc -c -fPIC -O2 -Wall -Wextra $^
@@ -60,4 +66,4 @@ install-libs: libdirectio
 	ln -fs $(libdir)/$(ldio_so) $(libdir)/libdirectio.so.0
 
 clean:
-	rm -f *.o $(progs) $(libs)
+	rm -f replicate.h *.o $(progs) $(libs)
