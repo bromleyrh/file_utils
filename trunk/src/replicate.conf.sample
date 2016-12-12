@@ -2,17 +2,17 @@
     "transfers":[
         {
             "src":"/mnt/data/data1",
-            "dest":"/dev/sde1",
+            "dest":"/dev/loop1",
             "format_cmd":"mkfs.xfs -f -L external $dest"
         },
         {
             "src":"/mnt/data/data2",
-            "dest":"/dev/sde2",
+            "dest":"/dev/loop2",
             "format_cmd":"mkfs.xfs -f -L external $dest"
         },
         {
             "src":"/mnt/data/data3",
-            "dest":"/dev/sde3",
+            "dest":"/dev/loop3",
             "format_cmd":"mkfs.xfs -f -L external $dest"
         }
     ],

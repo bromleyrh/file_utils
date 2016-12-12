@@ -33,11 +33,11 @@ attr_idx.o: attr_idx.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
 replicate: replicate.o
-	gcc -o $@ `pkg-config --libs libutil` `pkg-config --libs libjson` $^
+	gcc -o $@ `pkg-config --libs libjson` `pkg-config --libs libutil` $^
 
 replicate.o: replicate.c
-	gcc -c $(CFLAGS) `pkg-config --cflags libutil` \
-	`pkg-config --cflags libjson` $^
+	gcc -c $(CFLAGS) `pkg-config --cflags libjson` \
+	`pkg-config --cflags libutil` $^
 
 replicate.c: replicate.h
 
