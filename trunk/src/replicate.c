@@ -2,6 +2,8 @@
  * replicate.c
  */
 
+#define _GNU_SOURCE
+
 #include "replicate.h"
 
 #include <json.h>
@@ -9,11 +11,16 @@
 #include <json/grammar.h>
 #include <json/grammar_parse.h>
 
+#include <libmount/libmount.h>
+
 #include <hashes.h>
+#include <strings_ext.h>
 
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <sched.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +31,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #define CONFIG_PATH "replicate.conf"
 #define CONFIG_ROOT_ID "conf"
@@ -43,9 +51,14 @@ struct transfer {
 
 static int debug;
 
-static int get_string_value(const wchar_t *, const char **);
+static void debug_print(const char *, ...);
 
-static int format_device(struct transfer *);
+static int run_cmd(const char *);
+
+static int mount_filesystem(const char *, int);
+static int unmount_filesystem(const char *, int);
+
+static int format_device(const char *, const char *);
 
 static int do_transfers(struct transfer *, int);
 static void print_transfers(FILE *, struct transfer *, int);
@@ -60,70 +73,192 @@ static int read_json_config(json_val_t, struct ctx *);
 
 static int parse_config(const char *, struct ctx *);
 
-static int
-get_string_value(const wchar_t *wcs, const char **str)
+static void
+debug_print(const char *fmt, ...)
 {
-    char *buf, *tmp;
-    mbstate_t mbs;
-    size_t bufsize = 128, len = 0, tmplen;
+    if (debug) {
+        va_list ap;
 
-    memset(&mbs, 0, sizeof(mbs));
-
-    buf = malloc(bufsize);
-    if (buf == NULL)
-        return -errno;
-
-    for (;;) {
-        tmplen = wcsrtombs(buf + len, &wcs, bufsize - len, &mbs);
-        if (tmplen == (size_t)-1)
-            goto err;
-        len += tmplen;
-        if (wcs == NULL)
-            break;
-
-        bufsize *= 2;
-        tmp = realloc(buf, bufsize);
-        if (tmp == NULL)
-            goto err;
-        buf = tmp;
+        va_start(ap, fmt);
+        vfprintf(stderr, fmt, ap);
+        va_end(ap);
+        fputc('\n', stderr);
     }
-
-    tmp = realloc(buf, len + 1);
-    if (tmp == NULL)
-        goto err;
-
-    *str = tmp;
-    return 0;
-
-err:
-    free(buf);
-    return -errno;
 }
 
 static int
 run_cmd(const char *cmd)
 {
-    return 0;
+    char **argv;
+    int err = 0;
+    int i;
+    int status;
+    pid_t pid;
+
+    argv = strwords(cmd, " \t", '"', '\\');
+    if (argv == NULL)
+        return -errno;
+
+    pid = fork();
+    if (pid == 0) {
+        execvp(argv[0], argv);
+        error(EXIT_FAILURE, errno, "Error executing %s", argv[0]);
+        return EXIT_FAILURE;
+    }
+    if (pid == -1) {
+        err = -errno;
+        goto end;
+    }
+
+    while (waitpid(pid, &status, 0) == -1) {
+        if (errno != EINTR) {
+            err = -errno;
+            goto end;
+        }
+    }
+
+    if (!WIFEXITED(status)) {
+        err = -EIO;
+        goto end;
+    }
+    err = WEXITSTATUS(status);
+
+end:
+    for (i = 0; argv[i] != NULL; i++)
+        free(argv[i]);
+    free(argv);
+    return err;
 }
 
 static int
-format_device(struct transfer *transfer)
+mount_filesystem(const char *path, int read)
 {
-    (void)transfer;
+    int mflags;
+    int ret;
+    struct libmnt_context *mntctx;
 
-    return 0;
+    debug_print("Mounting %s", path);
+
+    mntctx = mnt_new_context();
+    if (mntctx == NULL)
+        return -ENOMEM;
+
+    mflags = MS_NODEV | MS_NOEXEC;
+    if (read)
+        mflags |= MS_RDONLY;
+
+    if ((mnt_context_set_mflags(mntctx, mflags) != 0)
+        || (mnt_context_set_target(mntctx, path) != 0)) {
+        mnt_free_context(mntctx);
+        return -EIO;
+    }
+
+    /* requires CAP_SYS_ADMIN */
+    ret = mnt_context_mount(mntctx);
+
+    mnt_free_context(mntctx);
+
+    if (ret != 0)
+        return (ret > 0) ? -ret : ret;
+
+    /* open root directory to provide a handle for subsequent operations */
+    ret = open(path, O_DIRECTORY | O_RDONLY);
+
+    return (ret == -1) ? -errno : ret;
+}
+
+static int
+unmount_filesystem(const char *path, int rootfd)
+{
+    int ret;
+    struct libmnt_context *mntctx;
+
+    debug_print("Unmounting %s", path);
+
+    mntctx = mnt_new_context();
+    if (mntctx == NULL)
+        return -ENOMEM;
+
+    if (mnt_context_set_target(mntctx, path) != 0) {
+        mnt_free_context(mntctx);
+        return -EIO;
+    }
+
+    /* explicitly synchronize filesystem for greater assurance of data
+       integrity if filesystem is writable */
+    syncfs(rootfd);
+
+    close(rootfd);
+
+    /* requires CAP_SYS_ADMIN */
+    ret = mnt_context_umount(mntctx);
+
+    mnt_free_context(mntctx);
+
+    return (ret > 0) ? -ret : ret;
+}
+
+static int
+format_device(const char *path, const char *cmd)
+{
+    const char *fullcmd;
+    int err;
+
+    debug_print("Formatting device %s", path);
+
+    fullcmd = strsub(cmd, FORMAT_CMD_DEST_SPECIFIER, path);
+    if (fullcmd == NULL)
+        return -errno;
+
+    debug_print("Running \"%s\"", fullcmd);
+    err = run_cmd(fullcmd);
+
+    free((void *)fullcmd);
+
+    return err;
 }
 
 static int
 do_transfers(struct transfer *transfers, int num)
 {
+    int err;
     int i;
+    int srcfd;
+    struct transfer *transfer;
 
     for (i = 0; i < num; i++) {
-        struct transfer *transfer = &transfers[i];
+        transfer = &transfers[i];
+
+        debug_print("Transfer %d:", i + 1);
+
+        srcfd = mount_filesystem(transfer->srcpath, 1);
+        if (srcfd < 0) {
+            error(0, -srcfd, "Error mounting %s", transfer->srcpath);
+            return srcfd;
+        }
+
+        err = format_device(transfer->dstpath, transfer->format_cmd);
+        if (err) {
+            if (err > 0)
+                error(0, 0, "Formatting command returned status %d", err);
+            goto err;
+        }
+
+        /* - mount destination filesystem
+           - change ownership of destination root directory
+           - in child process, change UID and GID and run dir_copy()
+           - unmount destination filesystem */
+
+        err = unmount_filesystem(transfer->srcpath, srcfd);
+        if (err)
+            return err;
     }
 
     return 0;
+
+err:
+    unmount_filesystem(transfer->srcpath, srcfd);
+    return err;
 }
 
 static void
@@ -235,6 +370,7 @@ read_transfers_opt(json_val_t opt, void *data)
         char *tmp;
         json_object_elem_t elem;
         json_val_t val;
+        mbstate_t s;
 
         val = json_val_array_get_elem(opt, i);
         if (val == NULL) {
@@ -247,26 +383,32 @@ read_transfers_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(val, L"src", &elem);
         if (err)
             goto err1;
-        err = get_string_value(json_val_string_get(elem.value),
-                               &transfer->srcpath);
-        if (err)
+        memset(&s, 0, sizeof(s));
+        if (awcstombs((char **)&transfer->srcpath,
+                      json_val_string_get(elem.value), &s) == (size_t)-1) {
+            err = -errno;
             goto err1;
+        }
 
         err = json_val_object_get_elem_by_key(val, L"dest", &elem);
         if (err)
             goto err2;
-        err = get_string_value(json_val_string_get(elem.value),
-                               &transfer->dstpath);
-        if (err)
+        memset(&s, 0, sizeof(s));
+        if (awcstombs((char **)&transfer->dstpath,
+                      json_val_string_get(elem.value), &s) == (size_t)-1) {
+            err = -errno;
             goto err2;
+        }
 
         err = json_val_object_get_elem_by_key(val, L"format_cmd", &elem);
         if (err)
             goto err3;
-        err = get_string_value(json_val_string_get(elem.value),
-                               &transfer->format_cmd);
-        if (err)
+        memset(&s, 0, sizeof(s));
+        if (awcstombs((char **)&transfer->format_cmd,
+                      json_val_string_get(elem.value), &s) == (size_t)-1) {
+            err = -errno;
             goto err3;
+        }
         tmp = strstr(transfer->format_cmd, FORMAT_CMD_DEST_SPECIFIER);
         if (tmp == NULL) {
             error(0, 0, "\"format_cmd\" option missing \""
@@ -366,10 +508,17 @@ main(int argc, char **argv)
         return EXIT_FAILURE;
     print_transfers(stdout, ctx.transfers, ctx.num_transfers);
 
+    /* requires CAP_SYS_ADMIN */
+    ret = unshare(CLONE_NEWNS);
+    if (ret == -1) {
+        error(0, -ret, "Error unsharing namespace");
+        goto end;
+    }
+
     ret = do_transfers(ctx.transfers, ctx.num_transfers);
 
+end:
     free_transfers(ctx.transfers, ctx.num_transfers);
-
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
