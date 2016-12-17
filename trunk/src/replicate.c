@@ -16,9 +16,13 @@
 #include <hashes.h>
 #include <strings_ext.h>
 
+#include <files/util.h>
+
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <grp.h>
+#include <pwd.h>
 #include <sched.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -41,6 +45,8 @@
 struct ctx {
     struct transfer *transfers;
     int             num_transfers;
+    uid_t           uid;
+    gid_t           gid;
 };
 
 struct transfer {
@@ -49,24 +55,39 @@ struct transfer {
     const char *format_cmd;
 };
 
+struct copy_args {
+    int     srcfd;
+    int     dstfd;
+    uid_t   uid;
+    gid_t   gid;
+};
+
 static int debug;
 
 static void debug_print(const char *, ...);
 
+static int get_gid(const char *, gid_t *);
+static int get_uid(const char *, uid_t *);
+
 static int run_cmd(const char *);
 
-static int mount_filesystem(const char *, int);
+static int mount_filesystem(const char *, const char **, int);
 static int unmount_filesystem(const char *, int);
 
 static int format_device(const char *, const char *);
 
-static int do_transfers(struct transfer *, int);
+static int copy_fn(void *);
+
+static int do_copy(struct copy_args *);
+
+static int do_transfers(struct ctx *);
 static void print_transfers(FILE *, struct transfer *, int);
 static void free_transfers(struct transfer *, int);
 
 static int parse_json_config(const char *, const struct json_parser *,
                              json_val_t *);
 
+static int read_copy_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
 static int read_transfers_opt(json_val_t, void *);
 static int read_json_config(json_val_t, struct ctx *);
@@ -84,6 +105,104 @@ debug_print(const char *fmt, ...)
         va_end(ap);
         fputc('\n', stderr);
     }
+}
+
+static int
+get_gid(const char *name, gid_t *gid)
+{
+    char *buf;
+    int err;
+    size_t bufsize;
+    struct group grp, *res;
+
+    bufsize = (size_t)sysconf(_SC_GETGR_R_SIZE_MAX);
+    if (bufsize == (size_t)-1)
+        bufsize = 1024;
+
+    buf = malloc(bufsize);
+    if (buf == NULL)
+        return -errno;
+
+    for (;;) {
+        char *tmp;
+
+        err = getgrnam_r(name, &grp, buf, bufsize, &res);
+        if (!err)
+            break;
+        if (err != ERANGE)
+            goto err;
+
+        bufsize *= 2;
+        tmp = realloc(buf, bufsize);
+        if (tmp == NULL) {
+            err = -errno;
+            goto err;
+        }
+        buf = tmp;
+    }
+    if (res == NULL) {
+        err = -ENOENT;
+        goto err;
+    }
+
+    *gid = grp.gr_gid;
+
+    free(buf);
+
+    return 0;
+
+err:
+    free(buf);
+    return err;
+}
+
+static int
+get_uid(const char *name, uid_t *uid)
+{
+    char *buf;
+    int err;
+    size_t bufsize;
+    struct passwd pwd, *res;
+
+    bufsize = (size_t)sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize == (size_t)-1)
+        bufsize = 1024;
+
+    buf = malloc(bufsize);
+    if (buf == NULL)
+        return -errno;
+
+    for (;;) {
+        char *tmp;
+
+        err = getpwnam_r(name, &pwd, buf, bufsize, &res);
+        if (!err)
+            break;
+        if (err != ERANGE)
+            goto err;
+
+        bufsize *= 2;
+        tmp = realloc(buf, bufsize);
+        if (tmp == NULL) {
+            err = -errno;
+            goto err;
+        }
+        buf = tmp;
+    }
+    if (res == NULL) {
+        err = -ENOENT;
+        goto err;
+    }
+
+    *uid = pwd.pw_uid;
+
+    free(buf);
+
+    return 0;
+
+err:
+    free(buf);
+    return err;
 }
 
 static int
@@ -131,13 +250,14 @@ end:
 }
 
 static int
-mount_filesystem(const char *path, int read)
+mount_filesystem(const char *devpath, const char **mntpath, int read)
 {
+    const char *rootdir;
     int mflags;
     int ret;
     struct libmnt_context *mntctx;
 
-    debug_print("Mounting %s", path);
+    debug_print("Mounting %s", devpath ? devpath : *mntpath);
 
     mntctx = mnt_new_context();
     if (mntctx == NULL)
@@ -147,10 +267,22 @@ mount_filesystem(const char *path, int read)
     if (read)
         mflags |= MS_RDONLY;
 
-    if ((mnt_context_set_mflags(mntctx, mflags) != 0)
-        || (mnt_context_set_target(mntctx, path) != 0)) {
-        mnt_free_context(mntctx);
-        return -EIO;
+    if (mnt_context_set_mflags(mntctx, mflags) != 0)
+        goto err1;
+
+    if (devpath != NULL) {
+        if (mnt_context_set_source(mntctx, devpath) != 0)
+            goto err2;
+        rootdir = mnt_context_get_target(mntctx);
+        if (rootdir == NULL)
+            goto err2;
+        rootdir = strdup(rootdir);
+        if (rootdir == NULL)
+            goto err2;
+    } else {
+        if (mnt_context_set_target(mntctx, *mntpath) != 0)
+            goto err2;
+        rootdir = *mntpath;
     }
 
     /* requires CAP_SYS_ADMIN */
@@ -159,12 +291,27 @@ mount_filesystem(const char *path, int read)
     mnt_free_context(mntctx);
 
     if (ret != 0)
-        return (ret > 0) ? -ret : ret;
+        goto err3;
 
     /* open root directory to provide a handle for subsequent operations */
-    ret = open(path, O_DIRECTORY | O_RDONLY);
+    ret = open(rootdir, O_DIRECTORY | O_RDONLY);
+    if (ret == -1) {
+        ret = -errno;
+        goto err3;
+    }
 
-    return (ret == -1) ? -errno : ret;
+    *mntpath = rootdir;
+    return ret;
+
+err3:
+    if (devpath != NULL)
+        free((void *)rootdir);
+    return (ret > 0) ? -ret : ret;
+
+err2:
+    mnt_free_context(mntctx);
+err1:
+    return -EIO;
 }
 
 static int
@@ -219,45 +366,110 @@ format_device(const char *path, const char *cmd)
 }
 
 static int
-do_transfers(struct transfer *transfers, int num)
+copy_fn(void *arg)
 {
+    struct copy_args *cargs = (struct copy_args *)arg;
+
+    if ((cargs->gid > 0) && (setgid(cargs->gid) == -1)) {
+        error(0, errno, "Error changing group");
+        return errno;
+    }
+    if ((cargs->uid > 0) && (setuid(cargs->uid) == -1)) {
+        error(0, errno, "Error changing user");
+        return errno;
+    }
+
+    return dir_copy(cargs->srcfd, cargs->dstfd,
+                    DIR_COPY_DISCARD_CACHE | DIR_COPY_TMPFILE);
+}
+
+static int
+do_copy(struct copy_args *copy_args)
+{
+    int status;
+    pid_t pid;
+
+    static char copy_stack[16 * 1024 * 1024];
+
+    pid = clone(&copy_fn, copy_stack + sizeof(copy_stack),
+                CLONE_FILES | CLONE_VM, copy_args);
+    if (pid == -1) {
+        error(0, errno, "Error creating process");
+        return -errno;
+    }
+
+    while (waitpid(pid, &status, 0) == -1) {
+        if (errno != EINTR)
+            return errno;
+    }
+
+    if (!WIFEXITED(status))
+        return -EIO;
+
+    return -WEXITSTATUS(status);
+}
+
+static int
+do_transfers(struct ctx *ctx)
+{
+    const char *dstroot;
     int err;
     int i;
-    int srcfd;
+    struct copy_args ca;
     struct transfer *transfer;
 
-    for (i = 0; i < num; i++) {
-        transfer = &transfers[i];
+    for (i = 0; i < ctx->num_transfers; i++) {
+        transfer = &ctx->transfers[i];
 
         debug_print("Transfer %d:", i + 1);
 
-        srcfd = mount_filesystem(transfer->srcpath, 1);
-        if (srcfd < 0) {
-            error(0, -srcfd, "Error mounting %s", transfer->srcpath);
-            return srcfd;
+        ca.srcfd = mount_filesystem(NULL, &transfer->srcpath, 1);
+        if (ca.srcfd < 0) {
+            error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
+            return ca.srcfd;
         }
 
         err = format_device(transfer->dstpath, transfer->format_cmd);
         if (err) {
             if (err > 0)
                 error(0, 0, "Formatting command returned status %d", err);
-            goto err;
+            goto err1;
         }
 
-        /* - mount destination filesystem
-           - change ownership of destination root directory
-           - in child process, change UID and GID and run dir_copy()
-           - unmount destination filesystem */
+        ca.dstfd = mount_filesystem(transfer->dstpath, &dstroot, 0);
+        if (ca.dstfd < 0) {
+            error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
+            err = ca.dstfd;
+            goto err1;
+        }
 
-        err = unmount_filesystem(transfer->srcpath, srcfd);
+        /* change ownership of destination root directory if needed */
+        if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1))
+            goto err2;
+
+        ca.uid = ctx->uid;
+        ca.gid = ctx->gid;
+        err = do_copy(&ca);
+        if (err)
+            goto err2;
+
+        err = unmount_filesystem(dstroot, ca.dstfd);
+        free((void *)dstroot);
+        if (err)
+            goto err1;
+
+        err = unmount_filesystem(transfer->srcpath, ca.srcfd);
         if (err)
             return err;
     }
 
     return 0;
 
-err:
-    unmount_filesystem(transfer->srcpath, srcfd);
+err2:
+    unmount_filesystem(dstroot, ca.dstfd);
+    free((void *)dstroot);
+err1:
+    unmount_filesystem(transfer->srcpath, ca.srcfd);
     return err;
 }
 
@@ -326,7 +538,7 @@ parse_json_config(const char *path, const struct json_parser *parser,
 
     close(fd);
 
-    err = json_grammar_validate(conf, parser, config);
+    err = json_grammar_validate(conf, NULL, NULL, parser, config);
 
     munmap((void *)conf, s.st_size);
 
@@ -340,6 +552,69 @@ parse_json_config(const char *path, const struct json_parser *parser,
 err:
     close(fd);
     return -1;
+}
+
+static int
+read_copy_creds_opt(json_val_t opt, void *data)
+{
+    char *buf;
+    int err;
+    json_object_elem_t elem;
+    mbstate_t s;
+    struct ctx *ctx = (struct ctx *)data;
+
+    memset(&s, 0, sizeof(s));
+
+    err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
+    if (!err) {
+        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
+            == (size_t)-1)
+            return -errno;
+        ctx->uid = atoi(buf);
+        free(buf);
+
+        err = json_val_object_get_elem_by_key(opt, L"gid", &elem);
+        if (err)
+            return err;
+        memset(&s, 0, sizeof(s));
+        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
+            == (size_t)-1)
+            return -errno;
+        ctx->gid = atoi(buf);
+        free(buf);
+    } else if (err == -EINVAL) {
+        err = json_val_object_get_elem_by_key(opt, L"user", &elem);
+        if (err)
+            return err;
+        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
+            == (size_t)-1)
+            return -errno;
+        err = get_uid(buf, &ctx->uid);
+        free(buf);
+        if (err)
+            return err;
+
+        err = json_val_object_get_elem_by_key(opt, L"group", &elem);
+        if (err)
+            return err;
+        memset(&s, 0, sizeof(s));
+        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
+            == (size_t)-1)
+            return -errno;
+        if (strcmp(buf, "-") == 0)
+            ctx->gid = (gid_t)-1;
+        else {
+            err = get_gid(buf, &ctx->gid);
+            if (err) {
+                free(buf);
+                return err;
+            }
+        }
+        free(buf);
+    } else
+        return err;
+
+    return 0;
 }
 
 static int
@@ -446,9 +721,10 @@ read_json_config(json_val_t config, struct ctx *ctx)
     static const struct {
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
-    } opts[2] = {
-        [0] = {L"debug", &read_debug_opt},
-        [1] = {L"transfers", &read_transfers_opt}
+    } opts[8] = {
+        [0] = {L"copy_creds",   &read_copy_creds_opt},
+        [1] = {L"debug",        &read_debug_opt},
+        [5] = {L"transfers",    &read_transfers_opt}
     }, *opt;
 
     numopt = json_val_object_get_num_elem(config);
@@ -459,7 +735,7 @@ read_json_config(json_val_t config, struct ctx *ctx)
         if (err)
             return err;
 
-        opt = &opts[(hash_str(elem.key, -1) >> 4) & 1];
+        opt = &opts[(hash_str(elem.key, -1) >> 2) & 7];
         if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
             return -EIO;
 
@@ -503,10 +779,13 @@ main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
+    ctx.uid = ctx.gid = 0;
+
     ret = parse_config(CONFIG_PATH, &ctx);
     if (ret != 0)
         return EXIT_FAILURE;
     print_transfers(stdout, ctx.transfers, ctx.num_transfers);
+    printf("UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
 
     /* requires CAP_SYS_ADMIN */
     ret = unshare(CLONE_NEWNS);
@@ -515,7 +794,7 @@ main(int argc, char **argv)
         goto end;
     }
 
-    ret = do_transfers(ctx.transfers, ctx.num_transfers);
+    ret = do_transfers(&ctx);
 
 end:
     free_transfers(ctx.transfers, ctx.num_transfers);

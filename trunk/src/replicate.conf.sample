@@ -1,4 +1,9 @@
 {
+    "copy_creds":{
+        "uid":"1000",
+        "gid":"-1"
+    },
+    "debug":false,
     "transfers":[
         {
             "src":"/mnt/data/data1",
@@ -15,6 +20,5 @@
             "dest":"/dev/loop3",
             "format_cmd":"mkfs.xfs -f -L external $dest"
         }
-    ],
-    "debug":false
+    ]
 }
