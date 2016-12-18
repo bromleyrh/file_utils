@@ -10,6 +10,7 @@
 
 #include <json/grammar.h>
 #include <json/grammar_parse.h>
+#include <json/native.h>
 
 #include <libmount/libmount.h>
 
@@ -87,6 +88,8 @@ static void free_transfers(struct transfer *, int);
 
 static int parse_json_config(const char *, const struct json_parser *,
                              json_val_t *);
+
+static int format_cmd_filter(void *, void *, void *);
 
 static int read_copy_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
@@ -542,6 +545,37 @@ err:
 }
 
 static int
+format_cmd_filter(void *src, void *dst, void *arg)
+{
+    char *tmp;
+    const char *format_cmd = *(const char **)src;
+
+    (void)arg;
+
+    tmp = strstr(format_cmd, FORMAT_CMD_DEST_SPECIFIER);
+    if (tmp == NULL) {
+        error(0, 0, "\"format_cmd\" option missing \"" FORMAT_CMD_DEST_SPECIFIER
+              "\"");
+        return -EINVAL;
+    }
+
+    tmp = strstr(tmp + sizeof(FORMAT_CMD_DEST_SPECIFIER) - 1,
+                 FORMAT_CMD_DEST_SPECIFIER);
+    if (tmp != NULL) {
+        error(0, 0, "\"format_cmd\" option must contain only one instance of \""
+                    FORMAT_CMD_DEST_SPECIFIER "\"");
+        return -EINVAL;
+    }
+
+    tmp = strdup(format_cmd);
+    if (tmp == NULL)
+        return -errno;
+
+    *(const char **)dst = tmp;
+    return 0;
+}
+
+static int
 read_copy_creds_opt(json_val_t opt, void *data)
 {
     char *buf;
@@ -614,13 +648,25 @@ read_debug_opt(json_val_t opt, void *data)
     return 0;
 }
 
+#define TRANSFER_PARAM(param) offsetof(struct transfer, param)
+
 static int
 read_transfers_opt(json_val_t opt, void *data)
 {
     int err;
     int i;
     struct ctx *ctx = (struct ctx *)data;
-    struct transfer *transfer;
+
+    static const struct json_scan_spec spec[] = {
+        {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
+         TRANSFER_PARAM(srcpath)},
+        {L"dest", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
+         TRANSFER_PARAM(dstpath)},
+        {L"dstpath", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
+         TRANSFER_PARAM(dstmntpath)},
+        {L"format_cmd", JSON_TYPE_STRING, 1, 0, 1, &format_cmd_filter, NULL,
+         NULL, TRANSFER_PARAM(format_cmd)}
+    };
 
     ctx->num_transfers = json_val_array_get_num_elem(opt);
 
@@ -629,87 +675,28 @@ read_transfers_opt(json_val_t opt, void *data)
         return -errno;
 
     for (i = 0; i < ctx->num_transfers; i++) {
-        char *tmp;
-        json_object_elem_t elem;
         json_val_t val;
-        mbstate_t s;
 
         val = json_val_array_get_elem(opt, i);
         if (val == NULL) {
             err = -EIO;
-            goto err1;
+            goto err;
         }
 
-        transfer = &ctx->transfers[i];
-
-        err = json_val_object_get_elem_by_key(val, L"src", &elem);
+        err = json_oscanf(&ctx->transfers[i], spec,
+                          (int)(sizeof(spec)/sizeof(spec[0])), val);
         if (err)
-            goto err1;
-        memset(&s, 0, sizeof(s));
-        if (awcstombs((char **)&transfer->srcpath,
-                      json_val_string_get(elem.value), &s) == (size_t)-1) {
-            err = -errno;
-            goto err1;
-        }
-
-        err = json_val_object_get_elem_by_key(val, L"dest", &elem);
-        if (err)
-            goto err2;
-        memset(&s, 0, sizeof(s));
-        if (awcstombs((char **)&transfer->dstpath,
-                      json_val_string_get(elem.value), &s) == (size_t)-1) {
-            err = -errno;
-            goto err2;
-        }
-
-        err = json_val_object_get_elem_by_key(val, L"dstpath", &elem);
-        if (err)
-            goto err2;
-        memset(&s, 0, sizeof(s));
-        if (awcstombs((char **)&transfer->dstmntpath,
-                      json_val_string_get(elem.value), &s) == (size_t)-1) {
-            err = -errno;
-            goto err3;
-        }
-
-        err = json_val_object_get_elem_by_key(val, L"format_cmd", &elem);
-        if (err)
-            goto err3;
-        memset(&s, 0, sizeof(s));
-        if (awcstombs((char **)&transfer->format_cmd,
-                      json_val_string_get(elem.value), &s) == (size_t)-1) {
-            err = -errno;
-            goto err4;
-        }
-        tmp = strstr(transfer->format_cmd, FORMAT_CMD_DEST_SPECIFIER);
-        if (tmp == NULL) {
-            error(0, 0, "\"format_cmd\" option missing \""
-                  FORMAT_CMD_DEST_SPECIFIER "\"");
-            err = -EINVAL;
-            goto err4;
-        }
-        tmp = strstr(tmp + sizeof(FORMAT_CMD_DEST_SPECIFIER) - 1,
-                     FORMAT_CMD_DEST_SPECIFIER);
-        if (tmp != NULL) {
-            error(0, 0, "\"format_cmd\" option must contain only one instance "
-                  "of \"" FORMAT_CMD_DEST_SPECIFIER "\"");
-            err = -EINVAL;
-            goto err4;
-        }
+            goto err;
     }
 
     return 0;
 
-err4:
-    free((void *)(transfer->dstpath));
-err3:
-    free((void *)(transfer->dstmntpath));
-err2:
-    free((void *)(transfer->srcpath));
-err1:
+err:
     free_transfers(ctx->transfers, i);
     return err;
 }
+
+#undef TRANSFER_PARAM
 
 static int
 read_json_config(json_val_t config, struct ctx *ctx)
