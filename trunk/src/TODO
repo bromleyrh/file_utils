@@ -1,0 +1,7 @@
+TODO
+
+replicate
+
+- Improve diagnostic output
+- Add option to set and clear read-only block device flags as needed through
+  ioctl()
