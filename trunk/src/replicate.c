@@ -52,6 +52,7 @@ struct ctx {
 struct transfer {
     const char *srcpath;
     const char *dstpath;
+    const char *dstmntpath;
     const char *format_cmd;
 };
 
@@ -71,7 +72,7 @@ static int get_uid(const char *, uid_t *);
 
 static int run_cmd(const char *);
 
-static int mount_filesystem(const char *, const char **, int);
+static int mount_filesystem(const char *, const char *, int);
 static int unmount_filesystem(const char *, int);
 
 static int format_device(const char *, const char *);
@@ -250,14 +251,13 @@ end:
 }
 
 static int
-mount_filesystem(const char *devpath, const char **mntpath, int read)
+mount_filesystem(const char *devpath, const char *mntpath, int read)
 {
-    const char *rootdir;
     int mflags;
     int ret;
     struct libmnt_context *mntctx;
 
-    debug_print("Mounting %s", devpath ? devpath : *mntpath);
+    debug_print("Mounting %s", devpath ? devpath : mntpath);
 
     mntctx = mnt_new_context();
     if (mntctx == NULL)
@@ -273,17 +273,8 @@ mount_filesystem(const char *devpath, const char **mntpath, int read)
     if (devpath != NULL) {
         if (mnt_context_set_source(mntctx, devpath) != 0)
             goto err2;
-        rootdir = mnt_context_get_target(mntctx);
-        if (rootdir == NULL)
-            goto err2;
-        rootdir = strdup(rootdir);
-        if (rootdir == NULL)
-            goto err2;
-    } else {
-        if (mnt_context_set_target(mntctx, *mntpath) != 0)
-            goto err2;
-        rootdir = *mntpath;
-    }
+    } else if (mnt_context_set_target(mntctx, mntpath) != 0)
+        goto err2;
 
     /* requires CAP_SYS_ADMIN */
     ret = mnt_context_mount(mntctx);
@@ -294,18 +285,15 @@ mount_filesystem(const char *devpath, const char **mntpath, int read)
         goto err3;
 
     /* open root directory to provide a handle for subsequent operations */
-    ret = open(rootdir, O_DIRECTORY | O_RDONLY);
+    ret = open(mntpath, O_DIRECTORY | O_RDONLY);
     if (ret == -1) {
         ret = -errno;
         goto err3;
     }
 
-    *mntpath = rootdir;
     return ret;
 
 err3:
-    if (devpath != NULL)
-        free((void *)rootdir);
     return (ret > 0) ? -ret : ret;
 
 err2:
@@ -370,11 +358,11 @@ copy_fn(void *arg)
 {
     struct copy_args *cargs = (struct copy_args *)arg;
 
-    if ((cargs->gid > 0) && (setgid(cargs->gid) == -1)) {
+    if ((cargs->gid != (gid_t)-1) && (setgid(cargs->gid) == -1)) {
         error(0, errno, "Error changing group");
         return errno;
     }
-    if ((cargs->uid > 0) && (setuid(cargs->uid) == -1)) {
+    if ((cargs->uid != (uid_t)-1) && (setuid(cargs->uid) == -1)) {
         error(0, errno, "Error changing user");
         return errno;
     }
@@ -391,6 +379,8 @@ do_copy(struct copy_args *copy_args)
 
     static char copy_stack[16 * 1024 * 1024];
 
+    debug_print("Performing copy");
+
     pid = clone(&copy_fn, copy_stack + sizeof(copy_stack),
                 CLONE_FILES | CLONE_VM, copy_args);
     if (pid == -1) {
@@ -398,7 +388,7 @@ do_copy(struct copy_args *copy_args)
         return -errno;
     }
 
-    while (waitpid(pid, &status, 0) == -1) {
+    while (waitpid(pid, &status, __WCLONE) == -1) {
         if (errno != EINTR)
             return errno;
     }
@@ -412,7 +402,6 @@ do_copy(struct copy_args *copy_args)
 static int
 do_transfers(struct ctx *ctx)
 {
-    const char *dstroot;
     int err;
     int i;
     struct copy_args ca;
@@ -423,7 +412,7 @@ do_transfers(struct ctx *ctx)
 
         debug_print("Transfer %d:", i + 1);
 
-        ca.srcfd = mount_filesystem(NULL, &transfer->srcpath, 1);
+        ca.srcfd = mount_filesystem(NULL, transfer->srcpath, 1);
         if (ca.srcfd < 0) {
             error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
             return ca.srcfd;
@@ -436,7 +425,7 @@ do_transfers(struct ctx *ctx)
             goto err1;
         }
 
-        ca.dstfd = mount_filesystem(transfer->dstpath, &dstroot, 0);
+        ca.dstfd = mount_filesystem(transfer->dstpath, transfer->dstmntpath, 0);
         if (ca.dstfd < 0) {
             error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
             err = ca.dstfd;
@@ -453,8 +442,7 @@ do_transfers(struct ctx *ctx)
         if (err)
             goto err2;
 
-        err = unmount_filesystem(dstroot, ca.dstfd);
-        free((void *)dstroot);
+        err = unmount_filesystem(transfer->dstmntpath, ca.dstfd);
         if (err)
             goto err1;
 
@@ -466,8 +454,7 @@ do_transfers(struct ctx *ctx)
     return 0;
 
 err2:
-    unmount_filesystem(dstroot, ca.dstfd);
-    free((void *)dstroot);
+    unmount_filesystem(transfer->dstmntpath, ca.dstfd);
 err1:
     unmount_filesystem(transfer->srcpath, ca.srcfd);
     return err;
@@ -675,6 +662,16 @@ read_transfers_opt(json_val_t opt, void *data)
             goto err2;
         }
 
+        err = json_val_object_get_elem_by_key(val, L"dstpath", &elem);
+        if (err)
+            goto err2;
+        memset(&s, 0, sizeof(s));
+        if (awcstombs((char **)&transfer->dstmntpath,
+                      json_val_string_get(elem.value), &s) == (size_t)-1) {
+            err = -errno;
+            goto err3;
+        }
+
         err = json_val_object_get_elem_by_key(val, L"format_cmd", &elem);
         if (err)
             goto err3;
@@ -682,14 +679,14 @@ read_transfers_opt(json_val_t opt, void *data)
         if (awcstombs((char **)&transfer->format_cmd,
                       json_val_string_get(elem.value), &s) == (size_t)-1) {
             err = -errno;
-            goto err3;
+            goto err4;
         }
         tmp = strstr(transfer->format_cmd, FORMAT_CMD_DEST_SPECIFIER);
         if (tmp == NULL) {
             error(0, 0, "\"format_cmd\" option missing \""
                   FORMAT_CMD_DEST_SPECIFIER "\"");
             err = -EINVAL;
-            goto err3;
+            goto err4;
         }
         tmp = strstr(tmp + sizeof(FORMAT_CMD_DEST_SPECIFIER) - 1,
                      FORMAT_CMD_DEST_SPECIFIER);
@@ -697,14 +694,16 @@ read_transfers_opt(json_val_t opt, void *data)
             error(0, 0, "\"format_cmd\" option must contain only one instance "
                   "of \"" FORMAT_CMD_DEST_SPECIFIER "\"");
             err = -EINVAL;
-            goto err3;
+            goto err4;
         }
     }
 
     return 0;
 
-err3:
+err4:
     free((void *)(transfer->dstpath));
+err3:
+    free((void *)(transfer->dstmntpath));
 err2:
     free((void *)(transfer->srcpath));
 err1:
