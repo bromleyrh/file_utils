@@ -2,6 +2,8 @@ TODO
 
 replicate
 
+- Change default configuration file path
+- Add command-line option to specify configuration file path
 - Improve diagnostic output
 - Add option to set and clear read-only block device flags as needed through
   ioctl()
