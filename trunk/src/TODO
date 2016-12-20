@@ -2,5 +2,6 @@ TODO
 
 replicate
 
+- Modify program to force mounting destination read-write
 - Add command-line option to specify configuration file path
 - Improve diagnostic output
