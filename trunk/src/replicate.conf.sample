@@ -9,19 +9,22 @@
             "src":"/mnt/data/data1",
             "dest":"/dev/loop1",
             "dstpath":"/mnt/external",
-            "format_cmd":"mkfs.xfs -f -L external $dest"
+            "format_cmd":"mkfs.xfs -f -L external $dest",
+            "setro":true
         },
         {
             "src":"/mnt/data/data2",
             "dest":"/dev/loop2",
             "dstpath":"/mnt/external",
-            "format_cmd":"mkfs.xfs -f -L external $dest"
+            "format_cmd":"mkfs.xfs -f -L external $dest",
+            "setro":true
         },
         {
             "src":"/mnt/data/data3",
             "dest":"/dev/loop3",
             "dstpath":"/mnt/external",
-            "format_cmd":"mkfs.xfs -f -L external $dest"
+            "format_cmd":"mkfs.xfs -f -L external $dest",
+            "setro":true
         }
     ]
 }

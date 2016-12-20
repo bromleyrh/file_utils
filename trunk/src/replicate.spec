@@ -15,6 +15,7 @@
     <transfer_destination>
     <transfer_dstpath>
     <transfer_format_cmd>
+    <transfer_setro?>
 }
 
 <copy_uidgid> = {
@@ -34,6 +35,8 @@
 <transfer_dstpath> = "dstpath" : <string>
 
 <transfer_format_cmd> = "format_cmd" : <string>
+
+<transfer_setro> = "setro" : <Boolean>
 
 <uid> = "uid" : <string>
 

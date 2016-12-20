@@ -34,6 +34,9 @@
 #include <wchar.h>
 #include <wordexp.h>
 
+#include <linux/fs.h>
+
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -52,10 +55,11 @@ struct ctx {
 };
 
 struct transfer {
-    const char *srcpath;
-    const char *dstpath;
-    const char *dstmntpath;
-    const char *format_cmd;
+    const char  *srcpath;
+    const char  *dstpath;
+    const char  *dstmntpath;
+    const char  *format_cmd;
+    int         setro;
 };
 
 struct copy_args {
@@ -74,19 +78,6 @@ static int get_uid(const char *, uid_t *);
 
 static int run_cmd(const char *);
 
-static int mount_filesystem(const char *, const char *, int);
-static int unmount_filesystem(const char *, int);
-
-static int format_device(const char *, const char *);
-
-static int copy_fn(void *);
-
-static int do_copy(struct copy_args *);
-
-static int do_transfers(struct ctx *);
-static void print_transfers(FILE *, struct transfer *, int);
-static void free_transfers(struct transfer *, int);
-
 static int get_conf_path(const char *, const char **);
 
 static int parse_json_config(const char *, const struct json_parser *,
@@ -100,6 +91,20 @@ static int read_transfers_opt(json_val_t, void *);
 static int read_json_config(json_val_t, struct ctx *);
 
 static int parse_config(const char *, struct ctx *);
+
+static int mount_filesystem(const char *, const char *, int);
+static int unmount_filesystem(const char *, int);
+
+static int set_device_read_only(const char *, int, int *);
+static int format_device(const char *, const char *);
+
+static int copy_fn(void *);
+
+static int do_copy(struct copy_args *);
+
+static int do_transfers(struct ctx *);
+static void print_transfers(FILE *, struct transfer *, int);
+static void free_transfers(struct transfer *, int);
 
 static void
 debug_print(const char *fmt, ...)
@@ -254,252 +259,6 @@ end:
         free(argv[i]);
     free(argv);
     return err;
-}
-
-static int
-mount_filesystem(const char *devpath, const char *mntpath, int read)
-{
-    int mflags;
-    int ret;
-    struct libmnt_context *mntctx;
-
-    debug_print("Mounting %s", devpath ? devpath : mntpath);
-
-    mntctx = mnt_new_context();
-    if (mntctx == NULL)
-        return -ENOMEM;
-
-    mflags = MS_NODEV | MS_NOEXEC;
-    if (read)
-        mflags |= MS_RDONLY;
-
-    if (mnt_context_set_mflags(mntctx, mflags) != 0)
-        goto err1;
-
-    if (devpath != NULL) {
-        if (mnt_context_set_source(mntctx, devpath) != 0)
-            goto err2;
-    } else if (mnt_context_set_target(mntctx, mntpath) != 0)
-        goto err2;
-
-    /* requires CAP_SYS_ADMIN */
-    ret = mnt_context_mount(mntctx);
-
-    mnt_free_context(mntctx);
-
-    if (ret != 0)
-        goto err3;
-
-    /* open root directory to provide a handle for subsequent operations */
-    ret = open(mntpath, O_DIRECTORY | O_RDONLY);
-    if (ret == -1) {
-        ret = -errno;
-        goto err3;
-    }
-
-    return ret;
-
-err3:
-    return (ret > 0) ? -ret : ret;
-
-err2:
-    mnt_free_context(mntctx);
-err1:
-    return -EIO;
-}
-
-static int
-unmount_filesystem(const char *path, int rootfd)
-{
-    int ret;
-    struct libmnt_context *mntctx;
-
-    debug_print("Unmounting %s", path);
-
-    mntctx = mnt_new_context();
-    if (mntctx == NULL)
-        return -ENOMEM;
-
-    if (mnt_context_set_target(mntctx, path) != 0) {
-        mnt_free_context(mntctx);
-        return -EIO;
-    }
-
-    /* explicitly synchronize filesystem for greater assurance of data
-       integrity if filesystem is writable */
-    syncfs(rootfd);
-
-    close(rootfd);
-
-    /* requires CAP_SYS_ADMIN */
-    ret = mnt_context_umount(mntctx);
-
-    mnt_free_context(mntctx);
-
-    return (ret > 0) ? -ret : ret;
-}
-
-static int
-format_device(const char *path, const char *cmd)
-{
-    const char *fullcmd;
-    int err;
-
-    debug_print("Formatting device %s", path);
-
-    fullcmd = strsub(cmd, FORMAT_CMD_DEST_SPECIFIER, path);
-    if (fullcmd == NULL)
-        return -errno;
-
-    debug_print("Running \"%s\"", fullcmd);
-    err = run_cmd(fullcmd);
-
-    free((void *)fullcmd);
-
-    return err;
-}
-
-static int
-copy_fn(void *arg)
-{
-    struct copy_args *cargs = (struct copy_args *)arg;
-
-    if ((cargs->gid != (gid_t)-1) && (setgid(cargs->gid) == -1)) {
-        error(0, errno, "Error changing group");
-        return errno;
-    }
-    if ((cargs->uid != (uid_t)-1) && (setuid(cargs->uid) == -1)) {
-        error(0, errno, "Error changing user");
-        return errno;
-    }
-
-    return dir_copy(cargs->srcfd, cargs->dstfd,
-                    DIR_COPY_DISCARD_CACHE | DIR_COPY_TMPFILE);
-}
-
-static int
-do_copy(struct copy_args *copy_args)
-{
-    int status;
-    pid_t pid;
-
-    static char copy_stack[16 * 1024 * 1024];
-
-    debug_print("Performing copy");
-
-    pid = clone(&copy_fn, copy_stack + sizeof(copy_stack),
-                CLONE_FILES | CLONE_VM, copy_args);
-    if (pid == -1) {
-        error(0, errno, "Error creating process");
-        return -errno;
-    }
-
-    while (waitpid(pid, &status, __WCLONE) == -1) {
-        if (errno != EINTR)
-            return errno;
-    }
-
-    if (!WIFEXITED(status))
-        return -EIO;
-
-    return -WEXITSTATUS(status);
-}
-
-static int
-do_transfers(struct ctx *ctx)
-{
-    int err;
-    int i;
-    struct copy_args ca;
-    struct transfer *transfer;
-
-    for (i = 0; i < ctx->num_transfers; i++) {
-        transfer = &ctx->transfers[i];
-
-        debug_print("Transfer %d:", i + 1);
-
-        ca.srcfd = mount_filesystem(NULL, transfer->srcpath, 1);
-        if (ca.srcfd < 0) {
-            error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
-            return ca.srcfd;
-        }
-
-        err = format_device(transfer->dstpath, transfer->format_cmd);
-        if (err) {
-            if (err > 0)
-                error(0, 0, "Formatting command returned status %d", err);
-            goto err1;
-        }
-
-        ca.dstfd = mount_filesystem(transfer->dstpath, transfer->dstmntpath, 0);
-        if (ca.dstfd < 0) {
-            error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
-            err = ca.dstfd;
-            goto err1;
-        }
-
-        /* change ownership of destination root directory if needed */
-        if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1))
-            goto err2;
-
-        ca.uid = ctx->uid;
-        ca.gid = ctx->gid;
-        err = do_copy(&ca);
-        if (err)
-            goto err2;
-
-        err = unmount_filesystem(transfer->dstmntpath, ca.dstfd);
-        if (err)
-            goto err1;
-
-        err = unmount_filesystem(transfer->srcpath, ca.srcfd);
-        if (err)
-            return err;
-    }
-
-    return 0;
-
-err2:
-    unmount_filesystem(transfer->dstmntpath, ca.dstfd);
-err1:
-    unmount_filesystem(transfer->srcpath, ca.srcfd);
-    return err;
-}
-
-static void
-print_transfers(FILE *f, struct transfer *transfers, int num)
-{
-    int i;
-
-    for (i = 0; i < num; i++) {
-        struct transfer *transfer = &transfers[i];
-
-        fprintf(f,
-                "Transfer %d:\n"
-                "\tSource directory path: %s\n"
-                "\tDestination device path: %s\n"
-                "\tDestination formatting command: \"%s\"\n",
-                i + 1,
-                transfer->srcpath,
-                transfer->dstpath,
-                transfer->format_cmd);
-    }
-}
-
-static void
-free_transfers(struct transfer *transfers, int num)
-{
-    int i;
-
-    for (i = 0; i < num; i++) {
-        struct transfer *transfer = &transfers[i];
-
-        free((void *)(transfer->srcpath));
-        free((void *)(transfer->dstpath));
-        free((void *)(transfer->format_cmd));
-    }
-
-    free(transfers);
 }
 
 static int
@@ -696,7 +455,9 @@ read_transfers_opt(json_val_t opt, void *data)
         {L"dstpath", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
          TRANSFER_PARAM(dstmntpath)},
         {L"format_cmd", JSON_TYPE_STRING, 1, 0, 1, &format_cmd_filter, NULL,
-         NULL, TRANSFER_PARAM(format_cmd)}
+         NULL, TRANSFER_PARAM(format_cmd)},
+        {L"setro", JSON_TYPE_BOOLEAN, 0, 0, 1, NULL, NULL, NULL,
+         TRANSFER_PARAM(setro)}
     };
 
     ctx->num_transfers = json_val_array_get_num_elem(opt);
@@ -714,6 +475,7 @@ read_transfers_opt(json_val_t opt, void *data)
             goto err;
         }
 
+        ctx->transfers[i].setro = 0;
         err = json_oscanf(&ctx->transfers[i], spec,
                           (int)(sizeof(spec)/sizeof(spec[0])), val);
         if (err)
@@ -785,6 +547,306 @@ parse_config(const char *path, struct ctx *ctx)
     json_val_free(config);
 
     return err;
+}
+
+static int
+mount_filesystem(const char *devpath, const char *mntpath, int read)
+{
+    int mflags;
+    int ret;
+    struct libmnt_context *mntctx;
+
+    debug_print("Mounting %s", devpath ? devpath : mntpath);
+
+    mntctx = mnt_new_context();
+    if (mntctx == NULL)
+        return -ENOMEM;
+
+    mflags = MS_NODEV | MS_NOEXEC;
+    if (read)
+        mflags |= MS_RDONLY;
+
+    if (mnt_context_set_mflags(mntctx, mflags) != 0)
+        goto err1;
+
+    if (devpath != NULL) {
+        if (mnt_context_set_source(mntctx, devpath) != 0)
+            goto err2;
+    } else if (mnt_context_set_target(mntctx, mntpath) != 0)
+        goto err2;
+
+    /* requires CAP_SYS_ADMIN */
+    ret = mnt_context_mount(mntctx);
+
+    mnt_free_context(mntctx);
+
+    if (ret != 0)
+        goto err3;
+
+    /* open root directory to provide a handle for subsequent operations */
+    ret = open(mntpath, O_DIRECTORY | O_RDONLY);
+    if (ret == -1) {
+        ret = -errno;
+        goto err3;
+    }
+
+    return ret;
+
+err3:
+    return (ret > 0) ? -ret : ret;
+
+err2:
+    mnt_free_context(mntctx);
+err1:
+    return -EIO;
+}
+
+static int
+unmount_filesystem(const char *path, int rootfd)
+{
+    int ret;
+    struct libmnt_context *mntctx;
+
+    debug_print("Unmounting %s", path);
+
+    mntctx = mnt_new_context();
+    if (mntctx == NULL)
+        return -ENOMEM;
+
+    if (mnt_context_set_target(mntctx, path) != 0) {
+        mnt_free_context(mntctx);
+        return -EIO;
+    }
+
+    /* explicitly synchronize filesystem for greater assurance of data
+       integrity if filesystem is writable */
+    syncfs(rootfd);
+
+    close(rootfd);
+
+    /* requires CAP_SYS_ADMIN */
+    ret = mnt_context_umount(mntctx);
+
+    mnt_free_context(mntctx);
+
+    return (ret > 0) ? -ret : ret;
+}
+
+static int
+set_device_read_only(const char *path, int read_only, int *prev_read_only)
+{
+    int fd;
+    int prev;
+
+    fd = open(path, O_RDONLY);
+    if (fd == -1) {
+        error(0, errno, "Error opening %s", path);
+        goto err1;
+    }
+
+    if (ioctl(fd, BLKROGET, &prev) == -1) {
+        error(0, errno, "Error setting %s read-only", path);
+        goto err2;
+    }
+
+    if ((prev != read_only) && (ioctl(fd, BLKROSET, &read_only) == -1)) {
+        error(0, errno, "Error setting %s read-only", path);
+        goto err2;
+    }
+
+    close(fd);
+
+    if (prev_read_only != NULL)
+        *prev_read_only = prev;
+    return 0;
+
+err2:
+    close(fd);
+err1:
+    return -errno;
+}
+
+static int
+format_device(const char *path, const char *cmd)
+{
+    const char *fullcmd;
+    int err;
+
+    debug_print("Formatting device %s", path);
+
+    fullcmd = strsub(cmd, FORMAT_CMD_DEST_SPECIFIER, path);
+    if (fullcmd == NULL)
+        return -errno;
+
+    debug_print("Running \"%s\"", fullcmd);
+    err = run_cmd(fullcmd);
+
+    free((void *)fullcmd);
+
+    return err;
+}
+
+static int
+copy_fn(void *arg)
+{
+    struct copy_args *cargs = (struct copy_args *)arg;
+
+    if ((cargs->gid != (gid_t)-1) && (setgid(cargs->gid) == -1)) {
+        error(0, errno, "Error changing group");
+        return errno;
+    }
+    if ((cargs->uid != (uid_t)-1) && (setuid(cargs->uid) == -1)) {
+        error(0, errno, "Error changing user");
+        return errno;
+    }
+
+    return dir_copy(cargs->srcfd, cargs->dstfd,
+                    DIR_COPY_DISCARD_CACHE | DIR_COPY_TMPFILE);
+}
+
+static int
+do_copy(struct copy_args *copy_args)
+{
+    int status;
+    pid_t pid;
+
+    static char copy_stack[16 * 1024 * 1024];
+
+    debug_print("Performing copy");
+
+    pid = clone(&copy_fn, copy_stack + sizeof(copy_stack),
+                CLONE_FILES | CLONE_VM, copy_args);
+    if (pid == -1) {
+        error(0, errno, "Error creating process");
+        return -errno;
+    }
+
+    while (waitpid(pid, &status, __WCLONE) == -1) {
+        if (errno != EINTR)
+            return errno;
+    }
+
+    if (!WIFEXITED(status))
+        return -EIO;
+
+    return -WEXITSTATUS(status);
+}
+
+static int
+do_transfers(struct ctx *ctx)
+{
+    int err;
+    int i;
+    struct copy_args ca;
+    struct transfer *transfer;
+
+    for (i = 0; i < ctx->num_transfers; i++) {
+        transfer = &ctx->transfers[i];
+
+        debug_print("Transfer %d:", i + 1);
+
+        ca.srcfd = mount_filesystem(NULL, transfer->srcpath, 1);
+        if (ca.srcfd < 0) {
+            error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
+            return ca.srcfd;
+        }
+
+        if (transfer->setro) {
+            err = set_device_read_only(transfer->dstpath, 0, &transfer->setro);
+            if (err) {
+                error(0, 0, "Error setting block device read-only flag for %s",
+                      transfer->dstpath);
+                goto err1;
+            }
+        }
+
+        err = format_device(transfer->dstpath, transfer->format_cmd);
+        if (err) {
+            if (err > 0)
+                error(0, 0, "Formatting command returned status %d", err);
+            goto err2;
+        }
+
+        ca.dstfd = mount_filesystem(transfer->dstpath, transfer->dstmntpath, 0);
+        if (ca.dstfd < 0) {
+            error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
+            err = ca.dstfd;
+            goto err2;
+        }
+
+        /* change ownership of destination root directory if needed */
+        if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1))
+            goto err3;
+
+        ca.uid = ctx->uid;
+        ca.gid = ctx->gid;
+        err = do_copy(&ca);
+        if (err)
+            goto err3;
+
+        err = unmount_filesystem(transfer->dstmntpath, ca.dstfd);
+        if (err)
+            goto err2;
+
+        if (transfer->setro) {
+            err = set_device_read_only(transfer->dstpath, 1, NULL);
+            if (err)
+                goto err1;
+        }
+
+        err = unmount_filesystem(transfer->srcpath, ca.srcfd);
+        if (err)
+            return err;
+    }
+
+    return 0;
+
+err3:
+    unmount_filesystem(transfer->dstmntpath, ca.dstfd);
+err2:
+    if (transfer->setro)
+        set_device_read_only(transfer->dstpath, 1, NULL);
+err1:
+    unmount_filesystem(transfer->srcpath, ca.srcfd);
+    return err;
+}
+
+static void
+print_transfers(FILE *f, struct transfer *transfers, int num)
+{
+    int i;
+
+    for (i = 0; i < num; i++) {
+        struct transfer *transfer = &transfers[i];
+
+        fprintf(f,
+                "Transfer %d:\n"
+                "\tSource directory path: %s\n"
+                "\tDestination device path: %s\n"
+                "\tDestination formatting command: \"%s\"\n"
+                "\tSet block device read-only flag: %d\n",
+                i + 1,
+                transfer->srcpath,
+                transfer->dstpath,
+                transfer->format_cmd,
+                !!(transfer->setro));
+    }
+}
+
+static void
+free_transfers(struct transfer *transfers, int num)
+{
+    int i;
+
+    for (i = 0; i < num; i++) {
+        struct transfer *transfer = &transfers[i];
+
+        free((void *)(transfer->srcpath));
+        free((void *)(transfer->dstpath));
+        free((void *)(transfer->format_cmd));
+    }
+
+    free(transfers);
 }
 
 int
