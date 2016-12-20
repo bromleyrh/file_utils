@@ -32,13 +32,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <wchar.h>
+#include <wordexp.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define CONFIG_PATH "replicate.conf"
+#define CONFIG_PATH "\"$HOME/.replicate.conf\""
 #define CONFIG_ROOT_ID "conf"
 
 #define FORMAT_CMD_DEST_SPECIFIER "$dest"
@@ -85,6 +86,8 @@ static int do_copy(struct copy_args *);
 static int do_transfers(struct ctx *);
 static void print_transfers(FILE *, struct transfer *, int);
 static void free_transfers(struct transfer *, int);
+
+static int get_conf_path(const char *, const char **);
 
 static int parse_json_config(const char *, const struct json_parser *,
                              json_val_t *);
@@ -500,6 +503,34 @@ free_transfers(struct transfer *transfers, int num)
 }
 
 static int
+get_conf_path(const char *pathspec, const char **path)
+{
+    const char *ret;
+    wordexp_t words;
+
+    if (wordexp(pathspec, &words, WRDE_NOCMD | WRDE_UNDEF) != 0)
+        goto err1;
+
+    if (words.we_wordc != 1)
+        goto err2;
+
+    ret = strdup(words.we_wordv[0]);
+
+    wordfree(&words);
+
+    if (ret == NULL)
+        return -errno;
+
+    *path = ret;
+    return 0;
+
+err2:
+    wordfree(&words);
+err1:
+    return -EIO;
+}
+
+static int
 parse_json_config(const char *path, const struct json_parser *parser,
                   json_val_t *config)
 {
@@ -759,6 +790,7 @@ parse_config(const char *path, struct ctx *ctx)
 int
 main(int argc, char **argv)
 {
+    const char *confpath = NULL;
     int ret;
     struct ctx ctx;
 
@@ -767,7 +799,12 @@ main(int argc, char **argv)
 
     ctx.uid = ctx.gid = 0;
 
-    ret = parse_config(CONFIG_PATH, &ctx);
+    ret = get_conf_path(CONFIG_PATH, &confpath);
+    if (ret != 0)
+        return EXIT_FAILURE;
+
+    ret = parse_config(confpath, &ctx);
+    free((void *)confpath);
     if (ret != 0)
         return EXIT_FAILURE;
     print_transfers(stdout, ctx.transfers, ctx.num_transfers);
