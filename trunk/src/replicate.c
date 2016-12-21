@@ -569,6 +569,9 @@ mount_filesystem(const char *devpath, const char *mntpath, int read)
     if (mnt_context_set_mflags(mntctx, mflags) != 0)
         goto err1;
 
+    if (!read && (mnt_context_set_options(mntctx, "rw") != 0))
+        goto err1;
+
     if (devpath != NULL) {
         if (mnt_context_set_source(mntctx, devpath) != 0)
             goto err1;
