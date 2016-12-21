@@ -4,3 +4,4 @@ replicate
 
 - Add command-line option to specify configuration file path
 - Improve diagnostic output
+- Modify program to run with restricted capabilities using libcap
