@@ -2,6 +2,7 @@ TODO
 
 replicate
 
+- Add option not to override "ro" /etc/fstab option for target
 - Add command-line option to specify configuration file path
 - Improve diagnostic output
 - Modify program to run with restricted capabilities using libcap
