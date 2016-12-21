@@ -775,8 +775,10 @@ do_transfers(struct ctx *ctx)
         }
 
         /* change ownership of destination root directory if needed */
-        if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1))
+        if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1)) {
+            err = -errno;
             goto err3;
+        }
 
         ca.uid = ctx->uid;
         ca.gid = ctx->gid;
