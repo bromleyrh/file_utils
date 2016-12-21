@@ -571,9 +571,9 @@ mount_filesystem(const char *devpath, const char *mntpath, int read)
 
     if (devpath != NULL) {
         if (mnt_context_set_source(mntctx, devpath) != 0)
-            goto err2;
+            goto err1;
     } else if (mnt_context_set_target(mntctx, mntpath) != 0)
-        goto err2;
+        goto err1;
 
     /* requires CAP_SYS_ADMIN */
     ret = mnt_context_mount(mntctx);
@@ -581,23 +581,22 @@ mount_filesystem(const char *devpath, const char *mntpath, int read)
     mnt_free_context(mntctx);
 
     if (ret != 0)
-        goto err3;
+        goto err2;
 
     /* open root directory to provide a handle for subsequent operations */
     ret = open(mntpath, O_DIRECTORY | O_RDONLY);
     if (ret == -1) {
         ret = -errno;
-        goto err3;
+        goto err2;
     }
 
     return ret;
 
-err3:
+err2:
     return (ret > 0) ? -ret : ret;
 
-err2:
-    mnt_free_context(mntctx);
 err1:
+    mnt_free_context(mntctx);
     return -EIO;
 }
 
