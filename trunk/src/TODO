@@ -2,7 +2,6 @@ TODO
 
 replicate
 
-- Log success message on transfer completion
 - Add option not to override "ro" /etc/fstab option for target
 - Add command-line option to specify configuration file path
 - Improve diagnostic output

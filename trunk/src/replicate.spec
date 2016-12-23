@@ -1,12 +1,15 @@
 <conf> = {
     <copy_creds?>
     <debug?>
+    <log?>
     <transfers?>
 }
 
 <copy_creds> = "copy_creds" : (<copy_uidgid> | <copy_usrgrp>)
 
 <debug> = "debug" : <Boolean>
+
+<log> = "log" : <Boolean>
 
 <transfers> = "transfers" : [ <transfer>+ ]
 

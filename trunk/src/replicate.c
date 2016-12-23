@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <wchar.h>
 #include <wordexp.h>
@@ -70,8 +71,10 @@ struct copy_args {
 };
 
 static int debug;
+static int log;
 
 static void debug_print(const char *, ...);
+static void log_print(int, const char *, ...);
 
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
@@ -116,6 +119,18 @@ debug_print(const char *fmt, ...)
         vfprintf(stderr, fmt, ap);
         va_end(ap);
         fputc('\n', stderr);
+    }
+}
+
+static void
+log_print(int priority, const char *fmt, ...)
+{
+    if (log) {
+        va_list ap;
+
+        va_start(ap, fmt);
+        vsyslog(priority, fmt, ap);
+        va_end(ap);
     }
 }
 
@@ -438,6 +453,16 @@ read_debug_opt(json_val_t opt, void *data)
     return 0;
 }
 
+static int
+read_log_opt(json_val_t opt, void *data)
+{
+    (void)data;
+
+    log = json_val_boolean_get(opt);
+
+    return 0;
+}
+
 #define TRANSFER_PARAM(param) offsetof(struct transfer, param)
 
 static int
@@ -503,6 +528,7 @@ read_json_config(json_val_t config, struct ctx *ctx)
     } opts[8] = {
         [0] = {L"copy_creds",   &read_copy_creds_opt},
         [1] = {L"debug",        &read_debug_opt},
+        [3] = {L"log",          &read_log_opt},
         [5] = {L"transfers",    &read_transfers_opt}
     }, *opt;
 
@@ -747,6 +773,8 @@ do_transfers(struct ctx *ctx)
         transfer = &ctx->transfers[i];
 
         debug_print("Transfer %d:", i + 1);
+        log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
+                  transfer->srcpath, transfer->dstpath);
 
         ca.srcfd = mount_filesystem(NULL, transfer->srcpath, 1);
         if (ca.srcfd < 0) {
@@ -802,6 +830,9 @@ do_transfers(struct ctx *ctx)
         err = unmount_filesystem(transfer->srcpath, ca.srcfd);
         if (err)
             return err;
+
+        log_print(LOG_INFO, "Finished transfer %d: %s -> %s", i + 1,
+                  transfer->srcpath, transfer->dstpath);
     }
 
     return 0;
@@ -877,6 +908,9 @@ main(int argc, char **argv)
     print_transfers(stdout, ctx.transfers, ctx.num_transfers);
     printf("UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
 
+    if (log)
+        openlog(NULL, LOG_PID, LOG_USER);
+
     /* requires CAP_SYS_ADMIN */
     ret = unshare(CLONE_NEWNS);
     if (ret == -1) {
@@ -887,6 +921,8 @@ main(int argc, char **argv)
     ret = do_transfers(&ctx);
 
 end:
+    if (log)
+        closelog();
     free_transfers(ctx.transfers, ctx.num_transfers);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
