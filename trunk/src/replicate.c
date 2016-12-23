@@ -37,6 +37,7 @@
 
 #include <linux/fs.h>
 
+#include <sys/capability.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -80,6 +81,8 @@ static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
 static int run_cmd(const char *);
+
+static int set_capabilities(void);
 
 static int get_conf_path(const char *, const char **);
 
@@ -274,6 +277,37 @@ end:
         free(argv[i]);
     free(argv);
     return err;
+}
+
+static int
+set_capabilities()
+{
+    cap_t caps;
+
+    static const cap_value_t capvals[] = {
+        CAP_SETGID,
+        CAP_SETUID,
+        CAP_SYS_ADMIN
+    };
+    static const int ncapvals = (int)(sizeof(capvals)/sizeof(capvals[0]));
+
+    caps = cap_init();
+    if (caps == NULL)
+        return -errno;
+
+    if ((cap_set_flag(caps, CAP_PERMITTED, ncapvals, capvals, CAP_SET) == -1)
+        || (cap_set_flag(caps, CAP_EFFECTIVE, ncapvals, capvals, CAP_SET)
+            == -1)
+        || (cap_set_proc(caps) == -1))
+        goto err;
+
+    cap_free(caps);
+
+    return 0;
+
+err:
+    cap_free(caps);
+    return -errno;
 }
 
 static int
@@ -894,6 +928,10 @@ main(int argc, char **argv)
 
     (void)argc;
     (void)argv;
+
+    ret = set_capabilities();
+    if (ret != 0)
+        error(EXIT_FAILURE, -ret, "Error setting capabilities");
 
     ctx.uid = (uid_t)-1;
     ctx.gid = (gid_t)-1;

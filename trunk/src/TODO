@@ -7,4 +7,3 @@ replicate
 - Determine if safe to set block device read-only immediately after mount
 - Improve diagnostic output
 - Investigate options (if any) for exploiting parallelism
-- Modify program to run with restricted capabilities using libcap
