@@ -895,7 +895,8 @@ main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
-    ctx.uid = ctx.gid = 0;
+    ctx.uid = (uid_t)-1;
+    ctx.gid = (gid_t)-1;
 
     ret = get_conf_path(CONFIG_PATH, &confpath);
     if (ret != 0)
