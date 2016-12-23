@@ -729,8 +729,8 @@ copy_fn(void *arg)
     }
 
     umask(0);
-    return dir_copy(cargs->srcfd, cargs->dstfd,
-                    DIR_COPY_DISCARD_CACHE | DIR_COPY_TMPFILE);
+    return dir_copy_fd(cargs->srcfd, cargs->dstfd,
+                       DIR_COPY_DISCARD_CACHE | DIR_COPY_TMPFILE);
 }
 
 static int
