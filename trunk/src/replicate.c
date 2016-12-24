@@ -944,8 +944,11 @@ main(int argc, char **argv)
     free((void *)confpath);
     if (ret != 0)
         return EXIT_FAILURE;
-    print_transfers(stderr, ctx.transfers, ctx.num_transfers);
-    fprintf(stderr, "UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
+
+    if (debug) {
+        print_transfers(stderr, ctx.transfers, ctx.num_transfers);
+        fprintf(stderr, "UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
+    }
 
     if (log)
         openlog(NULL, LOG_PID, LOG_USER);
