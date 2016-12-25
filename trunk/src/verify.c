@@ -774,8 +774,8 @@ do_verif(struct verif_args *verif_args)
 
     debug_print("Performing verification");
 
-    pid = clone(&verif_fn, verif_stack + sizeof(verif_stack),
-                CLONE_FILES | CLONE_VM, verif_args);
+    pid = clone(&verif_fn, verif_stack + sizeof(verif_stack), CLONE_FILES,
+                verif_args);
     if (pid == -1) {
         error(0, errno, "Error creating process");
         return -errno;
