@@ -9,6 +9,8 @@ trunk/src/open
 trunk/src/open_pipes
 trunk/src/replicate
 trunk/src/tmpfile
+trunk/src/verify
 
 replicate.h
 replicate.conf
+verify.h

@@ -1,5 +1,8 @@
 TODO
 
+- Factor out common code shared between replicate and verify into a shared
+  library, or create single executable with multiple modes of operation
+
 replicate
 
 - Add option not to override "ro" /etc/fstab option for target
@@ -7,3 +10,9 @@ replicate
 - Determine if safe to set block device read-only immediately after mount
 - Improve diagnostic output
 - Investigate options (if any) for exploiting parallelism
+
+verify
+
+- Modify to output file size and hash of first 512 bytes of file
+- Allow selection of different hash algorithms
+- Modify to reuse hash context instead of re-initializing

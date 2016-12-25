@@ -18,7 +18,7 @@ prefix=/usr/local
 bindir=$(prefix)/bin
 libdir=$(prefix)/lib
 
-progs = attr_idx cp_mem open open_pipes replicate tmpfile
+progs = attr_idx cp_mem open open_pipes replicate tmpfile verify
 libs = $(ldio_so)
 
 all: $(progs) libdirectio
@@ -45,6 +45,19 @@ replicate.c: replicate.h
 replicate.h: replicate.spec
 	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
+verify: verify.o
+	gcc -o $@ -lcap -lmount -lrt `pkg-config --libs libjson` \
+	`pkg-config --libs libutil` `pkg-config --libs openssl` $^
+
+verify.o: verify.c
+	gcc -c $(CFLAGS) `pkg-config --cflags libjson` \
+	`pkg-config --cflags libutil` `pkg-config --cflags openssl` $^
+
+verify.c: verify.h
+
+verify.h: verify.spec
+	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
+
 libdirectio.o: libdirectio.c
 	gcc -c -fPIC -O2 -Wall -Wextra $^
 
@@ -67,4 +80,4 @@ install-libs: libdirectio
 	ln -fs $(libdir)/$(ldio_so) $(libdir)/libdirectio.so.0
 
 clean:
-	rm -f replicate.h *.o $(progs) $(libs)
+	rm -f replicate.h verify.h *.o $(progs) $(libs)
