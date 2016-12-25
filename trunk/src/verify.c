@@ -43,6 +43,7 @@
 #include <sys/capability.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -98,7 +99,7 @@ static int parse_config(const char *, struct ctx *);
 static int mount_filesystem(const char *);
 static int unmount_filesystem(const char *, int);
 
-static int calc_chksum(int, unsigned char *, unsigned *);
+static int calc_chksums(int, unsigned char *, unsigned char *, unsigned *);
 
 static int verif_walk_fn(int, int, const char *, const char *, struct stat *,
                          void *);
@@ -627,18 +628,20 @@ unmount_filesystem(const char *path, int rootfd)
 #define BUFSIZE (1024 * 1024)
 
 static int
-calc_chksum(int fd, unsigned char *sum, unsigned *sumlen)
+calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
+             unsigned *sumlen)
 {
     char *buf;
     const struct aiocb *cbp;
-    EVP_MD_CTX ctx;
+    EVP_MD_CTX ctx, initctx;
     int err;
-    size_t flen = 0;
+    size_t flen = 0, initrem = 512;
     struct aiocb cb;
 
     static char buf1[BUFSIZE], buf2[BUFSIZE];
 
-    if (EVP_DigestInit(&ctx, EVP_sha1()) != 1)
+    if ((EVP_DigestInit(&ctx, EVP_sha1()) != 1)
+        || (EVP_DigestInit(&initctx, EVP_sha1()) != 1))
         return -EIO;
 
     memset(&cb, 0, sizeof(cb));
@@ -668,11 +671,21 @@ calc_chksum(int fd, unsigned char *sum, unsigned *sumlen)
         if (aio_read(&cb) == -1)
             return -errno;
 
+        if (initrem > 0) {
+            size_t sz = MIN(initrem, len);
+
+            if (EVP_DigestUpdate(&initctx, buf, sz) != 1)
+                goto err;
+            initrem -= sz;
+        }
         if (EVP_DigestUpdate(&ctx, buf, len) != 1)
             goto err;
 
         buf = nextbuf;
     }
+
+    if (EVP_DigestFinal(&initctx, initsum, sumlen) != 1)
+        return -EIO;
 
     return (EVP_DigestFinal(&ctx, sum, sumlen) == 1) ? 0 : -EIO;
 
@@ -691,7 +704,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     FILE *f = (FILE *)ctx;
     int err;
     unsigned i, sumlen;
-    unsigned char sum[EVP_MAX_MD_SIZE];
+    unsigned char initsum[EVP_MAX_MD_SIZE], sum[EVP_MAX_MD_SIZE];
 
     (void)dirfd;
     (void)name;
@@ -699,11 +712,14 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (!S_ISREG(s->st_mode))
         return 0;
 
-    err = calc_chksum(fd, sum, &sumlen);
+    err = calc_chksums(fd, initsum, sum, &sumlen);
     if (err)
         return err;
 
     fprintf(f, "%s: ", path);
+    for (i = 0; i < sumlen; i++)
+        fprintf(f, "%02x", initsum[i]);
+    fputs(", ", f);
     for (i = 0; i < sumlen; i++)
         fprintf(f, "%02x", sum[i]);
     fputc('\n', f);
