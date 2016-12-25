@@ -737,7 +737,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (fprintf(wctx->dstf, "\t%s/%s\n", wctx->prefix, path) <= 0)
         goto err;
 
-    return 0;
+    return (fflush(wctx->dstf) == EOF) ? -errno : 0;
 
 err:
     return -EIO;
