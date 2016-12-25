@@ -64,10 +64,16 @@ struct verif {
 };
 
 struct verif_args {
-    int     srcfd;
-    FILE    *dstf;
-    uid_t   uid;
-    gid_t   gid;
+    int         srcfd;
+    FILE        *dstf;
+    const char  *prefix;
+    uid_t       uid;
+    gid_t       gid;
+};
+
+struct verif_walk_ctx {
+    FILE        *dstf;
+    const char  *prefix;
 };
 
 static int debug;
@@ -701,8 +707,8 @@ static int
 verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
               struct stat *s, void *ctx)
 {
-    FILE *f = (FILE *)ctx;
     int err;
+    struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
     unsigned i, sumlen;
     unsigned char initsum[EVP_MAX_MD_SIZE], sum[EVP_MAX_MD_SIZE];
 
@@ -716,13 +722,13 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (err)
         return err;
 
-    fprintf(f, "%zd\t", s->st_size);
+    fprintf(wctx->dstf, "%zd\t", s->st_size);
     for (i = 0; i < sumlen; i++)
-        fprintf(f, "%02x", initsum[i]);
-    fputc('\t', f);
+        fprintf(wctx->dstf, "%02x", initsum[i]);
+    fputc('\t', wctx->dstf);
     for (i = 0; i < sumlen; i++)
-        fprintf(f, "%02x", sum[i]);
-    fprintf(f, "\t%s\n", path);
+        fprintf(wctx->dstf, "%02x", sum[i]);
+    fprintf(wctx->dstf, "\t%s/%s\n", wctx->prefix, path);
 
     return 0;
 }
@@ -731,6 +737,7 @@ static int
 verif_fn(void *arg)
 {
     struct verif_args *vargs = (struct verif_args *)arg;
+    struct verif_walk_ctx wctx;
 
     if ((vargs->gid != (gid_t)-1) && (setgid(vargs->gid) == -1)) {
         error(0, errno, "Error changing group");
@@ -741,7 +748,9 @@ verif_fn(void *arg)
         return errno;
     }
 
-    return dir_walk_fd(vargs->srcfd, &verif_walk_fn, 0, (void *)(vargs->dstf));
+    wctx.dstf = vargs->dstf;
+    wctx.prefix = vargs->prefix;
+    return dir_walk_fd(vargs->srcfd, &verif_walk_fn, 0, (void *)&wctx);
 }
 
 static int
@@ -802,6 +811,7 @@ do_verifs(struct ctx *ctx)
         }
 
         va.dstf = dstf;
+        va.prefix = verif->srcpath;
         va.uid = ctx->uid;
         va.gid = ctx->gid;
         err = do_verif(&va);
