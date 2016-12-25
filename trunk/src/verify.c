@@ -760,7 +760,8 @@ verif_fn(void *arg)
 
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
-    return dir_walk_fd(vargs->srcfd, &verif_walk_fn, 0, (void *)&wctx);
+    return dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
+                       (void *)&wctx);
 }
 
 static int
