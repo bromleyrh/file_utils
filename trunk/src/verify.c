@@ -832,8 +832,10 @@ do_verifs(struct ctx *ctx)
         if (err)
             goto err1;
 
-        if (fsync(fileno(dstf)) == -1)
+        if (fsync(fileno(dstf)) == -1) {
+            err = -errno;
             goto err1;
+        }
 
         log_print(LOG_INFO, "Finished verifcation %d: %s", i + 1,
                   verif->srcpath);
