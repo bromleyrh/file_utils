@@ -722,15 +722,25 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (err)
         return err;
 
-    fprintf(wctx->dstf, "%zd\t", s->st_size);
-    for (i = 0; i < sumlen; i++)
-        fprintf(wctx->dstf, "%02x", initsum[i]);
-    fputc('\t', wctx->dstf);
-    for (i = 0; i < sumlen; i++)
-        fprintf(wctx->dstf, "%02x", sum[i]);
-    fprintf(wctx->dstf, "\t%s/%s\n", wctx->prefix, path);
+    if (fprintf(wctx->dstf, "%zd\t", s->st_size) <= 0)
+        goto err;
+    for (i = 0; i < sumlen; i++) {
+        if (fprintf(wctx->dstf, "%02x", initsum[i]) <= 0)
+            goto err;
+    }
+    if (fputc('\t', wctx->dstf) == EOF)
+        goto err;
+    for (i = 0; i < sumlen; i++) {
+        if (fprintf(wctx->dstf, "%02x", sum[i]) <= 0)
+            goto err;
+    }
+    if (fprintf(wctx->dstf, "\t%s/%s\n", wctx->prefix, path) <= 0)
+        goto err;
 
     return 0;
+
+err:
+    return -EIO;
 }
 
 static int
