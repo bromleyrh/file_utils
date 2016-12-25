@@ -716,13 +716,13 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (err)
         return err;
 
-    fprintf(f, "%s: ", path);
+    fprintf(f, "%zd\t", s->st_size);
     for (i = 0; i < sumlen; i++)
         fprintf(f, "%02x", initsum[i]);
-    fputs(", ", f);
+    fputc('\t', f);
     for (i = 0; i < sumlen; i++)
         fprintf(f, "%02x", sum[i]);
-    fputc('\n', f);
+    fprintf(f, "\t%s\n", path);
 
     return 0;
 }

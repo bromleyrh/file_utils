@@ -13,6 +13,5 @@ replicate
 
 verify
 
-- Modify to output file size and hash of first 512 bytes of file
 - Allow selection of different hash algorithms
 - Modify to reuse hash context instead of re-initializing
