@@ -925,13 +925,13 @@ main(int argc, char **argv)
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
 
-    ctx.base_dir = NULL;
-    ctx.uid = (uid_t)-1;
-    ctx.gid = (gid_t)-1;
-
     ret = get_conf_path(CONFIG_PATH, &confpath);
     if (ret != 0)
         return EXIT_FAILURE;
+
+    ctx.base_dir = NULL;
+    ctx.uid = (uid_t)-1;
+    ctx.gid = (gid_t)-1;
 
     ret = parse_config(confpath, &ctx);
     free((void *)confpath);
