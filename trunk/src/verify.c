@@ -632,6 +632,7 @@ unmount_filesystem(const char *path, int rootfd)
 }
 
 #define BUFSIZE (1024 * 1024)
+#define DISCARD_CACHE_INTERVAL (16 * 1024 * 1024)
 
 static int
 calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
@@ -672,6 +673,10 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
         }
         flen += len;
 
+        if ((flen % DISCARD_CACHE_INTERVAL == 0)
+            && (posix_fadvise(fd, 0, flen, POSIX_FADV_DONTNEED) == -1))
+            goto err;
+
         cb.aio_offset = flen;
         cb.aio_buf = nextbuf = (buf == buf1) ? buf2 : buf1;
         if (aio_read(&cb) == -1)
@@ -702,6 +707,7 @@ err:
 }
 
 #undef BUFSIZE
+#undef DISCARD_CACHE_INTERVAL
 
 static int
 verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
@@ -723,24 +729,33 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         return err;
 
     if (fprintf(wctx->dstf, "%zd\t", s->st_size) <= 0)
-        goto err;
+        goto err1;
     for (i = 0; i < sumlen; i++) {
         if (fprintf(wctx->dstf, "%02x", initsum[i]) <= 0)
-            goto err;
+            goto err1;
     }
     if (fputc('\t', wctx->dstf) == EOF)
-        goto err;
+        goto err1;
     for (i = 0; i < sumlen; i++) {
         if (fprintf(wctx->dstf, "%02x", sum[i]) <= 0)
-            goto err;
+            goto err1;
     }
     if (fprintf(wctx->dstf, "\t%s/%s\n", wctx->prefix, path) <= 0)
-        goto err;
+        goto err1;
 
-    return (fflush(wctx->dstf) == EOF) ? -errno : 0;
+    if (fflush(wctx->dstf) == EOF)
+        goto err2;
 
-err:
+    if (posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED) == -1)
+        goto err2;
+
+    return 0;
+
+err1:
     return -EIO;
+
+err2:
+    return -errno;
 }
 
 static int
