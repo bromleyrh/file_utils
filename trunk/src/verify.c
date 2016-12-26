@@ -27,6 +27,7 @@
 #include <error.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <inttypes.h>
 #include <pwd.h>
 #include <sched.h>
 #include <stdarg.h>
@@ -744,7 +745,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (err)
         return err;
 
-    if (fprintf(wctx->dstf, "%zd\t", s->st_size) <= 0)
+    if (fprintf(wctx->dstf, "%" PRIu64 "\t", s->st_size) <= 0)
         goto err1;
     for (i = 0; i < sumlen; i++) {
         if (fprintf(wctx->dstf, "%02x", initsum[i]) <= 0)
