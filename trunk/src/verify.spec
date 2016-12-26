@@ -1,10 +1,13 @@
 <conf> = {
+    <base_dir?>
     <debug?>
     <log?>
     <output_file>
     <verifs?>
     <verif_creds?>
 }
+
+<base_dir> = "base_dir" : <string>
 
 <debug> = "debug" : <Boolean>
 

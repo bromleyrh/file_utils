@@ -54,6 +54,7 @@
 struct ctx {
     struct verif    *verifs;
     int             num_verifs;
+    const char      *base_dir;
     const char      *output_file;
     uid_t           uid;
     gid_t           gid;
@@ -94,6 +95,7 @@ static int get_conf_path(const char *, const char **);
 static int parse_json_config(const char *, const struct json_parser *,
                              json_val_t *);
 
+static int read_base_dir_opt(json_val_t, void *);
 static int read_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
 static int read_output_file_opt(json_val_t, void *);
@@ -364,6 +366,17 @@ err:
 }
 
 static int
+read_base_dir_opt(json_val_t opt, void *data)
+{
+    mbstate_t s;
+    struct ctx *ctx = (struct ctx *)data;
+
+    memset(&s, 0, sizeof(s));
+    return (awcstombs((char **)&ctx->base_dir, json_val_string_get(opt), &s)
+            == (size_t)-1) ? -errno : 0;
+}
+
+static int
 read_creds_opt(json_val_t opt, void *data)
 {
     char *buf;
@@ -510,12 +523,13 @@ read_json_config(json_val_t config, struct ctx *ctx)
     static const struct {
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
-    } opts[8] = {
-        [1] = {L"creds",        &read_creds_opt},
-        [2] = {L"debug",        &read_debug_opt},
-        [6] = {L"log",          &read_log_opt},
-        [7] = {L"output_file",  &read_output_file_opt},
-        [3] = {L"verifs",       &read_verifs_opt}
+    } opts[16] = {
+        [2]     = {L"base_dir",     &read_base_dir_opt},
+        [3]     = {L"creds",        &read_creds_opt},
+        [4]     = {L"debug",        &read_debug_opt},
+        [12]    = {L"log",          &read_log_opt},
+        [15]    = {L"output_file",  &read_output_file_opt},
+        [6]     = {L"verifs",       &read_verifs_opt}
     }, *opt;
 
     numopt = json_val_object_get_num_elem(config);
@@ -526,7 +540,7 @@ read_json_config(json_val_t config, struct ctx *ctx)
         if (err)
             return err;
 
-        opt = &opts[(hash_str(elem.key, -1) >> 1) & 7];
+        opt = &opts[hash_str(elem.key, -1) & 15];
         if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
             return -EIO;
 
@@ -911,6 +925,7 @@ main(int argc, char **argv)
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
 
+    ctx.base_dir = NULL;
     ctx.uid = (uid_t)-1;
     ctx.gid = (gid_t)-1;
 
@@ -922,6 +937,11 @@ main(int argc, char **argv)
     free((void *)confpath);
     if (ret != 0)
         return EXIT_FAILURE;
+
+    if ((ctx.base_dir != NULL) && (chdir(ctx.base_dir) == -1)) {
+        error(0, -errno, "Error changing directory to %s", ctx.base_dir);
+        goto end1;
+    }
 
     if (debug) {
         print_verifs(stderr, ctx.verifs, ctx.num_verifs);
@@ -935,14 +955,17 @@ main(int argc, char **argv)
     ret = unshare(CLONE_NEWNS);
     if (ret == -1) {
         error(0, -ret, "Error unsharing namespace");
-        goto end;
+        goto end2;
     }
 
     ret = do_verifs(&ctx);
 
-end:
+end2:
     if (log)
         closelog();
+end1:
+    if (ctx.base_dir != NULL)
+        free((void *)(ctx.base_dir));
     free_verifs(ctx.verifs, ctx.num_verifs);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
