@@ -1,13 +1,15 @@
 <conf> = {
     <base_dir?>
+    <creds?>
     <debug?>
     <log?>
     <output_file>
     <verifs?>
-    <verif_creds?>
 }
 
 <base_dir> = "base_dir" : <string>
+
+<creds> = "creds" : (<creds_uidgid> | <creds_usrgrp>)
 
 <debug> = "debug" : <Boolean>
 
@@ -17,19 +19,17 @@
 
 <verifs> = "verifs" : [ <verif>+ ]
 
-<verif_creds> = "verif_creds" : (<verif_uidgid> | <verif_usrgrp>)
-
 <verif> = {
     <verif_dev>
     <verif_source>
 }
 
-<verif_uidgid> = {
+<creds_uidgid> = {
     <uid>
     <gid>
 }
 
-<verif_usrgrp> = {
+<creds_usrgrp> = {
     <user>
     <group>
 }
