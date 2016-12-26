@@ -894,8 +894,10 @@ print_verifs(FILE *f, struct verif *verifs, int num)
 
         fprintf(f,
                 "Verifcation %d:\n"
+                "\tDevice path: %s\n"
                 "\tSource directory path: %s\n",
                 i + 1,
+                verif->devpath,
                 verif->srcpath);
     }
 }
