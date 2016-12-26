@@ -966,6 +966,7 @@ end2:
 end1:
     if (ctx.base_dir != NULL)
         free((void *)(ctx.base_dir));
+    free((void *)(ctx.output_file));
     free_verifs(ctx.verifs, ctx.num_verifs);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
