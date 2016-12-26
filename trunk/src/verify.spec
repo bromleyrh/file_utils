@@ -20,6 +20,7 @@
 <verif_creds> = "verif_creds" : (<verif_uidgid> | <verif_usrgrp>)
 
 <verif> = {
+    <verif_dev>
     <verif_source>
 }
 
@@ -32,6 +33,8 @@
     <user>
     <group>
 }
+
+<verif_dev> = "dev" : <string>
 
 <verif_source> = "src" : <string>
 

@@ -63,6 +63,7 @@ struct ctx {
 };
 
 struct verif {
+    const char *devpath;
     const char *srcpath;
 };
 
@@ -106,7 +107,7 @@ static int read_json_config(json_val_t, struct ctx *);
 
 static int parse_config(const char *, struct ctx *);
 
-static int mount_filesystem(const char *);
+static int mount_filesystem(const char *, const char *);
 static int unmount_filesystem(const char *, int);
 
 static int calc_chksums(int, unsigned char *, unsigned char *, unsigned *);
@@ -482,6 +483,8 @@ read_verifs_opt(json_val_t opt, void *data)
     struct ctx *ctx = (struct ctx *)data;
 
     static const struct json_scan_spec spec[] = {
+        {L"dev", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
+         VERIF_PARAM(devpath)},
         {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(srcpath)}
     };
@@ -578,7 +581,7 @@ parse_config(const char *path, struct ctx *ctx)
 }
 
 static int
-mount_filesystem(const char *mntpath)
+mount_filesystem(const char *devpath, const char *mntpath)
 {
     int mflags;
     int ret;
@@ -593,6 +596,7 @@ mount_filesystem(const char *mntpath)
     mflags = MS_NODEV | MS_NOEXEC | MS_RDONLY;
 
     if ((mnt_context_set_mflags(mntctx, mflags) != 0)
+        || (mnt_context_set_source(mntctx, devpath) != 0)
         || (mnt_context_set_target(mntctx, mntpath) != 0))
         goto err1;
 
@@ -843,7 +847,7 @@ do_verifs(struct ctx *ctx)
         log_print(LOG_INFO, "Starting verifcation %d: %s", i + 1,
                   verif->srcpath);
 
-        va.srcfd = mount_filesystem(verif->srcpath);
+        va.srcfd = mount_filesystem(verif->devpath, verif->srcpath);
         if (va.srcfd < 0) {
             error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
             err = va.srcfd;
