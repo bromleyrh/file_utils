@@ -816,10 +816,7 @@ do_verif(struct verif_args *verif_args)
             return errno;
     }
 
-    if (!WIFEXITED(status))
-        return -EIO;
-
-    return -WEXITSTATUS(status);
+    return WIFEXITED(status) ? -WEXITSTATUS(status) : -EIO;
 }
 
 static int
@@ -902,11 +899,8 @@ free_verifs(struct verif *verifs, int num)
 {
     int i;
 
-    for (i = 0; i < num; i++) {
-        struct verif *verif = &verifs[i];
-
-        free((void *)(verif->srcpath));
-    }
+    for (i = 0; i < num; i++)
+        free((void *)(verifs[i].srcpath));
 
     free(verifs);
 }
