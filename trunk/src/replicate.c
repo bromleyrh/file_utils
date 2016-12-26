@@ -2,6 +2,7 @@
  * replicate.c
  */
 
+#define _FILE_OFFSET_BITS 64
 #define _GNU_SOURCE
 
 #include "replicate.h"
