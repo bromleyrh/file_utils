@@ -663,7 +663,7 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
     const struct aiocb *cbp;
     EVP_MD_CTX ctx, initctx;
     int err;
-    size_t flen = 0, initrem = 512;
+    off_t flen = 0, initrem = 512;
     struct aiocb cb;
 
     static char buf1[BUFSIZE], buf2[BUFSIZE];
