@@ -834,10 +834,14 @@ do_verifs(struct ctx *ctx)
     struct verif *verif;
     struct verif_args va;
 
-    dstf = fopen(ctx->output_file, "w");
-    if (dstf == NULL) {
-        error(0, -errno, "Error opening %s", ctx->output_file);
-        return -errno;
+    if (strcmp("-", ctx->output_file) == 0)
+        dstf = stdout;
+    else {
+        dstf = fopen(ctx->output_file, "w");
+        if (dstf == NULL) {
+            error(0, errno, "Error opening %s", ctx->output_file);
+            return -errno;
+        }
     }
 
     for (i = 0; i < ctx->num_verifs; i++) {
@@ -866,7 +870,7 @@ do_verifs(struct ctx *ctx)
         if (err)
             goto err1;
 
-        if (fsync(fileno(dstf)) == -1) {
+        if ((dstf != stdout) && (fsync(fileno(dstf)) == -1)) {
             err = -errno;
             goto err1;
         }
@@ -875,12 +879,13 @@ do_verifs(struct ctx *ctx)
                   verif->srcpath);
     }
 
-    return (fclose(dstf) == EOF) ? -errno : 0;
+    return (dstf == stdout) ? 0 : ((fclose(dstf) == EOF) ? -errno : 0);
 
 err2:
     unmount_filesystem(verif->srcpath, va.srcfd);
 err1:
-    fclose(dstf);
+    if (dstf != stdout)
+        fclose(dstf);
     return err;
 }
 
