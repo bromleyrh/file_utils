@@ -785,7 +785,8 @@ verif_fn(void *arg)
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
 
-    if ((vargs->gid != (gid_t)-1) && (setgid(vargs->gid) == -1)) {
+    if ((vargs->gid != (gid_t)-1)
+        && ((setgroups(0, NULL) == -1) || (setgid(vargs->gid) == -1))) {
         error(0, errno, "Error changing group");
         return errno;
     }

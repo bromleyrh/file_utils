@@ -754,7 +754,8 @@ copy_fn(void *arg)
 {
     struct copy_args *cargs = (struct copy_args *)arg;
 
-    if ((cargs->gid != (gid_t)-1) && (setgid(cargs->gid) == -1)) {
+    if ((cargs->gid != (gid_t)-1)
+        && ((setgroups(0, NULL) == -1) || (setgid(cargs->gid) == -1))) {
         error(0, errno, "Error changing group");
         return errno;
     }
