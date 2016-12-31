@@ -1,5 +1,6 @@
 TODO
 
+- Verify child process stack sizes sufficient
 - Factor out common code shared between replicate and verify into a shared
   library, or create single executable with multiple modes of operation
 
