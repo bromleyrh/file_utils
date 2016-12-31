@@ -836,10 +836,8 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
         buf = nextbuf;
     }
 
-    if (EVP_DigestFinal(&initctx, initsum, sumlen) != 1)
-        return -EIO;
-
-    return (EVP_DigestFinal(&ctx, sum, sumlen) == 1) ? 0 : -EIO;
+    return ((EVP_DigestFinal(&initctx, initsum, sumlen) == 1)
+            && (EVP_DigestFinal(&ctx, sum, sumlen) == 1)) ? 0 : -EIO;
 
 err:
     err = -((errno == 0) ? EIO : errno);
