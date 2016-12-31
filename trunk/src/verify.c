@@ -29,6 +29,7 @@
 #include <grp.h>
 #include <inttypes.h>
 #include <pwd.h>
+#include <regex.h>
 #include <sched.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -57,9 +58,17 @@ struct ctx {
     struct verif    *verifs;
     int             num_verifs;
     const char      *base_dir;
+    regex_t         *reg_excl;
     const char      *output_file;
     uid_t           uid;
     gid_t           gid;
+};
+
+struct parse_ctx {
+    struct ctx  ctx;
+    char        *regex;
+    char        *regexcurbr;
+    size_t      regexlen;
 };
 
 struct verif {
@@ -70,12 +79,14 @@ struct verif {
 struct verif_args {
     int         srcfd;
     FILE        *dstf;
+    regex_t     *reg_excl;
     const char  *prefix;
     uid_t       uid;
     gid_t       gid;
 };
 
 struct verif_walk_ctx {
+    regex_t     *reg_excl;
     FILE        *dstf;
     const char  *prefix;
 };
@@ -85,6 +96,8 @@ static int log;
 
 static void debug_print(const char *, ...);
 static void log_print(int, const char *, ...);
+
+static int expand_string(char **, char **, size_t *, size_t);
 
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
@@ -101,16 +114,22 @@ static int parse_json_config(const char *, const struct json_parser *,
 static int read_base_dir_opt(json_val_t, void *);
 static int read_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
+static int read_exclude_opt(json_val_t, void *);
 static int read_output_file_opt(json_val_t, void *);
 static int read_verifs_opt(json_val_t, void *);
-static int read_json_config(json_val_t, struct ctx *);
+static int read_json_config(json_val_t, struct parse_ctx *);
 
-static int parse_config(const char *, struct ctx *);
+static int parse_config(const char *, struct parse_ctx *);
+
+static int get_regex(regex_t *, const char *);
 
 static int mount_filesystem(const char *, const char *);
 static int unmount_filesystem(const char *, int);
 
 static int calc_chksums(int, unsigned char *, unsigned char *, unsigned *);
+
+static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
+                         unsigned, const char *, const char *);
 
 static int verif_walk_fn(int, int, const char *, const char *, struct stat *,
                          void *);
@@ -146,6 +165,27 @@ log_print(int priority, const char *fmt, ...)
         vsyslog(priority, fmt, ap);
         va_end(ap);
     }
+}
+
+static int
+expand_string(char **str, char **dst, size_t *len, size_t minadd)
+{
+    size_t off = *dst - *str;
+
+    if (off + minadd > *len) {
+        char *tmp;
+        size_t newlen;
+
+        newlen = MAX(*len + minadd, *len * 2);
+        tmp = realloc((void *)*str, newlen + 1);
+        if (tmp == NULL)
+            return -errno;
+        *str = tmp;
+        *dst = tmp + off;
+        *len = newlen;
+    }
+
+    return 0;
 }
 
 static int
@@ -453,6 +493,48 @@ read_debug_opt(json_val_t opt, void *data)
 }
 
 static int
+read_exclude_opt(json_val_t opt, void *data)
+{
+    int err;
+    int first;
+    int i, numexcl;
+    struct parse_ctx *pctx = (struct parse_ctx *)data;
+
+    numexcl = json_val_array_get_num_elem(opt);
+    first = (pctx->regexlen == 0);
+
+    for (i = 0; i < numexcl; i++) {
+        char *regexbr;
+        json_val_t val;
+        mbstate_t s;
+        size_t brlen;
+
+        val = json_val_array_get_elem(opt, i);
+        if (val == NULL)
+            return -EIO;
+
+        memset(&s, 0, sizeof(s));
+        brlen = awcstombs(&regexbr, json_val_string_get(val), &s);
+        if (brlen == (size_t)-1)
+            return -errno;
+
+        err = expand_string(&pctx->regex, &pctx->regexcurbr, &pctx->regexlen,
+                            brlen + 2);
+        if (err)
+            return err;
+        if (first)
+            first = 0;
+        else
+            *((pctx->regexcurbr)++) = '|';
+        pctx->regexcurbr = stpcpy(pctx->regexcurbr, regexbr);
+
+        free(regexbr);
+    }
+
+    return 0;
+}
+
+static int
 read_output_file_opt(json_val_t opt, void *data)
 {
     mbstate_t s;
@@ -520,7 +602,7 @@ err:
 #undef VERIF_PARAM
 
 static int
-read_json_config(json_val_t config, struct ctx *ctx)
+read_json_config(json_val_t config, struct parse_ctx *ctx)
 {
     int err;
     int i, numopt;
@@ -532,6 +614,7 @@ read_json_config(json_val_t config, struct ctx *ctx)
         [2]     = {L"base_dir",     &read_base_dir_opt},
         [3]     = {L"creds",        &read_creds_opt},
         [4]     = {L"debug",        &read_debug_opt},
+        [5]     = {L"exclude",      &read_exclude_opt},
         [12]    = {L"log",          &read_log_opt},
         [15]    = {L"output_file",  &read_output_file_opt},
         [6]     = {L"verifs",       &read_verifs_opt}
@@ -558,7 +641,7 @@ read_json_config(json_val_t config, struct ctx *ctx)
 }
 
 static int
-parse_config(const char *path, struct ctx *ctx)
+parse_config(const char *path, struct parse_ctx *ctx)
 {
     int err;
     json_val_t config;
@@ -579,6 +662,43 @@ parse_config(const char *path, struct ctx *ctx)
 
     return err;
 }
+
+#define ERRBUF_INIT_SIZE 128
+
+static int
+get_regex(regex_t *reg, const char *regex)
+{
+    int err;
+
+    err = regcomp(reg, regex, REG_EXTENDED | REG_NOSUB);
+    if (err) {
+        char *errbuf;
+        size_t errbuf_size;
+
+        errbuf = malloc(ERRBUF_INIT_SIZE);
+        if (errbuf == NULL)
+            return -EIO;
+
+        errbuf_size = regerror(err, reg, errbuf, ERRBUF_INIT_SIZE);
+        if (errbuf_size > ERRBUF_INIT_SIZE) {
+            free(errbuf);
+            errbuf = malloc(errbuf_size);
+            if (errbuf == NULL)
+                return -EIO;
+
+            regerror(err, reg, errbuf, errbuf_size);
+        }
+        error(0, 0, "Error compiling regular expression: %s", errbuf);
+
+        free(errbuf);
+
+        return -EIO;
+    }
+
+    return 0;
+}
+
+#undef ERRBUF_INIT_SIZE
 
 static int
 mount_filesystem(const char *devpath, const char *mntpath)
@@ -731,12 +851,46 @@ err:
 #undef DISCARD_CACHE_INTERVAL
 
 static int
+output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
+              unsigned sumlen, const char *prefix, const char *path)
+{
+    unsigned i;
+
+    /* print file size */
+    if (fprintf(f, "%" PRIu64 "\t", size) <= 0)
+        goto err;
+
+    /* print checksum of first min(file_size, 512) bytes of file */
+    for (i = 0; i < sumlen; i++) {
+        if (fprintf(f, "%02x", initsum[i]) <= 0)
+            goto err;
+    }
+    if (fputc('\t', f) == EOF)
+        goto err;
+
+    /* print checksum of file */
+    for (i = 0; i < sumlen; i++) {
+        if (fprintf(f, "%02x", sum[i]) <= 0)
+            goto err;
+    }
+
+    /* print file path */
+    if (fprintf(f, "\t%s/%s\n", prefix, path) <= 0)
+        goto err;
+
+    return (fflush(f) == EOF) ? -errno : 0;
+
+err:
+    return -EIO;
+}
+
+static int
 verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
               struct stat *s, void *ctx)
 {
     int err;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
-    unsigned i, sumlen;
+    unsigned sumlen;
     unsigned char initsum[EVP_MAX_MD_SIZE], sum[EVP_MAX_MD_SIZE];
 
     (void)dirfd;
@@ -745,38 +899,24 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (!S_ISREG(s->st_mode))
         return 0;
 
+    /* check if file excluded */
+    if ((wctx->reg_excl != NULL)
+        && (regexec(wctx->reg_excl, path, 0, NULL, 0) == 0)) {
+        fprintf(stderr, "%s excluded\n", path);
+        return 0;
+    }
+
     err = calc_chksums(fd, initsum, sum, &sumlen);
     if (err)
         return err;
 
-    if (fprintf(wctx->dstf, "%" PRIu64 "\t", s->st_size) <= 0)
-        goto err1;
-    for (i = 0; i < sumlen; i++) {
-        if (fprintf(wctx->dstf, "%02x", initsum[i]) <= 0)
-            goto err1;
-    }
-    if (fputc('\t', wctx->dstf) == EOF)
-        goto err1;
-    for (i = 0; i < sumlen; i++) {
-        if (fprintf(wctx->dstf, "%02x", sum[i]) <= 0)
-            goto err1;
-    }
-    if (fprintf(wctx->dstf, "\t%s/%s\n", wctx->prefix, path) <= 0)
-        goto err1;
+    err = output_record(wctx->dstf, s->st_size, initsum, sum, sumlen,
+                        wctx->prefix, path);
+    if (err)
+        return err;
 
-    if (fflush(wctx->dstf) == EOF)
-        goto err2;
-
-    if (posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED) == -1)
-        goto err2;
-
-    return 0;
-
-err1:
-    return -EIO;
-
-err2:
-    return -errno;
+    return (posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED) == -1)
+           ? -errno : 0;
 }
 
 static int
@@ -796,6 +936,7 @@ verif_fn(void *arg)
     }
 
     wctx.dstf = vargs->dstf;
+    wctx.reg_excl = vargs->reg_excl;
     wctx.prefix = vargs->prefix;
     return dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
                        (void *)&wctx);
@@ -859,6 +1000,7 @@ do_verifs(struct ctx *ctx)
             goto err1;
         }
 
+        va.reg_excl = ctx->reg_excl;
         va.dstf = dstf;
         va.prefix = verif->srcpath;
         va.uid = ctx->uid;
@@ -924,7 +1066,9 @@ main(int argc, char **argv)
 {
     const char *confpath = NULL;
     int ret;
-    struct ctx ctx;
+    regex_t reg_excl;
+    struct ctx *ctx;
+    struct parse_ctx pctx;
 
     (void)argc;
     (void)argv;
@@ -937,23 +1081,36 @@ main(int argc, char **argv)
     if (ret != 0)
         return EXIT_FAILURE;
 
-    ctx.base_dir = NULL;
-    ctx.uid = (uid_t)-1;
-    ctx.gid = (gid_t)-1;
+    ctx = &pctx.ctx;
+    ctx->base_dir = NULL;
+    ctx->uid = (uid_t)-1;
+    ctx->gid = (gid_t)-1;
 
-    ret = parse_config(confpath, &ctx);
+    pctx.regex = pctx.regexcurbr = NULL;
+    pctx.regexlen = 0;
+
+    ret = parse_config(confpath, &pctx);
     free((void *)confpath);
     if (ret != 0)
         return EXIT_FAILURE;
 
-    if ((ctx.base_dir != NULL) && (chdir(ctx.base_dir) == -1)) {
-        error(0, -errno, "Error changing directory to %s", ctx.base_dir);
+    if ((ctx->base_dir != NULL) && (chdir(ctx->base_dir) == -1)) {
+        error(0, -errno, "Error changing directory to %s", ctx->base_dir);
         goto end1;
     }
 
+    ctx->reg_excl = NULL;
+    if (pctx.regex != NULL) {
+        ret = get_regex(&reg_excl, pctx.regex);
+        free((void *)(pctx.regex));
+        if (ret != 0)
+            goto end1;
+        ctx->reg_excl = &reg_excl;
+    }
+
     if (debug) {
-        print_verifs(stderr, ctx.verifs, ctx.num_verifs);
-        fprintf(stderr, "UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
+        print_verifs(stderr, ctx->verifs, ctx->num_verifs);
+        fprintf(stderr, "UID: %d\nGID: %d\n", ctx->uid, ctx->gid);
     }
 
     if (log)
@@ -966,16 +1123,18 @@ main(int argc, char **argv)
         goto end2;
     }
 
-    ret = do_verifs(&ctx);
+    ret = do_verifs(ctx);
 
 end2:
     if (log)
         closelog();
 end1:
-    if (ctx.base_dir != NULL)
-        free((void *)(ctx.base_dir));
-    free((void *)(ctx.output_file));
-    free_verifs(ctx.verifs, ctx.num_verifs);
+    if (ctx->base_dir != NULL)
+        free((void *)(ctx->base_dir));
+    if (ctx->reg_excl != NULL)
+        regfree(ctx->reg_excl);
+    free((void *)(ctx->output_file));
+    free_verifs(ctx->verifs, ctx->num_verifs);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

@@ -2,6 +2,7 @@
     <base_dir?>
     <creds?>
     <debug?>
+    <exclude?>
     <log?>
     <output_file>
     <verifs?>
@@ -12,6 +13,8 @@
 <creds> = "creds" : (<creds_uidgid> | <creds_usrgrp>)
 
 <debug> = "debug" : <Boolean>
+
+<exclude> = "exclude" : [ <string>+ ]
 
 <log> = "log" : <Boolean>
 
