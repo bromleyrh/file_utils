@@ -899,11 +899,15 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (!S_ISREG(s->st_mode))
         return 0;
 
-    /* check if file excluded */
-    if ((wctx->reg_excl != NULL)
-        && (regexec(wctx->reg_excl, path, 0, NULL, 0) == 0)) {
-        fprintf(stderr, "%s excluded\n", path);
-        return 0;
+    if (wctx->reg_excl != NULL) { /* check if file excluded */
+        char buf[PATH_MAX];
+
+        if ((snprintf(buf, sizeof(buf), "%s/%s", wctx->prefix, path)
+             < (int)sizeof(buf))
+            && (regexec(wctx->reg_excl, buf, 0, NULL, 0) == 0)) {
+            fprintf(stderr, "%s excluded\n", buf);
+            return 0;
+        }
     }
 
     err = calc_chksums(fd, initsum, sum, &sumlen);
