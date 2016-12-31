@@ -878,7 +878,7 @@ output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
     if (fprintf(f, "\t%s/%s\n", prefix, path) <= 0)
         goto err;
 
-    return 0;
+    return (fflush(f) == EOF) ? -errno : 0;
 
 err:
     return -EIO;
@@ -988,7 +988,6 @@ do_verifs(struct ctx *ctx)
             error(0, errno, "Error opening %s", ctx->output_file);
             return -errno;
         }
-        setlinebuf(dstf);
     }
 
     for (i = 0; i < ctx->num_verifs; i++) {
