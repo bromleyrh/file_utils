@@ -824,7 +824,7 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
             return -errno;
 
         if (initrem > 0) {
-            size_t sz = MIN(initrem, len);
+            size_t sz = MIN(initrem, (off_t)len);
 
             if (EVP_DigestUpdate(&initctx, buf, sz) != 1)
                 goto err;
