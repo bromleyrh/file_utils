@@ -31,6 +31,7 @@
 #include <pwd.h>
 #include <regex.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -91,6 +92,8 @@ struct verif_walk_ctx {
     const char  *prefix;
 };
 
+static volatile sig_atomic_t quit;
+
 static int debug;
 static int log;
 
@@ -123,10 +126,17 @@ static int parse_config(const char *, struct parse_ctx *);
 
 static int get_regex(regex_t *, const char *);
 
+static void int_handler(int);
+
+static int set_signal_handlers(void);
+
 static int mount_filesystem(const char *, const char *);
 static int unmount_filesystem(const char *, int);
 
-static int calc_chksums(int, unsigned char *, unsigned char *, unsigned *);
+static int calc_chksums_cb(int, off_t);
+
+static int calc_chksums(int, unsigned char *, unsigned char *, unsigned *,
+                        int (*)(int, off_t));
 
 static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
                          unsigned, const char *, const char *);
@@ -700,6 +710,35 @@ get_regex(regex_t *reg, const char *regex)
 
 #undef ERRBUF_INIT_SIZE
 
+static void
+int_handler(int signum)
+{
+    (void)signum;
+
+    /* flag checked in verif_walk_fn() */
+    quit = 1;
+}
+
+static int
+set_signal_handlers()
+{
+    size_t i;
+    struct sigaction sa;
+
+    static const int intsignals[] = {SIGINT, SIGPIPE, SIGTERM};
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = &int_handler;
+    sa.sa_flags = SA_RESETHAND;
+
+    for (i = 0; i < sizeof(intsignals)/sizeof(intsignals[0]); i++) {
+        if (sigaction(intsignals[i], &sa, NULL) == -1)
+            return -errno;
+    }
+
+    return 0;
+}
+
 static int
 mount_filesystem(const char *devpath, const char *mntpath)
 {
@@ -772,19 +811,32 @@ unmount_filesystem(const char *path, int rootfd)
     return (ret > 0) ? -ret : ret;
 }
 
-#define BUFSIZE (1024 * 1024)
 #define DISCARD_CACHE_INTERVAL (16 * 1024 * 1024)
 
 static int
+calc_chksums_cb(int fd, off_t flen)
+{
+    if (quit)
+        return -EINTR;
+
+    return (flen % DISCARD_CACHE_INTERVAL == 0)
+           ? -posix_fadvise(fd, 0, flen, POSIX_FADV_DONTNEED) : 0;
+}
+
+#undef DISCARD_CACHE_INTERVAL
+
+#define BUFSIZE (1024 * 1024)
+
+static int
 calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
-             unsigned *sumlen)
+             unsigned *sumlen, int (*cb)(int, off_t))
 {
     char *buf;
-    const struct aiocb *cbp;
+    const struct aiocb *aiocbp;
     EVP_MD_CTX ctx, initctx;
     int err;
     off_t flen = 0, initrem = 512;
-    struct aiocb cb;
+    struct aiocb aiocb;
 
     static char buf1[BUFSIZE], buf2[BUFSIZE];
 
@@ -792,21 +844,21 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
         || (EVP_DigestInit(&initctx, EVP_sha1()) != 1))
         return -EIO;
 
-    memset(&cb, 0, sizeof(cb));
-    cb.aio_nbytes = BUFSIZE;
-    cb.aio_fildes = fd;
-    cb.aio_buf = buf = buf1;
-    if (aio_read(&cb) == -1)
+    memset(&aiocb, 0, sizeof(aiocb));
+    aiocb.aio_nbytes = BUFSIZE;
+    aiocb.aio_fildes = fd;
+    aiocb.aio_buf = buf = buf1;
+    if (aio_read(&aiocb) == -1)
         return -errno;
-    cbp = &cb;
+    aiocbp = &aiocb;
 
     for (;;) {
         char *nextbuf;
         size_t len;
 
-        if (aio_suspend(&cbp, 1, NULL) == -1)
+        if (aio_suspend(&aiocbp, 1, NULL) == -1)
             goto err;
-        len = aio_return(&cb);
+        len = aio_return(&aiocb);
         if (len < 1) {
             if (len != 0)
                 goto err;
@@ -814,15 +866,13 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
         }
         flen += len;
 
-        if (flen % DISCARD_CACHE_INTERVAL == 0) {
-            err = -posix_fadvise(fd, 0, flen, POSIX_FADV_DONTNEED);
-            if (err)
-                return err;
-        }
+        err = (*cb)(fd, flen);
+        if (err)
+            return err;
 
-        cb.aio_offset = flen;
-        cb.aio_buf = nextbuf = (buf == buf1) ? buf2 : buf1;
-        if (aio_read(&cb) == -1)
+        aiocb.aio_offset = flen;
+        aiocb.aio_buf = nextbuf = (buf == buf1) ? buf2 : buf1;
+        if (aio_read(&aiocb) == -1)
             return -errno;
 
         if (initrem > 0) {
@@ -843,12 +893,11 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
 
 err:
     err = -((errno == 0) ? EIO : errno);
-    cancel_aio(&cb);
+    cancel_aio(&aiocb);
     return -err;
 }
 
 #undef BUFSIZE
-#undef DISCARD_CACHE_INTERVAL
 
 static int
 output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
@@ -896,6 +945,9 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     (void)dirfd;
     (void)name;
 
+    if (quit)
+        return -EINTR;
+
     if (!S_ISREG(s->st_mode))
         return 0;
 
@@ -910,7 +962,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         }
     }
 
-    err = calc_chksums(fd, initsum, sum, &sumlen);
+    err = calc_chksums(fd, initsum, sum, &sumlen, &calc_chksums_cb);
     if (err)
         return err;
 
@@ -1125,6 +1177,10 @@ main(int argc, char **argv)
         error(0, -ret, "Error unsharing namespace");
         goto end2;
     }
+
+    ret = set_signal_handlers();
+    if (ret != 0)
+        goto end2;
 
     ret = do_verifs(ctx);
 
