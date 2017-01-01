@@ -54,7 +54,7 @@ backup_link_dep = @libutil_link_dep@
 
 bin_PROGRAMS += src/attr_idx src/cp_mem src/fastcat src/fastcp src/md_verify \
 	src/mkmanifest src/open src/open_pipes src/replicate src/simpledb \
-	src/sparse_scan src/tmpfile src/verify
+	src/sparse_scan src/tmpfile src/verify src/verify-gui
 if HAVE_LIBXFS
 bin_PROGRAMS += src/xfsutil
 endif
@@ -131,6 +131,10 @@ src_verify_LDADD = src/libfileutil.a -lcap -lm -lmount -lrt $(backup_link) \
 	$(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ \
 	@openssl_link_dep@
 src_verify_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la
+
+src_verify-gui_SOURCES = src/verify-gui.c
+src_verify-gui_CFLAGS = $(AM_CFLAGS) $(bin_cflags) @gtk_cflags@
+src_verify-gui_LDADD = @gtk_link_dep@
 
 else
 

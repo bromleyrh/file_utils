@@ -15,6 +15,7 @@
 /sparse_scan
 /tmpfile
 /verify
+/verify-gui
 /xfsutil
 
 /libdirectio.so*
