@@ -197,6 +197,10 @@ EOF
          [dbus_cppflags=$dbus_CFLAGS
           dbus_link_dep=$dbus_LIBS]
      )
+     PKG_CHECK_MODULES([gtk], [gtk+-2.0],
+         [gtk_cppflags=$gtk_CFLAGS
+          gtk_link_dep=$gtk_LIBS]
+     )
      PKG_CHECK_MODULES([libjson], [libjson],
          [libjson_cppflags=$libjson_CFLAGS
           libjson_link_dep=$libjson_LIBS]
@@ -211,11 +215,13 @@ EOF
      )
 
      AC_SUBST([dbus_cppflags])
+     AC_SUBST([gtk_cppflags])
      AC_SUBST([libjson_cppflags])
      AC_SUBST([libmatroska_cppflags])
      AC_SUBST([openssl_cppflags])
 
      AC_SUBST([dbus_link_dep])
+     AC_SUBST([gtk_link_dep])
      AC_SUBST([libjson_link_dep])
      AC_SUBST([libmatroska_link_dep])
      AC_SUBST([openssl_link_dep])
