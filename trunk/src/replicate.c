@@ -26,6 +26,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -72,6 +73,8 @@ struct copy_args {
     gid_t   gid;
 };
 
+static volatile sig_atomic_t quit;
+
 static int debug;
 static int log;
 
@@ -99,11 +102,17 @@ static int read_json_config(json_val_t, struct ctx *);
 
 static int parse_config(const char *, struct ctx *);
 
+static void int_handler(int);
+
+static int set_signal_handlers(void);
+
 static int mount_filesystem(const char *, const char *, int);
 static int unmount_filesystem(const char *, int);
 
 static int set_device_read_only(const char *, int, int *);
 static int format_device(const char *, const char *);
+
+static int copy_cb(int, int, const char *, const char *, struct stat *, void *);
 
 static int copy_fn(void *);
 
@@ -610,6 +619,35 @@ parse_config(const char *path, struct ctx *ctx)
     return err;
 }
 
+static void
+int_handler(int signum)
+{
+    (void)signum;
+
+    /* flag checked in copy_cb() */
+    quit = 1;
+}
+
+static int
+set_signal_handlers()
+{
+    size_t i;
+    struct sigaction sa;
+
+    static const int intsignals[] = {SIGINT, SIGTERM};
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = &int_handler;
+    sa.sa_flags = SA_RESETHAND;
+
+    for (i = 0; i < sizeof(intsignals)/sizeof(intsignals[0]); i++) {
+        if (sigaction(intsignals[i], &sa, NULL) == -1)
+            return -errno;
+    }
+
+    return 0;
+}
+
 static int
 mount_filesystem(const char *devpath, const char *mntpath, int read)
 {
@@ -750,6 +788,20 @@ format_device(const char *path, const char *cmd)
 }
 
 static int
+copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
+        void *ctx)
+{
+    (void)fd;
+    (void)dirfd;
+    (void)name;
+    (void)path;
+    (void)s;
+    (void)ctx;
+
+    return quit ? -EINTR : 0;
+}
+
+static int
 copy_fn(void *arg)
 {
     struct copy_args *cargs = (struct copy_args *)arg;
@@ -766,7 +818,9 @@ copy_fn(void *arg)
 
     umask(0);
     return dir_copy_fd(cargs->srcfd, cargs->dstfd,
-                       DIR_COPY_DISCARD_CACHE | DIR_COPY_TMPFILE);
+                       DIR_COPY_CALLBACK | DIR_COPY_DISCARD_CACHE
+                       | DIR_COPY_TMPFILE,
+                       &copy_cb, NULL);
 }
 
 static int
@@ -961,6 +1015,10 @@ main(int argc, char **argv)
         error(0, -ret, "Error unsharing namespace");
         goto end;
     }
+
+    ret = set_signal_handlers();
+    if (ret != 0)
+        goto end;
 
     ret = do_transfers(&ctx);
 
