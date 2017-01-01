@@ -814,9 +814,11 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
         }
         flen += len;
 
-        if ((flen % DISCARD_CACHE_INTERVAL == 0)
-            && (posix_fadvise(fd, 0, flen, POSIX_FADV_DONTNEED) == -1))
-            goto err;
+        if (flen % DISCARD_CACHE_INTERVAL == 0) {
+            err = -posix_fadvise(fd, 0, flen, POSIX_FADV_DONTNEED);
+            if (err)
+                return err;
+        }
 
         cb.aio_offset = flen;
         cb.aio_buf = nextbuf = (buf == buf1) ? buf2 : buf1;
@@ -917,8 +919,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (err)
         return err;
 
-    return (posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED) == -1)
-           ? -errno : 0;
+    return -posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED);
 }
 
 static int
