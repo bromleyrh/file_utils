@@ -55,6 +55,8 @@
 #define CONFIG_PATH "\"$HOME/.verify.conf\""
 #define CONFIG_ROOT_ID "conf"
 
+#define CHECK_CMD_SRC_SPECIFIER "$dev"
+
 struct ctx {
     struct verif    *verifs;
     int             num_verifs;
@@ -75,6 +77,7 @@ struct parse_ctx {
 struct verif {
     const char *devpath;
     const char *srcpath;
+    const char *check_cmd;
 };
 
 struct verif_args {
@@ -106,6 +109,8 @@ static int expand_string(char **, char **, size_t *, size_t);
 
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
+
+static int run_cmd(const char *);
 
 static void cancel_aio(struct aiocb *);
 
@@ -140,6 +145,7 @@ static int unshare_mnt_ns(void);
 
 static int mount_filesystem(const char *, const char *);
 static int unmount_filesystem(const char *, int);
+static int check_filesystem(const char *, const char *);
 
 static int calc_chksums_cb(int, off_t);
 
@@ -301,6 +307,49 @@ get_uid(const char *name, uid_t *uid)
 
 err:
     free(buf);
+    return err;
+}
+
+static int
+run_cmd(const char *cmd)
+{
+    char **argv;
+    int err = 0;
+    int i;
+    int status;
+    pid_t pid;
+
+    if (strwords(&argv, cmd, " \t", '"', '\\') == (size_t)-1)
+        return -errno;
+
+    pid = fork();
+    if (pid == 0) {
+        execvp(argv[0], argv);
+        error(EXIT_FAILURE, errno, "Error executing %s", argv[0]);
+        return EXIT_FAILURE;
+    }
+    if (pid == -1) {
+        err = -errno;
+        goto end;
+    }
+
+    while (waitpid(pid, &status, 0) == -1) {
+        if (errno != EINTR) {
+            err = -errno;
+            goto end;
+        }
+    }
+
+    if (!WIFEXITED(status)) {
+        err = -EIO;
+        goto end;
+    }
+    err = WEXITSTATUS(status);
+
+end:
+    for (i = 0; argv[i] != NULL; i++)
+        free(argv[i]);
+    free(argv);
     return err;
 }
 
@@ -586,7 +635,9 @@ read_verifs_opt(json_val_t opt, void *data)
         {L"dev", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(devpath)},
         {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
-         VERIF_PARAM(srcpath)}
+         VERIF_PARAM(srcpath)},
+        {L"check_cmd", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
+         VERIF_PARAM(check_cmd)}
     };
 
     ctx->num_verifs = json_val_array_get_num_elem(opt);
@@ -604,6 +655,7 @@ read_verifs_opt(json_val_t opt, void *data)
             goto err;
         }
 
+        ctx->verifs[i].check_cmd = NULL;
         err = json_oscanf(&ctx->verifs[i], spec,
                           (int)(sizeof(spec)/sizeof(spec[0])), val);
         if (err)
@@ -946,6 +998,26 @@ unmount_filesystem(const char *path, int rootfd)
     return (ret > 0) ? -ret : ret;
 }
 
+static int
+check_filesystem(const char *path, const char *cmd)
+{
+    const char *fullcmd;
+    int err;
+
+    debug_print("Checking filesystem on %s", path);
+
+    fullcmd = strsub(cmd, CHECK_CMD_SRC_SPECIFIER, path);
+    if (fullcmd == NULL)
+        return -errno;
+
+    debug_print("Running \"%s\"", fullcmd);
+    err = run_cmd(fullcmd);
+
+    free((void *)fullcmd);
+
+    return err;
+}
+
 #define DISCARD_CACHE_INTERVAL (16 * 1024 * 1024)
 
 static int
@@ -1194,6 +1266,12 @@ do_verifs(struct ctx *ctx)
         debug_print("Verification %d:", i + 1);
         log_print(LOG_INFO, "Starting verifcation %d: %s", i + 1,
                   verif->srcpath);
+
+        if (verif->check_cmd != NULL) {
+            err = check_filesystem(verif->devpath, verif->check_cmd);
+            if (err)
+                goto err1;
+        }
 
         va.srcfd = mount_filesystem(verif->devpath, verif->srcpath);
         if (va.srcfd < 0) {

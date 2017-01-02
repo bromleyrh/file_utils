@@ -25,6 +25,7 @@
 <verif> = {
     <verif_dev>
     <verif_source>
+    <verif_check_cmd?>
 }
 
 <creds_uidgid> = {
@@ -40,6 +41,8 @@
 <verif_dev> = "dev" : <string>
 
 <verif_source> = "src" : <string>
+
+<verif_check_cmd> = "check_cmd" : <string>
 
 <uid> = "uid" : <string>
 
