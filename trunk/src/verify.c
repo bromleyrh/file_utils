@@ -1186,9 +1186,9 @@ main(int argc, char **argv)
         openlog(NULL, LOG_PID, LOG_USER);
 
     /* requires CAP_SYS_ADMIN */
-    ret = unshare(CLONE_NEWNS);
-    if (ret == -1) {
-        error(0, -ret, "Error unsharing namespace");
+    if (unshare(CLONE_NEWNS) == -1) {
+        error(0, errno, "Error unsharing namespace");
+        ret = -errno;
         goto end2;
     }
 
