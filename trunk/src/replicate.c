@@ -260,8 +260,7 @@ run_cmd(const char *cmd)
     int status;
     pid_t pid;
 
-    argv = strwords(cmd, " \t", '"', '\\');
-    if (argv == NULL)
+    if (strwords(&argv, cmd, " \t", '"', '\\') == (size_t)-1)
         return -errno;
 
     pid = fork();
