@@ -88,6 +88,8 @@ struct verif_args {
 
 struct verif_walk_ctx {
     regex_t     *reg_excl;
+    EVP_MD_CTX  initsumctx;
+    EVP_MD_CTX  sumctx;
     FILE        *dstf;
     const char  *prefix;
 };
@@ -135,8 +137,8 @@ static int unmount_filesystem(const char *, int);
 
 static int calc_chksums_cb(int, off_t);
 
-static int calc_chksums(int, unsigned char *, unsigned char *, unsigned *,
-                        int (*)(int, off_t));
+static int calc_chksums(int, EVP_MD_CTX *, EVP_MD_CTX *, unsigned char *,
+                        unsigned char *, unsigned *, int (*)(int, off_t));
 
 static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
                          unsigned, const char *, const char *);
@@ -828,20 +830,20 @@ calc_chksums_cb(int fd, off_t flen)
 #define BUFSIZE (1024 * 1024)
 
 static int
-calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
-             unsigned *sumlen, int (*cb)(int, off_t))
+calc_chksums(int fd, EVP_MD_CTX *initsumctx, EVP_MD_CTX *sumctx,
+             unsigned char *initsum, unsigned char *sum, unsigned *sumlen,
+             int (*cb)(int, off_t))
 {
     char *buf;
     const struct aiocb *aiocbp;
-    EVP_MD_CTX ctx, initctx;
     int err;
     off_t flen = 0, initrem = 512;
     struct aiocb aiocb;
 
     static char buf1[BUFSIZE], buf2[BUFSIZE];
 
-    if ((EVP_DigestInit(&ctx, EVP_sha1()) != 1)
-        || (EVP_DigestInit(&initctx, EVP_sha1()) != 1))
+    if ((EVP_DigestInit_ex(sumctx, EVP_sha1(), NULL) != 1)
+        || (EVP_DigestInit_ex(initsumctx, EVP_sha1(), NULL) != 1))
         return -EIO;
 
     memset(&aiocb, 0, sizeof(aiocb));
@@ -878,18 +880,18 @@ calc_chksums(int fd, unsigned char *initsum, unsigned char *sum,
         if (initrem > 0) {
             size_t sz = MIN(initrem, (off_t)len);
 
-            if (EVP_DigestUpdate(&initctx, buf, sz) != 1)
+            if (EVP_DigestUpdate(initsumctx, buf, sz) != 1)
                 goto err;
             initrem -= sz;
         }
-        if (EVP_DigestUpdate(&ctx, buf, len) != 1)
+        if (EVP_DigestUpdate(sumctx, buf, len) != 1)
             goto err;
 
         buf = nextbuf;
     }
 
-    return ((EVP_DigestFinal(&initctx, initsum, sumlen) == 1)
-            && (EVP_DigestFinal(&ctx, sum, sumlen) == 1)) ? 0 : -EIO;
+    return ((EVP_DigestFinal_ex(initsumctx, initsum, sumlen) == 1)
+            && (EVP_DigestFinal_ex(sumctx, sum, sumlen) == 1)) ? 0 : -EIO;
 
 err:
     err = -((errno == 0) ? EIO : errno);
@@ -962,7 +964,8 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         }
     }
 
-    err = calc_chksums(fd, initsum, sum, &sumlen, &calc_chksums_cb);
+    err = calc_chksums(fd, &wctx->initsumctx, &wctx->sumctx, initsum, sum,
+                       &sumlen, &calc_chksums_cb);
     if (err)
         return err;
 
@@ -977,6 +980,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 static int
 verif_fn(void *arg)
 {
+    int err;
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
 
@@ -990,11 +994,21 @@ verif_fn(void *arg)
         return errno;
     }
 
-    wctx.dstf = vargs->dstf;
+    if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
+        || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1))
+        return -EIO;
+
     wctx.reg_excl = vargs->reg_excl;
+    wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
-    return dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
-                       (void *)&wctx);
+
+    err = dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
+                      (void *)&wctx);
+
+    EVP_MD_CTX_cleanup(&wctx.sumctx);
+    EVP_MD_CTX_cleanup(&wctx.initsumctx);
+
+    return err;
 }
 
 static int

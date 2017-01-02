@@ -15,4 +15,3 @@ replicate
 verify
 
 - Allow selection of different hash algorithms
-- Modify to reuse hash context instead of re-initializing
