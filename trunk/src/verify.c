@@ -57,6 +57,8 @@
 
 #define CHECK_CMD_SRC_SPECIFIER "$dev"
 
+#define BUFSIZE (1024 * 1024)
+
 struct ctx {
     struct verif    *verifs;
     int             num_verifs;
@@ -91,6 +93,8 @@ struct verif_args {
 
 struct verif_walk_ctx {
     regex_t     *reg_excl;
+    char        *buf1;
+    char        *buf2;
     EVP_MD_CTX  initsumctx;
     EVP_MD_CTX  sumctx;
     FILE        *dstf;
@@ -111,6 +115,8 @@ static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
 static int run_cmd(const char *);
+
+static int set_direct_io(int);
 
 static void cancel_aio(struct aiocb *);
 
@@ -149,8 +155,9 @@ static int check_filesystem(const char *, const char *);
 
 static int calc_chksums_cb(int, off_t);
 
-static int calc_chksums(int, EVP_MD_CTX *, EVP_MD_CTX *, unsigned char *,
-                        unsigned char *, unsigned *, int (*)(int, off_t));
+static int calc_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
+                        unsigned char *, unsigned char *, unsigned *,
+                        int (*)(int, off_t));
 
 static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
                          unsigned, const char *, const char *);
@@ -351,6 +358,18 @@ end:
         free(argv[i]);
     free(argv);
     return err;
+}
+
+static int
+set_direct_io(int fd)
+{
+    int fl;
+
+    fl = fcntl(fd, F_GETFL);
+    if (fl == -1)
+        return -errno;
+
+    return (fcntl(fd, F_SETFL, fl | O_DIRECT) == -1) ? -errno : 0;
 }
 
 static void
@@ -1032,20 +1051,16 @@ calc_chksums_cb(int fd, off_t flen)
 
 #undef DISCARD_CACHE_INTERVAL
 
-#define BUFSIZE (1024 * 1024)
-
 static int
-calc_chksums(int fd, EVP_MD_CTX *initsumctx, EVP_MD_CTX *sumctx,
-             unsigned char *initsum, unsigned char *sum, unsigned *sumlen,
-             int (*cb)(int, off_t))
+calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
+             EVP_MD_CTX *sumctx, unsigned char *initsum, unsigned char *sum,
+             unsigned *sumlen, int (*cb)(int, off_t))
 {
     char *buf;
     const struct aiocb *aiocbp;
     int err;
     off_t flen = 0, initrem = 512;
     struct aiocb aiocb;
-
-    static char buf1[BUFSIZE], buf2[BUFSIZE];
 
     if ((EVP_DigestInit_ex(sumctx, EVP_sha1(), NULL) != 1)
         || (EVP_DigestInit_ex(initsumctx, EVP_sha1(), NULL) != 1))
@@ -1103,8 +1118,6 @@ err:
     cancel_aio(&aiocb);
     return -err;
 }
-
-#undef BUFSIZE
 
 static int
 output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
@@ -1169,8 +1182,12 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         }
     }
 
-    err = calc_chksums(fd, &wctx->initsumctx, &wctx->sumctx, initsum, sum,
-                       &sumlen, &calc_chksums_cb);
+    err = set_direct_io(fd);
+    if (err)
+        return err;
+
+    err = calc_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
+                       &wctx->sumctx, initsum, sum, &sumlen, &calc_chksums_cb);
     if (err)
         return err;
 
@@ -1199,9 +1216,18 @@ verif_fn(void *arg)
         return errno;
     }
 
+    err = posix_memalign((void **)&wctx.buf1, 512, BUFSIZE);
+    if (err)
+        return err;
+    err = posix_memalign((void **)&wctx.buf2, 512, BUFSIZE);
+    if (err)
+        goto end1;
+
     if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
-        || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1))
-        return -EIO;
+        || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
+        err = -EIO;
+        goto end2;
+    }
 
     wctx.reg_excl = vargs->reg_excl;
     wctx.dstf = vargs->dstf;
@@ -1213,6 +1239,10 @@ verif_fn(void *arg)
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
 
+end2:
+    free(wctx.buf2);
+end1:
+    free(wctx.buf1);
     return err;
 }
 
