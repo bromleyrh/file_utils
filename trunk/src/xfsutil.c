@@ -1,0 +1,83 @@
+/*
+ * xfsutil.c
+ */
+
+#define _FILE_OFFSET_BITS 64
+
+#include <errno.h>
+#include <error.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+
+typedef off_t off64_t;
+
+#include <xfs/xfs.h>
+
+static int print_dioattrs(FILE *, int);
+
+static int
+print_dioattrs(FILE *outf, int fd)
+{
+    struct dioattr dioattrs;
+
+    if (xfsctl(NULL, fd, XFS_IOC_DIOINFO, &dioattrs) == -1) {
+        error(0, errno, "Error getting XFS information");
+        return -errno;
+    }
+
+    fprintf(outf,
+            "     Memory alignment: %" PRIu32 " bytes\n"
+            "        Transfer unit: %" PRIu32 " bytes\n"
+            "Maximum transfer size: %" PRIu32 " bytes\n",
+            dioattrs.d_mem, dioattrs.d_miniosz, dioattrs.d_maxiosz);
+
+    return 0;
+}
+
+int
+main(int argc, char **argv)
+{
+    const char *file, *mode;
+    int fd;
+    int ret = EXIT_SUCCESS;
+
+    if (argc < 3)
+        error(EXIT_FAILURE, 0, "Must specify file and mode");
+    file = argv[1];
+    mode = argv[2];
+
+    if (mode[0] != '-')
+        error(EXIT_FAILURE, 0, "Invalid mode %s", mode);
+
+    fd = open(file, O_NONBLOCK | O_RDONLY);
+    if (fd == -1)
+        error(EXIT_FAILURE, errno, "Error opening %s", file);
+
+    if (!platform_test_xfs_fd(fd)) {
+        error(0, 0, "%s does not reside on an XFS filesystem", file);
+        close(fd);
+        return EXIT_FAILURE;
+    }
+
+    switch (mode[1]) {
+    case 'd':
+        printf("Direct I/O parameters for %s:\n", file);
+        if (print_dioattrs(stdout, fd) != 0)
+            ret = EXIT_FAILURE;
+        break;
+    default:
+        error(0, 0, "Invalid mode %s", mode);
+        ret = EXIT_FAILURE;
+    }
+
+    close(fd);
+    return ret;
+}
+
+/* vi: set expandtab sw=4 ts=4: */
