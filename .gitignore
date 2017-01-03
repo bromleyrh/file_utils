@@ -10,6 +10,7 @@ trunk/src/open_pipes
 trunk/src/replicate
 trunk/src/tmpfile
 trunk/src/verify
+trunk/src/xfsutil
 
 replicate.h
 replicate.conf
