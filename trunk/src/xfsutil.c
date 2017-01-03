@@ -3,6 +3,7 @@
  */
 
 #define _FILE_OFFSET_BITS 64
+#define _GNU_SOURCE
 
 #include <errno.h>
 #include <error.h>
@@ -16,7 +17,6 @@
 #include <sys/types.h>
 
 typedef off_t off64_t;
-
 #include <xfs/xfs.h>
 
 static int print_dioattrs(FILE *, int);
@@ -38,6 +38,43 @@ print_dioattrs(FILE *outf, int fd)
             dioattrs.d_mem, dioattrs.d_miniosz, dioattrs.d_maxiosz);
 
     return 0;
+}
+
+static int
+test_dio(int fd)
+{
+    int err;
+    int fl;
+    struct dioattr dioattrs;
+    void *buf;
+
+    if (xfsctl(NULL, fd, XFS_IOC_DIOINFO, &dioattrs) == -1) {
+        error(0, errno, "Error getting XFS information");
+        return -errno;
+    }
+
+    err = posix_memalign(&buf, dioattrs.d_mem, dioattrs.d_miniosz);
+    if (err)
+        return err;
+
+    fl = fcntl(fd, F_GETFL);
+    if (fl == -1)
+        goto err;
+    if (fcntl(fd, F_SETFL, fl | O_DIRECT) == -1)
+        goto err;
+
+    if (pread(fd, buf, dioattrs.d_miniosz, 0) == -1) {
+        error(0, errno, "Error reading");
+        goto err;
+    }
+
+    free(buf);
+
+    return 0;
+
+err:
+    free(buf);
+    return -errno;
 }
 
 int
@@ -69,6 +106,10 @@ main(int argc, char **argv)
     case 'd':
         printf("Direct I/O parameters for %s:\n", file);
         if (print_dioattrs(stdout, fd) != 0)
+            ret = EXIT_FAILURE;
+        break;
+    case 't':
+        if (test_dio(fd) != 0)
             ret = EXIT_FAILURE;
         break;
     default:
