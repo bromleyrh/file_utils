@@ -7,7 +7,7 @@ bindir=$(prefix)/bin
 
 helpers=git-ck git-commit-archive git-cscope git-get-bundles git-install-dist \
 git-make-bundle git-prepare git-set-version git-skel git-submodule-commit \
-git-verify
+git-sync git-verify
 
 .PHONY: install clean
 
