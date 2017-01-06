@@ -33,7 +33,7 @@ attr_idx.o: attr_idx.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
 replicate: replicate.o
-	gcc -o $@ -lcap -lmount `pkg-config --libs libjson` \
+	gcc -o $@ -lcap -lmount -lbackup `pkg-config --libs libjson` \
 	`pkg-config --libs libutil` $^
 
 replicate.o: replicate.c
@@ -46,7 +46,7 @@ replicate.h: replicate.spec
 	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
 verify: verify.o
-	gcc -o $@ -lcap -lmount -lrt `pkg-config --libs libjson` \
+	gcc -o $@ -lcap -lmount -lrt -lbackup `pkg-config --libs libjson` \
 	`pkg-config --libs libutil` `pkg-config --libs openssl` $^
 
 verify.o: verify.c

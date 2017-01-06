@@ -4,15 +4,19 @@
 
 #define _GNU_SOURCE
 
-#include "libbackup.h"
+#include "backup.h"
+#include "util.h"
 
 #include <libmount/libmount.h>
+
+#include <strings_ext.h>
 
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
 #include <sched.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -233,6 +237,26 @@ unmount_filesystem(const char *path, int rootfd)
     mnt_free_context(mntctx);
 
     return (ret > 0) ? -ret : ret;
+}
+
+int
+check_filesystem(const char *path, const char *cmd, const char *src_specifier)
+{
+    const char *fullcmd;
+    int err;
+
+    debug_print("Checking filesystem on %s", path);
+
+    fullcmd = strsub(cmd, src_specifier, path);
+    if (fullcmd == NULL)
+        return -errno;
+
+    debug_print("Running \"%s\"", fullcmd);
+    err = run_cmd(fullcmd);
+
+    free((void *)fullcmd);
+
+    return err;
 }
 
 /* vi: set expandtab sw=4 ts=4: */

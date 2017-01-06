@@ -2,7 +2,8 @@
  * blkdev.c
  */
 
-#include "libbackup.h"
+#include "backup.h"
+#include "util.h"
 
 #include <strings_ext.h>
 
@@ -13,56 +14,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <linux/fs.h>
+
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-
-static int run_cmd(const char *);
-
-static int
-run_cmd(const char *cmd)
-{
-    char **argv;
-    int err = 0;
-    int i;
-    int status;
-    pid_t pid;
-
-    argv = strwords(cmd, " \t", '"', '\\');
-    if (argv == NULL)
-        return -errno;
-
-    pid = fork();
-    if (pid == 0) {
-        execvp(argv[0], argv);
-        error(EXIT_FAILURE, errno, "Error executing %s", argv[0]);
-        return EXIT_FAILURE;
-    }
-    if (pid == -1) {
-        err = -errno;
-        goto end;
-    }
-
-    while (waitpid(pid, &status, 0) == -1) {
-        if (errno != EINTR) {
-            err = -errno;
-            goto end;
-        }
-    }
-
-    if (!WIFEXITED(status)) {
-        err = -EIO;
-        goto end;
-    }
-    err = WEXITSTATUS(status);
-
-end:
-    for (i = 0; argv[i] != NULL; i++)
-        free(argv[i]);
-    free(argv);
-    return err;
-}
 
 int
 blkdev_set_read_only(const char *path, int read_only, int *prev_read_only)
@@ -99,14 +55,14 @@ err1:
 }
 
 int
-blkdev_format(const char *path, const char *cmd)
+blkdev_format(const char *path, const char *cmd, const char *dest_specifier)
 {
     const char *fullcmd;
     int err;
 
     debug_print("Formatting device %s", path);
 
-    fullcmd = strsub(cmd, FORMAT_CMD_DEST_SPECIFIER, path);
+    fullcmd = strsub(cmd, dest_specifier, path);
     if (fullcmd == NULL)
         return -errno;
 

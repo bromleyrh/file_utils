@@ -15,6 +15,8 @@
 
 #include <libmount/libmount.h>
 
+#include <backup.h>
+
 #include <hashes.h>
 #include <strings_ext.h>
 
@@ -36,8 +38,6 @@
 #include <unistd.h>
 #include <wchar.h>
 #include <wordexp.h>
-
-#include <linux/fs.h>
 
 #include <sys/capability.h>
 #include <sys/ioctl.h>
@@ -84,8 +84,6 @@ static void log_print(int, const char *, ...);
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
-static int run_cmd(const char *);
-
 static int set_capabilities(void);
 
 static int get_conf_path(const char *, const char **);
@@ -105,18 +103,6 @@ static int parse_config(const char *, struct ctx *);
 static void int_handler(int);
 
 static int set_signal_handlers(void);
-
-static int mnt_cmp(struct libmnt_table *, struct libmnt_fs *,
-                   struct libmnt_fs *);
-static int keep_mnt(const char *);
-
-static int unshare_mnt_ns(void);
-
-static int mount_filesystem(const char *, const char *, int);
-static int unmount_filesystem(const char *, int);
-
-static int set_device_read_only(const char *, int, int *);
-static int format_device(const char *, const char *);
 
 static int copy_cb(int, int, const char *, const char *, struct stat *, void *);
 
@@ -248,49 +234,6 @@ get_uid(const char *name, uid_t *uid)
 
 err:
     free(buf);
-    return err;
-}
-
-static int
-run_cmd(const char *cmd)
-{
-    char **argv;
-    int err = 0;
-    int i;
-    int status;
-    pid_t pid;
-
-    if (strwords(&argv, cmd, " \t", '"', '\\') == (size_t)-1)
-        return -errno;
-
-    pid = fork();
-    if (pid == 0) {
-        execvp(argv[0], argv);
-        error(EXIT_FAILURE, errno, "Error executing %s", argv[0]);
-        return EXIT_FAILURE;
-    }
-    if (pid == -1) {
-        err = -errno;
-        goto end;
-    }
-
-    while (waitpid(pid, &status, 0) == -1) {
-        if (errno != EINTR) {
-            err = -errno;
-            goto end;
-        }
-    }
-
-    if (!WIFEXITED(status)) {
-        err = -EIO;
-        goto end;
-    }
-    err = WEXITSTATUS(status);
-
-end:
-    for (i = 0; argv[i] != NULL; i++)
-        free(argv[i]);
-    free(argv);
     return err;
 }
 
@@ -497,7 +440,7 @@ read_debug_opt(json_val_t opt, void *data)
 {
     (void)data;
 
-    debug = json_val_boolean_get(opt);
+    debug = backup_debug = json_val_boolean_get(opt);
 
     return 0;
 }
@@ -654,272 +597,6 @@ set_signal_handlers()
 }
 
 static int
-mnt_cmp(struct libmnt_table *tbl, struct libmnt_fs *fs1, struct libmnt_fs *fs2)
-{
-    const char *target1, *target2;
-
-    (void)tbl;
-
-    if (((target1 = mnt_fs_get_target(fs1)) == NULL)
-        || ((target2 = mnt_fs_get_target(fs2)) == NULL))
-        return -1;
-
-    return strcmp(target1, target2);
-}
-
-#define MNT(target) {target, sizeof(target) - 1}
-
-static int
-keep_mnt(const char *target)
-{
-    size_t i;
-
-    static const struct {
-        const char  *target;
-        size_t      len;
-    } keep[] = {
-        MNT("/dev"),
-        MNT("/proc"),
-        MNT("/run"),
-        MNT("/sys"),
-        MNT("/tmp")
-    }, *mnt;
-
-    if (strcmp("/", target) == 0)
-        return 1;
-
-    for (i = 0; i < sizeof(keep)/sizeof(keep[0]); i++) {
-        mnt = &keep[i];
-
-        if ((strncmp(target, mnt->target, mnt->len) == 0)
-            && ((target[mnt->len] == '\0') || (target[mnt->len] == '/')))
-            return 1;
-    }
-
-    return 0;
-}
-
-#undef MNT
-
-static int
-unshare_mnt_ns()
-{
-    int ret;
-    struct libmnt_context *mntctx;
-    struct libmnt_fs *fs;
-    struct libmnt_iter *itr;
-    struct libmnt_table *tbl;
-
-    /* requires CAP_SYS_ADMIN */
-    if (unshare(CLONE_NEWNS) == -1) {
-        error(0, errno, "Error unsharing namespace");
-        return -errno;
-    }
-
-    tbl = mnt_new_table();
-    if (tbl == NULL)
-        return -ENOMEM;
-    itr = mnt_new_iter(MNT_ITER_FORWARD);
-    if (itr == NULL) {
-        mnt_free_table(tbl);
-        return -ENOMEM;
-    }
-    mntctx = mnt_new_context();
-    if (mntctx == NULL) {
-        mnt_free_table(tbl);
-        mnt_free_iter(itr);
-        return -ENOMEM;
-    }
-    if (mnt_context_disable_mtab(mntctx, 1) != 0)
-        goto err;
-
-    if (mnt_table_parse_mtab(tbl, NULL) != 0)
-        goto err;
-
-    if (mnt_table_uniq_fs(tbl, 0, &mnt_cmp) != 0)
-        goto err;
-
-    if ((mnt_table_first_fs(tbl, &fs) != 0)
-        || (mnt_table_set_iter(tbl, itr, fs) != 0))
-        goto err;
-
-    for (;;) {
-        const char *target;
-
-        target = mnt_fs_get_target(fs);
-        if (target == NULL)
-            goto err;
-
-        if (!keep_mnt(target)) {
-            debug_print("Unmounting %s in private namespace", target);
-            if ((mnt_reset_context(mntctx) != 0)
-                || (mnt_context_set_fs(mntctx, fs) != 0)
-                || (mnt_context_umount(mntctx) != 0))
-                goto err;
-        }
-
-        ret = mnt_table_next_fs(tbl, itr, &fs);
-        if (ret != 0) {
-            if (ret == 1)
-                break;
-            goto err;
-        }
-    }
-
-    mnt_free_context(mntctx);
-    mnt_free_iter(itr);
-    mnt_free_table(tbl);
-
-    return 0;
-
-err:
-    error(0, 0, "Error parsing /etc/mtab");
-    mnt_free_context(mntctx);
-    mnt_free_iter(itr);
-    mnt_free_table(tbl);
-    return -EIO;
-}
-
-static int
-mount_filesystem(const char *devpath, const char *mntpath, int read)
-{
-    int mflags;
-    int ret;
-    struct libmnt_context *mntctx;
-
-    debug_print("Mounting %s", devpath ? devpath : mntpath);
-
-    mntctx = mnt_new_context();
-    if (mntctx == NULL)
-        return -ENOMEM;
-
-    mflags = MS_NODEV | MS_NOEXEC;
-    if (read)
-        mflags |= MS_RDONLY;
-
-    if (mnt_context_set_mflags(mntctx, mflags) != 0)
-        goto err1;
-
-    if (!read && (mnt_context_set_options(mntctx, "rw") != 0))
-        goto err1;
-
-    if (devpath != NULL) {
-        if (mnt_context_set_source(mntctx, devpath) != 0)
-            goto err1;
-    } else if (mnt_context_set_target(mntctx, mntpath) != 0)
-        goto err1;
-
-    /* requires CAP_SYS_ADMIN */
-    ret = mnt_context_mount(mntctx);
-
-    mnt_free_context(mntctx);
-
-    if (ret != 0)
-        goto err2;
-
-    /* open root directory to provide a handle for subsequent operations */
-    ret = open(mntpath, O_DIRECTORY | O_RDONLY);
-    if (ret == -1) {
-        ret = -errno;
-        goto err2;
-    }
-
-    return ret;
-
-err2:
-    return (ret > 0) ? -ret : ret;
-
-err1:
-    mnt_free_context(mntctx);
-    return -EIO;
-}
-
-static int
-unmount_filesystem(const char *path, int rootfd)
-{
-    int ret;
-    struct libmnt_context *mntctx;
-
-    debug_print("Unmounting %s", path);
-
-    mntctx = mnt_new_context();
-    if (mntctx == NULL)
-        return -ENOMEM;
-
-    if (mnt_context_set_target(mntctx, path) != 0) {
-        mnt_free_context(mntctx);
-        return -EIO;
-    }
-
-    /* explicitly synchronize filesystem for greater assurance of data
-       integrity if filesystem is writable */
-    syncfs(rootfd);
-
-    close(rootfd);
-
-    /* requires CAP_SYS_ADMIN */
-    ret = mnt_context_umount(mntctx);
-
-    mnt_free_context(mntctx);
-
-    return (ret > 0) ? -ret : ret;
-}
-
-static int
-set_device_read_only(const char *path, int read_only, int *prev_read_only)
-{
-    int fd;
-    int prev;
-
-    fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        error(0, errno, "Error opening %s", path);
-        goto err1;
-    }
-
-    if (ioctl(fd, BLKROGET, &prev) == -1) {
-        error(0, errno, "Error setting %s read-only", path);
-        goto err2;
-    }
-
-    if ((prev != read_only) && (ioctl(fd, BLKROSET, &read_only) == -1)) {
-        error(0, errno, "Error setting %s read-only", path);
-        goto err2;
-    }
-
-    close(fd);
-
-    if (prev_read_only != NULL)
-        *prev_read_only = prev;
-    return 0;
-
-err2:
-    close(fd);
-err1:
-    return -errno;
-}
-
-static int
-format_device(const char *path, const char *cmd)
-{
-    const char *fullcmd;
-    int err;
-
-    debug_print("Formatting device %s", path);
-
-    fullcmd = strsub(cmd, FORMAT_CMD_DEST_SPECIFIER, path);
-    if (fullcmd == NULL)
-        return -errno;
-
-    debug_print("Running \"%s\"", fullcmd);
-    err = run_cmd(fullcmd);
-
-    free((void *)fullcmd);
-
-    return err;
-}
-
-static int
 copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         void *ctx)
 {
@@ -1005,7 +682,7 @@ do_transfers(struct ctx *ctx)
         }
 
         if (transfer->setro) {
-            err = set_device_read_only(transfer->dstpath, 0, &transfer->setro);
+            err = blkdev_set_read_only(transfer->dstpath, 0, &transfer->setro);
             if (err) {
                 error(0, 0, "Error setting block device read-only flag for %s",
                       transfer->dstpath);
@@ -1013,7 +690,8 @@ do_transfers(struct ctx *ctx)
             }
         }
 
-        err = format_device(transfer->dstpath, transfer->format_cmd);
+        err = blkdev_format(transfer->dstpath, transfer->format_cmd,
+                            FORMAT_CMD_DEST_SPECIFIER);
         if (err) {
             if (err > 0)
                 error(0, 0, "Formatting command returned status %d", err);
@@ -1044,7 +722,7 @@ do_transfers(struct ctx *ctx)
             goto err2;
 
         if (transfer->setro) {
-            err = set_device_read_only(transfer->dstpath, 1, NULL);
+            err = blkdev_set_read_only(transfer->dstpath, 1, NULL);
             if (err)
                 goto err1;
         }
@@ -1063,7 +741,7 @@ err3:
     unmount_filesystem(transfer->dstmntpath, ca.dstfd);
 err2:
     if (transfer->setro)
-        set_device_read_only(transfer->dstpath, 1, NULL);
+        blkdev_set_read_only(transfer->dstpath, 1, NULL);
 err1:
     unmount_filesystem(transfer->srcpath, ca.srcfd);
     return err;
@@ -1141,7 +819,7 @@ main(int argc, char **argv)
     if (log)
         openlog(NULL, LOG_PID, LOG_USER);
 
-    ret = unshare_mnt_ns();
+    ret = mount_ns_unshare();
     if (ret != 0)
         goto end;
 
