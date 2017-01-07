@@ -763,19 +763,14 @@ set_signal_handlers()
     return 0;
 }
 
-#define DISCARD_CACHE_INTERVAL (16 * 1024 * 1024)
-
 static int
 calc_chksums_cb(int fd, off_t flen)
 {
-    if (quit)
-        return -EINTR;
+    (void)fd;
+    (void)flen;
 
-    return (flen % DISCARD_CACHE_INTERVAL == 0)
-           ? -posix_fadvise(fd, 0, flen, POSIX_FADV_DONTNEED) : 0;
+    return quit ? -EINTR : 0;
 }
-
-#undef DISCARD_CACHE_INTERVAL
 
 static int
 calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
