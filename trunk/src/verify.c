@@ -155,6 +155,8 @@ static int svc_run_fn(void *);
 
 static int do_svc_run(void);
 
+static int init_rpc(void);
+
 static int set_capabilities(void);
 
 static int get_conf_path(const char *, const char **);
@@ -456,6 +458,16 @@ do_svc_run()
     }
 
     return 0;
+}
+
+static int
+init_rpc()
+{
+    return ((registerrpc(RPC_PROGNUM, RPC_VERSNUM, RPC_PROCNUM_VERIFY_RECORD,
+                         &verify_record_proc, &verify_record_arg_dec, &xdr_int)
+             == 0)
+            && (do_svc_run() == 0))
+           ? 0 : -EIO;
 }
 
 static int
@@ -1461,10 +1473,7 @@ main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
-    if ((registerrpc(RPC_PROGNUM, RPC_VERSNUM, RPC_PROCNUM_VERIFY_RECORD,
-                     &verify_record_proc, &verify_record_arg_dec, &xdr_int)
-         == -1)
-        || (do_svc_run() != 0)) {
+    if (init_rpc() != 0) {
         error(0, 0, "Error initializing");
         return -EIO;
     }
