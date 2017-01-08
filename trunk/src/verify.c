@@ -1473,6 +1473,11 @@ main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
+    /* Note: Remote procedure calls are used for communication between the
+       parent process and the verification child process, instead of using
+       clone(CLONE_VM) to share memory, in order to work around an apparent bug
+       in the glibc asynchronous I/O implementation when clone(CLONE_VM) is
+       used */
     if (init_rpc() != 0) {
         error(0, 0, "Error initializing");
         return -EIO;
