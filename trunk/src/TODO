@@ -14,5 +14,7 @@ replicate
 
 verify
 
+- Verify checksum for first min(file_size, 512) bytes of file as soon as this
+  number of bytes is read
 - Disable direct I/O if not supported
 - Allow selection of different hash algorithms

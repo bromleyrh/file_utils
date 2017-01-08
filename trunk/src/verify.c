@@ -20,16 +20,19 @@
 #include <backup.h>
 
 #include <hashes.h>
+#include <radix_tree.h>
 #include <strings_ext.h>
 
 #include <files/util.h>
 
 #include <aio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <pwd.h>
 #include <regex.h>
 #include <sched.h>
@@ -44,6 +47,8 @@
 #include <wchar.h>
 #include <wordexp.h>
 
+#include <rpc/rpc.h>
+
 #include <sys/capability.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -57,16 +62,22 @@
 
 #define CHECK_CMD_SRC_SPECIFIER "$dev"
 
+#define RPC_PROGNUM 0x20000001
+#define RPC_VERSNUM 1
+#define RPC_PROCNUM_VERIFY_RECORD 1
+
 #define BUFSIZE (1024 * 1024)
 
 struct ctx {
-    struct verif    *verifs;
-    int             num_verifs;
-    const char      *base_dir;
-    regex_t         *reg_excl;
-    const char      *output_file;
-    uid_t           uid;
-    gid_t           gid;
+    struct verif        *verifs;
+    int                 num_verifs;
+    const char          *base_dir;
+    regex_t             *reg_excl;
+    const char          *input_file;
+    struct radix_tree   *input_data;
+    const char          *output_file;
+    uid_t               uid;
+    gid_t               gid;
 };
 
 struct parse_ctx {
@@ -76,6 +87,21 @@ struct parse_ctx {
     size_t      regexlen;
 };
 
+struct input_record {
+    off_t           size;
+    unsigned char   initsum[EVP_MAX_MD_SIZE];
+    unsigned char   sum[EVP_MAX_MD_SIZE];
+};
+
+struct verify_record_xdr {
+    u_long  input_data;
+    char    path[PATH_MAX];
+    u_long  size_ms;
+    u_long  size_ls;
+    u_char  initsum[EVP_MAX_MD_SIZE];
+    u_char  sum[EVP_MAX_MD_SIZE];
+};
+
 struct verif {
     const char *devpath;
     const char *srcpath;
@@ -83,22 +109,24 @@ struct verif {
 };
 
 struct verif_args {
-    int         srcfd;
-    FILE        *dstf;
-    regex_t     *reg_excl;
-    const char  *prefix;
-    uid_t       uid;
-    gid_t       gid;
+    int                 srcfd;
+    FILE                *dstf;
+    regex_t             *reg_excl;
+    struct radix_tree   *input_data;
+    const char          *prefix;
+    uid_t               uid;
+    gid_t               gid;
 };
 
 struct verif_walk_ctx {
-    regex_t     *reg_excl;
-    char        *buf1;
-    char        *buf2;
-    EVP_MD_CTX  initsumctx;
-    EVP_MD_CTX  sumctx;
-    FILE        *dstf;
-    const char  *prefix;
+    regex_t             *reg_excl;
+    struct radix_tree   *input_data;
+    char                *buf1;
+    char                *buf2;
+    EVP_MD_CTX          initsumctx;
+    EVP_MD_CTX          sumctx;
+    FILE                *dstf;
+    const char          *prefix;
 };
 
 static volatile sig_atomic_t quit;
@@ -111,12 +139,21 @@ static void log_print(int, const char *, ...);
 
 static int expand_string(char **, char **, size_t *, size_t);
 
+static char from_hex(char);
+
+static int scan_chksum(const char *, unsigned char *, unsigned);
+static int print_chksum(FILE *, unsigned char *, unsigned);
+
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
 static int set_direct_io(int);
 
 static void cancel_aio(struct aiocb *);
+
+static int svc_run_fn(void *);
+
+static int do_svc_run(void);
 
 static int set_capabilities(void);
 
@@ -129,6 +166,7 @@ static int read_base_dir_opt(json_val_t, void *);
 static int read_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
 static int read_exclude_opt(json_val_t, void *);
+static int read_input_file_opt(json_val_t, void *);
 static int read_output_file_opt(json_val_t, void *);
 static int read_verifs_opt(json_val_t, void *);
 static int read_json_config(json_val_t, struct parse_ctx *);
@@ -141,12 +179,25 @@ static void int_handler(int);
 
 static int set_signal_handlers(void);
 
+static int input_data_walk_cb(const char *, void *, void *);
+
+static int scan_input_file(const char *, struct radix_tree **);
+static int print_input_data(FILE *, struct radix_tree *);
+
 static int calc_chksums_cb(int, off_t);
 
 static int calc_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
                         unsigned char *, unsigned char *, unsigned *,
                         int (*)(int, off_t));
 
+static int verify_record_arg_dec(XDR *, void *);
+static int verify_record_arg_enc(XDR *, void *);
+static int do_verify_record(struct radix_tree *, const char *, off_t,
+                            unsigned char *, unsigned char *);
+static char *verify_record_proc(char *);
+
+static int verify_record(struct radix_tree *, const char *, const char *, off_t,
+                         unsigned char *, unsigned char *, unsigned);
 static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
                          unsigned, const char *, const char *);
 
@@ -202,6 +253,56 @@ expand_string(char **str, char **dst, size_t *len, size_t minadd)
         *str = tmp;
         *dst = tmp + off;
         *len = newlen;
+    }
+
+    return 0;
+}
+
+static char
+from_hex(char hexchar)
+{
+    if ((hexchar >= '0') && (hexchar <= '9'))
+        return hexchar - '0';
+    if ((hexchar >= 'a') && (hexchar <= 'f'))
+        return hexchar + 10 - 'a';
+
+    return -1;
+}
+
+static int
+scan_chksum(const char *str, unsigned char *sum, unsigned sumlen)
+{
+    unsigned i;
+
+    for (i = 0; i < sumlen; i++) {
+        char tmp1, tmp2;
+
+        if (*str == '\0')
+            return -EINVAL;
+        tmp2 = from_hex(tolower(*(str++)));
+        if (tmp2 == -1)
+            return -EINVAL;
+
+        if (*str == '\0')
+            return -EINVAL;
+        tmp1 = from_hex(tolower(*(str++)));
+        if (tmp1 == -1)
+            return -EINVAL;
+
+        sum[i] = tmp2 * 0x10 + tmp1;
+    }
+
+    return 0;
+}
+
+static int
+print_chksum(FILE *f, unsigned char *sum, unsigned sumlen)
+{
+    unsigned i;
+
+    for (i = 0; i < sumlen; i++) {
+        if (fprintf(f, "%02x", sum[i]) <= 0)
+            return -EIO;
     }
 
     return 0;
@@ -332,6 +433,29 @@ cancel_aio(struct aiocb *cb)
     }
 
     aio_return(cb);
+}
+
+static int
+svc_run_fn(void *arg)
+{
+    (void)arg;
+
+    svc_run();
+    return -1;
+}
+
+static int
+do_svc_run()
+{
+    static char svc_run_stack[16 * 1024 * 1024];
+
+    if (clone(&svc_run_fn, svc_run_stack + sizeof(svc_run_stack),
+              CLONE_SIGHAND | CLONE_THREAD | CLONE_VM, NULL) == -1) {
+        error(0, errno, "Error creating process");
+        return -errno;
+    }
+
+    return 0;
 }
 
 static int
@@ -566,6 +690,17 @@ read_exclude_opt(json_val_t opt, void *data)
 }
 
 static int
+read_input_file_opt(json_val_t opt, void *data)
+{
+    mbstate_t s;
+    struct ctx *ctx = (struct ctx *)data;
+
+    memset(&s, 0, sizeof(s));
+    return (awcstombs((char **)&ctx->input_file, json_val_string_get(opt), &s)
+            == (size_t)-1) ? -errno : 0;
+}
+
+static int
 read_output_file_opt(json_val_t opt, void *data)
 {
     mbstate_t s;
@@ -649,6 +784,7 @@ read_json_config(json_val_t config, struct parse_ctx *ctx)
         [3]     = {L"creds",        &read_creds_opt},
         [4]     = {L"debug",        &read_debug_opt},
         [5]     = {L"exclude",      &read_exclude_opt},
+        [9]     = {L"input_file",   &read_input_file_opt},
         [12]    = {L"log",          &read_log_opt},
         [15]    = {L"output_file",  &read_output_file_opt},
         [6]     = {L"verifs",       &read_verifs_opt}
@@ -764,6 +900,92 @@ set_signal_handlers()
 }
 
 static int
+input_data_walk_cb(const char *str, void *val, void *ctx)
+{
+    FILE *f = (FILE *)ctx;
+
+    (void)val;
+
+    fprintf(f, "%s\n", str);
+    return 0;
+}
+
+static int
+scan_input_file(const char *path, struct radix_tree **data)
+{
+    char *ln = NULL;
+    FILE *f;
+    int linenum;
+    int res;
+    size_t n;
+    struct radix_tree *ret;
+
+    f = fopen(path, "r");
+    if (f == NULL) {
+        error(0, errno, "Error opening %s", path);
+        return -errno;
+    }
+
+    res = radix_tree_new(&ret, sizeof(struct input_record));
+    if (res != 0)
+        goto err1;
+
+    errno = 0;
+    for (linenum = 1;; linenum++) {
+        char buf1[16], buf2[256], buf3[256], buf4[PATH_MAX];
+        struct input_record record;
+
+        if (getline(&ln, &n, f) == -1) {
+            if (errno != 0) {
+                res = -errno;
+                goto err2;
+            }
+            break;
+        }
+        res = sscanf(ln, "%s\t%s\t%s\t%s", buf1, buf2, buf3, buf4);
+        if (res != 4) {
+            if ((res != EOF) || !ferror(f)) {
+                error(0, 0, "Line %d of %s invalid", linenum, path);
+                res = -EINVAL;
+                goto err2;
+            }
+            res = -errno;
+            goto err2;
+        }
+        record.size = strtoll(buf1, NULL, 10);
+        if ((scan_chksum(buf2, record.initsum, 20) != 0)
+            || (scan_chksum(buf3, record.sum, 20) != 0)) {
+            res = -EINVAL;
+            goto err2;
+        }
+        res = radix_tree_insert(ret, buf4, &record);
+        if (res != 0)
+            goto err2;
+    }
+
+    if (ln != NULL)
+        free(ln);
+    fclose(f);
+
+    *data = ret;
+    return 0;
+
+err2:
+    if (ln != NULL)
+        free(ln);
+    radix_tree_free(ret);
+err1:
+    fclose(f);
+    return res;
+}
+
+static int
+print_input_data(FILE *f, struct radix_tree *input_data)
+{
+    return radix_tree_walk(input_data, &input_data_walk_cb, (void *)f);
+}
+
+static int
 calc_chksums_cb(int fd, off_t flen)
 {
     (void)fd;
@@ -841,28 +1063,105 @@ err:
 }
 
 static int
+verify_record_arg_dec(XDR *xdrs, void *obj)
+{
+    char *path;
+    struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
+
+    if (xdrs->x_op == XDR_FREE)
+        return TRUE;
+
+    path = vr->path;
+
+    xdr_u_long(xdrs, &vr->input_data);
+    xdr_string(xdrs, &path, sizeof(vr->path));
+    xdr_u_long(xdrs, &vr->size_ms);
+    xdr_u_long(xdrs, &vr->size_ls);
+    xdr_vector(xdrs, (char *)&vr->initsum, sizeof(vr->initsum),
+               sizeof(*(vr->initsum)), (xdrproc_t)&xdr_char);
+    xdr_vector(xdrs, (char *)&vr->sum, sizeof(vr->sum), sizeof(*(vr->sum)),
+               (xdrproc_t)&xdr_char);
+
+    return TRUE;
+}
+
+static int
+verify_record_arg_enc(XDR *xdrs, void *obj)
+{
+    char *path;
+    struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
+
+    if (xdrs->x_op == XDR_FREE)
+        return TRUE;
+
+    path = vr->path;
+
+    xdr_u_long(xdrs, &vr->input_data);
+    xdr_string(xdrs, &path, sizeof(vr->path));
+    xdr_u_long(xdrs, &vr->size_ms);
+    xdr_u_long(xdrs, &vr->size_ls);
+    xdr_vector(xdrs, (char *)&vr->initsum, sizeof(vr->initsum),
+               sizeof(*(vr->initsum)), (xdrproc_t)&xdr_char);
+    xdr_vector(xdrs, (char *)&vr->sum, sizeof(vr->sum), sizeof(*(vr->sum)),
+               (xdrproc_t)&xdr_char);
+
+    return TRUE;
+}
+
+static int
+do_verify_record(struct radix_tree *input_data, const char *path, off_t size,
+                 unsigned char *initsum, unsigned char *sum)
+{
+    int ret;
+    struct input_record record;
+
+    ret = radix_tree_search(input_data, path, &record);
+    if (ret != 1) {
+        if (ret != 0)
+            return ret;
+        error(0, 0, "Verification error: %s added", path);
+        return -EIO;
+    }
+
+    if ((size != record.size) || (memcmp(initsum, record.initsum, 20) != 0)
+        || (memcmp(sum, record.sum, 20) != 0)) {
+        error(0, 0, "Verification error: %s failed verification", path);
+        return -EIO;
+    }
+
+    return radix_tree_delete(input_data, path);
+}
+
+static char *
+verify_record_proc(char *obj)
+{
+    off_t size;
+    static int ret;
+    struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
+
+    size = (((uint64_t)(vr->size_ms)) << 32) | vr->size_ls;
+
+    ret = do_verify_record((struct radix_tree *)(vr->input_data), vr->path,
+                           size, vr->initsum, vr->sum);
+
+    return (char *)&ret;
+}
+
+static int
 output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
               unsigned sumlen, const char *prefix, const char *path)
 {
-    unsigned i;
-
     /* print file size */
     if (fprintf(f, "%" PRIu64 "\t", size) <= 0)
         goto err;
 
     /* print checksum of first min(file_size, 512) bytes of file */
-    for (i = 0; i < sumlen; i++) {
-        if (fprintf(f, "%02x", initsum[i]) <= 0)
-            goto err;
-    }
-    if (fputc('\t', f) == EOF)
+    if ((print_chksum(f, initsum, sumlen) != 0) || (fputc('\t', f) == EOF))
         goto err;
 
     /* print checksum of file */
-    for (i = 0; i < sumlen; i++) {
-        if (fprintf(f, "%02x", sum[i]) <= 0)
-            goto err;
-    }
+    if (print_chksum(f, sum, sumlen) != 0)
+        goto err;
 
     /* print file path */
     if (fprintf(f, "\t%s/%s\n", prefix, path) <= 0)
@@ -872,6 +1171,38 @@ output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
 
 err:
     return -EIO;
+}
+
+static int
+verify_record(struct radix_tree *input_data, const char *prefix,
+              const char *path, off_t size, unsigned char *initsum,
+              unsigned char *sum, unsigned sumlen)
+{
+    int ret;
+    struct verify_record_xdr vr;
+    uint64_t usize;
+
+    if (sumlen != 20)
+        return -EIO;
+
+    if (snprintf(vr.path, sizeof(vr.path), "%s/%s", prefix, path)
+        >= (int)sizeof(vr.path))
+        return -EIO;
+
+    usize = (uint64_t)size;
+    vr.size_ms = (usize & 0xffffffff00000000) >> 32;
+    vr.size_ls = usize & 0xffffffff;
+
+    vr.input_data = (u_long)input_data;
+    memcpy(vr.initsum, initsum, EVP_MAX_MD_SIZE);
+    memcpy(vr.sum, sum, EVP_MAX_MD_SIZE);
+
+    return (callrpc("localhost", RPC_PROGNUM, RPC_VERSNUM,
+                    RPC_PROCNUM_VERIFY_RECORD,
+                    (xdrproc_t)&verify_record_arg_enc, (const char *)&vr,
+                    (xdrproc_t)&xdr_int, (char *)&ret)
+            == 0)
+           ? ret : -EIO;
 }
 
 static int
@@ -912,6 +1243,15 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (err)
         return err;
 
+    /* FIXME: later, verify first checksum as soon as min(s->st_size, 512) bytes
+       read */
+    if (wctx->input_data != NULL) {
+        err = verify_record(wctx->input_data, wctx->prefix, path, s->st_size,
+                            initsum, sum, sumlen);
+        if (err)
+            return err;
+    }
+
     err = output_record(wctx->dstf, s->st_size, initsum, sum, sumlen,
                         wctx->prefix, path);
     if (err)
@@ -951,6 +1291,7 @@ verif_fn(void *arg)
     }
 
     wctx.reg_excl = vargs->reg_excl;
+    wctx.input_data = vargs->input_data;
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
 
@@ -1033,6 +1374,7 @@ do_verifs(struct ctx *ctx)
         }
 
         va.reg_excl = ctx->reg_excl;
+        va.input_data = ctx->input_data;
         va.dstf = dstf;
         va.prefix = verif->srcpath;
         va.uid = ctx->uid;
@@ -1052,6 +1394,20 @@ do_verifs(struct ctx *ctx)
 
         log_print(LOG_INFO, "Finished verifcation %d: %s", i + 1,
                   verif->srcpath);
+    }
+
+    if (ctx->input_data != NULL) {
+        struct radix_tree_stats s;
+
+        err = radix_tree_stats(ctx->input_data, &s);
+        if (err)
+            goto err1;
+        if (s.num_info_nodes != 0) {
+            error(0, 0, "Verification error: Files removed:");
+            print_input_data(stderr, ctx->input_data);
+            err = -EIO;
+            goto err1;
+        }
     }
 
     return (dstf == stdout) ? 0 : ((fclose(dstf) == EOF) ? -errno : 0);
@@ -1105,6 +1461,14 @@ main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
+    if ((registerrpc(RPC_PROGNUM, RPC_VERSNUM, RPC_PROCNUM_VERIFY_RECORD,
+                     &verify_record_proc, &verify_record_arg_dec, &xdr_int)
+         == -1)
+        || (do_svc_run() != 0)) {
+        error(0, 0, "Error initializing");
+        return -EIO;
+    }
+
     ret = set_capabilities();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
@@ -1115,6 +1479,8 @@ main(int argc, char **argv)
 
     ctx = &pctx.ctx;
     ctx->base_dir = NULL;
+    ctx->input_file = NULL;
+    ctx->input_data = NULL;
     ctx->uid = (uid_t)-1;
     ctx->gid = (gid_t)-1;
 
@@ -1140,6 +1506,12 @@ main(int argc, char **argv)
         ctx->reg_excl = &reg_excl;
     }
 
+    if (ctx->input_file != NULL) {
+        ret = scan_input_file(ctx->input_file, &ctx->input_data);
+        if (ret != 0)
+            goto end1;
+    }
+
     if (debug) {
         print_verifs(stderr, ctx->verifs, ctx->num_verifs);
         fprintf(stderr, "UID: %d\nGID: %d\n", ctx->uid, ctx->gid);
@@ -1161,11 +1533,14 @@ main(int argc, char **argv)
 end2:
     if (log)
         closelog();
+    radix_tree_free(ctx->input_data);
 end1:
     if (ctx->base_dir != NULL)
         free((void *)(ctx->base_dir));
     if (ctx->reg_excl != NULL)
         regfree(ctx->reg_excl);
+    if (ctx->input_file != NULL)
+        free((void *)(ctx->input_file));
     free((void *)(ctx->output_file));
     free_verifs(ctx->verifs, ctx->num_verifs);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;

@@ -3,6 +3,7 @@
     <creds?>
     <debug?>
     <exclude?>
+    <input_file?>
     <log?>
     <output_file>
     <verifs?>
@@ -15,6 +16,8 @@
 <debug> = "debug" : <Boolean>
 
 <exclude> = "exclude" : [ <string>+ ]
+
+<input_file> = "input_file" : <string>
 
 <log> = "log" : <Boolean>
 
