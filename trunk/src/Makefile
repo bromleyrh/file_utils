@@ -18,7 +18,8 @@ prefix=/usr/local
 bindir=$(prefix)/bin
 libdir=$(prefix)/lib
 
-progs = attr_idx cp_mem open open_pipes replicate tmpfile verify xfsutil
+progs = attr_idx cp_mem mkmanifest open open_pipes replicate tmpfile verify \
+	xfsutil
 libs = $(ldio_so)
 
 all: $(progs) libdirectio
@@ -30,6 +31,12 @@ attr_idx: attr_idx.o
 	gcc -o $@ `pkg-config --libs libutil` $^
 
 attr_idx.o: attr_idx.c
+	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
+
+mkmanifest: mkmanifest.o
+	gcc -o $@ `pkg-config --libs libutil` $^
+
+mkmanifest.o: mkmanifest.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
 replicate: replicate.o
