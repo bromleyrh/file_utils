@@ -2,21 +2,21 @@
 # Makefile
 #
 
-debug=0
+debug = 0
 
 ldio_vmaj = 0
 ldio_vmin = 1
 ldio_so = libdirectio.so.$(ldio_vmaj).$(ldio_vmin)
 
 ifeq ($(debug), 1)
-CFLAGS=-ggdb3 -O0 -Wall -Wextra
+CFLAGS = -ggdb3 -O0 -Wall -Wextra
 else
-CFLAGS=-O2 -s -Wall -Wextra
+CFLAGS = -O2 -s -Wall -Wextra
 endif
 
-prefix=/usr/local
-bindir=$(prefix)/bin
-libdir=$(prefix)/lib
+prefix = /usr/local
+bindir = $(prefix)/bin
+libdir = $(prefix)/lib
 
 progs = attr_idx cp_mem mkmanifest open open_pipes replicate tmpfile verify \
 	xfsutil
