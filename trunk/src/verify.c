@@ -1289,12 +1289,16 @@ verif_fn(void *arg)
         return errno;
     }
 
-    err = posix_memalign((void **)&wctx.buf1, 512, BUFSIZE);
-    if (err)
-        return err;
-    err = posix_memalign((void **)&wctx.buf2, 512, BUFSIZE);
-    if (err)
+    wctx.buf1 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
+                     MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE, -1, 0);
+    if (wctx.buf1 == MAP_FAILED)
+        return errno;
+    wctx.buf2 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
+                     MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE, -1, 0);
+    if (wctx.buf2 == MAP_FAILED) {
+        err = errno;
         goto end1;
+    }
 
     if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
         || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
@@ -1313,10 +1317,11 @@ verif_fn(void *arg)
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
 
+    /* FIXME: determine huge page size at runtime */
 end2:
-    free(wctx.buf2);
+    munmap(wctx.buf2, 4 * 1024 * 1024);
 end1:
-    free(wctx.buf1);
+    munmap(wctx.buf1, 4 * 1024 * 1024);
     return err;
 }
 
