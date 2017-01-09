@@ -14,6 +14,7 @@ replicate
 
 verify
 
+- Speed up processing of files with multiple hard links
 - Verify checksum for first min(file_size, 512) bytes of file as soon as this
   number of bytes is read
 - Disable direct I/O if not supported
