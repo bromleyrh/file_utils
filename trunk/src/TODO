@@ -14,6 +14,8 @@ replicate
 
 verify
 
+- Fix verify to restrict access to RPC procedures using a magic cookie passed
+  from the parent process to the verification child process
 - Verify checksum for first min(file_size, 512) bytes of file as soon as this
   number of bytes is read
 - Disable direct I/O if not supported
