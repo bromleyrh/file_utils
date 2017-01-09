@@ -1294,7 +1294,7 @@ verif_fn(void *arg)
 
     if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
         || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
-        err = -EIO;
+        err = EIO;
         goto end2;
     }
 
@@ -1303,8 +1303,8 @@ verif_fn(void *arg)
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
 
-    err = dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
-                      (void *)&wctx);
+    err = -dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
+                       (void *)&wctx);
 
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
