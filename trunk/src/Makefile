@@ -53,7 +53,7 @@ replicate.h: replicate.spec
 	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
 verify: verify.o
-	gcc -o $@ -lcap -lmount -lrt -lbackup `pkg-config --libs libjson` \
+	gcc -o $@ -lcap -lmount -lrt -luuid -lbackup `pkg-config --libs libjson` \
 	`pkg-config --libs libutil` `pkg-config --libs openssl` $^
 
 verify.o: verify.c

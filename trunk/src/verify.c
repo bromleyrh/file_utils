@@ -17,6 +17,8 @@
 
 #include <openssl/evp.h>
 
+#include <uuid/uuid.h>
+
 #include <backup.h>
 
 #include <hashes.h>
@@ -94,6 +96,7 @@ struct input_record {
 };
 
 struct verify_record_xdr {
+    u_char  rpc_cookie[sizeof(uuid_t)];
     u_long  input_data;
     char    path[PATH_MAX];
     u_long  size_ms;
@@ -133,6 +136,8 @@ static volatile sig_atomic_t quit;
 
 static int debug;
 static int log;
+
+static uuid_t rpc_cookie;
 
 static void debug_print(const char *, ...);
 static void log_print(int, const char *, ...);
@@ -463,6 +468,8 @@ do_svc_run()
 static int
 init_rpc()
 {
+    uuid_generate(rpc_cookie);
+
     return ((registerrpc(RPC_PROGNUM, RPC_VERSNUM, RPC_PROCNUM_VERIFY_RECORD,
                          &verify_record_proc, &verify_record_arg_dec, &xdr_int)
              == 0)
@@ -1085,6 +1092,8 @@ verify_record_arg_dec(XDR *xdrs, void *obj)
 
     path = vr->path;
 
+    xdr_vector(xdrs, (char *)&vr->rpc_cookie, sizeof(vr->rpc_cookie),
+               sizeof(*(vr->rpc_cookie)), (xdrproc_t)&xdr_char);
     xdr_u_long(xdrs, &vr->input_data);
     xdr_string(xdrs, &path, sizeof(vr->path));
     xdr_u_long(xdrs, &vr->size_ms);
@@ -1108,6 +1117,8 @@ verify_record_arg_enc(XDR *xdrs, void *obj)
 
     path = vr->path;
 
+    xdr_vector(xdrs, (char *)&vr->rpc_cookie, sizeof(vr->rpc_cookie),
+               sizeof(*(vr->rpc_cookie)), (xdrproc_t)&xdr_char);
     xdr_u_long(xdrs, &vr->input_data);
     xdr_string(xdrs, &path, sizeof(vr->path));
     xdr_u_long(xdrs, &vr->size_ms);
@@ -1150,6 +1161,11 @@ verify_record_proc(char *obj)
     off_t size;
     static int ret;
     struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
+
+    if (memcmp(rpc_cookie, vr->rpc_cookie, sizeof(uuid_t)) != 0) {
+        ret = -EACCES;
+        return (char *)&ret;
+    }
 
     size = (((uint64_t)(vr->size_ms)) << 32) | vr->size_ls;
 
@@ -1200,6 +1216,8 @@ verify_record(struct radix_tree *input_data, const char *prefix,
     if (snprintf(vr.path, sizeof(vr.path), "%s/%s", prefix, path)
         >= (int)sizeof(vr.path))
         return -EIO;
+
+    memcpy(vr.rpc_cookie, rpc_cookie, sizeof(rpc_cookie));
 
     usize = (uint64_t)size;
     vr.size_ms = (usize & 0xffffffff00000000) >> 32;
