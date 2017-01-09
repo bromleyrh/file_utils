@@ -197,8 +197,7 @@ static int calc_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
                         unsigned char *, unsigned char *, unsigned *,
                         int (*)(int, off_t));
 
-static int verify_record_arg_dec(XDR *, void *);
-static int verify_record_arg_enc(XDR *, void *);
+static int verify_record_arg_conv(XDR *, void *);
 static int do_verify_record(struct radix_tree *, const char *, off_t,
                             unsigned char *, unsigned char *);
 static char *verify_record_proc(char *);
@@ -471,7 +470,7 @@ init_rpc()
     uuid_generate(rpc_cookie);
 
     return ((registerrpc(RPC_PROGNUM, RPC_VERSNUM, RPC_PROCNUM_VERIFY_RECORD,
-                         &verify_record_proc, &verify_record_arg_dec, &xdr_int)
+                         &verify_record_proc, &verify_record_arg_conv, &xdr_int)
              == 0)
             && (do_svc_run() == 0))
            ? 0 : -EIO;
@@ -1082,32 +1081,7 @@ err:
 }
 
 static int
-verify_record_arg_dec(XDR *xdrs, void *obj)
-{
-    char *path;
-    struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
-
-    if (xdrs->x_op == XDR_FREE)
-        return TRUE;
-
-    path = vr->path;
-
-    xdr_vector(xdrs, (char *)&vr->rpc_cookie, sizeof(vr->rpc_cookie),
-               sizeof(*(vr->rpc_cookie)), (xdrproc_t)&xdr_char);
-    xdr_u_long(xdrs, &vr->input_data);
-    xdr_string(xdrs, &path, sizeof(vr->path));
-    xdr_u_long(xdrs, &vr->size_ms);
-    xdr_u_long(xdrs, &vr->size_ls);
-    xdr_vector(xdrs, (char *)&vr->initsum, sizeof(vr->initsum),
-               sizeof(*(vr->initsum)), (xdrproc_t)&xdr_char);
-    xdr_vector(xdrs, (char *)&vr->sum, sizeof(vr->sum), sizeof(*(vr->sum)),
-               (xdrproc_t)&xdr_char);
-
-    return TRUE;
-}
-
-static int
-verify_record_arg_enc(XDR *xdrs, void *obj)
+verify_record_arg_conv(XDR *xdrs, void *obj)
 {
     char *path;
     struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
@@ -1229,7 +1203,7 @@ verify_record(struct radix_tree *input_data, const char *prefix,
 
     return (callrpc("localhost", RPC_PROGNUM, RPC_VERSNUM,
                     RPC_PROCNUM_VERIFY_RECORD,
-                    (xdrproc_t)&verify_record_arg_enc, (const char *)&vr,
+                    (xdrproc_t)&verify_record_arg_conv, (const char *)&vr,
                     (xdrproc_t)&xdr_int, (char *)&ret)
             == 0)
            ? ret : -EIO;
