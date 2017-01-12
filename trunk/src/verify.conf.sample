@@ -1,0 +1,31 @@
+{
+    "base_dir":"/mnt",
+    "creds":{
+        "user":"data",
+        "group":"data"
+    },
+    "exclude":[
+        "data1/\\.git.*",
+        "data2/\\.git.*",
+        "data3/\\.git.*"
+    ],
+    "log":true,
+    "output_file":"-",
+    "verifs":[
+        {
+            "dev":"/dev/sdb1",
+            "src":"data1",
+            "check_cmd":"xfs_repair -n $dev"
+        },
+        {
+            "dev":"/dev/sdb2",
+            "src":"data2",
+            "check_cmd":"xfs_repair -n $dev"
+        },
+        {
+            "dev":"/dev/sdb3",
+            "src":"data3",
+            "check_cmd":"xfs_repair -n $dev"
+        }
+    ]
+}
