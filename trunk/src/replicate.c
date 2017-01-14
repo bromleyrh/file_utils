@@ -641,7 +641,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         cctx->lastoff = dcpctx->off;
 
         if (debug) {
-            fprintf(stderr, "Progress: %.6f%%\n",
+            fprintf(stderr, "\rProgress: %.6f%%",
                     (double)100 * cctx->bytescopied / cctx->fsbytesused);
         }
     }
