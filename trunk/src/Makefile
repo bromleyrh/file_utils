@@ -84,7 +84,7 @@ install-git-helpers:
 	make -C git install
 
 install-progs: $(progs)
-	install -D -g root -o root -s $(progs) $(bindir)
+	install -D -g root -o root $(progs) $(bindir)
 	ln -fs open $(bindir)/delete_input
 
 install-libs: libdirectio
