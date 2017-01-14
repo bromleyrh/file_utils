@@ -55,7 +55,7 @@
 struct ctx {
     struct transfer *transfers;
     int             num_transfers;
-    int             discard_cache;
+    int             keep_cache;
     uid_t           uid;
     gid_t           gid;
 };
@@ -71,7 +71,7 @@ struct transfer {
 struct copy_args {
     int     srcfd;
     int     dstfd;
-    int     discard_cache;
+    int     keep_cache;
     uid_t   uid;
     gid_t   gid;
 };
@@ -105,7 +105,7 @@ static int format_cmd_filter(void *, void *, void *);
 
 static int read_copy_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
-static int read_no_cache_opt(json_val_t, void *);
+static int read_keep_cache_opt(json_val_t, void *);
 static int read_transfers_opt(json_val_t, void *);
 static int read_json_config(json_val_t, struct ctx *);
 
@@ -457,11 +457,11 @@ read_debug_opt(json_val_t opt, void *data)
 }
 
 static int
-read_no_cache_opt(json_val_t opt, void *data)
+read_keep_cache_opt(json_val_t opt, void *data)
 {
     struct ctx *ctx = (struct ctx *)data;
 
-    ctx->discard_cache = json_val_boolean_get(opt);
+    ctx->keep_cache = json_val_boolean_get(opt);
 
     return 0;
 }
@@ -539,11 +539,11 @@ read_json_config(json_val_t config, struct ctx *ctx)
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
     } opts[16] = {
-        [0]     = {L"copy_creds",   &read_copy_creds_opt},
-        [1]     = {L"debug",        &read_debug_opt},
-        [3]     = {L"log",          &read_log_opt},
-        [11]    = {L"no_cache",     &read_no_cache_opt},
-        [5]     = {L"transfers",    &read_transfers_opt}
+        [0] = {L"copy_creds",   &read_copy_creds_opt},
+        [1] = {L"debug",        &read_debug_opt},
+        [2] = {L"keep_cache",   &read_keep_cache_opt},
+        [3] = {L"log",          &read_log_opt},
+        [5] = {L"transfers",    &read_transfers_opt}
     }, *opt;
 
     numopt = json_val_object_get_num_elem(config);
@@ -675,7 +675,7 @@ copy_fn(void *arg)
     cctx.lastino = 0;
 
     fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_TMPFILE;
-    if (cargs->discard_cache)
+    if (!(cargs->keep_cache))
         fl |= DIR_COPY_DISCARD_CACHE;
 
     umask(0);
@@ -765,7 +765,7 @@ do_transfers(struct ctx *ctx)
             goto err3;
         }
 
-        ca.discard_cache = ctx->discard_cache;
+        ca.keep_cache = ctx->keep_cache;
         ca.uid = ctx->uid;
         ca.gid = ctx->gid;
         err = do_copy(&ca);
@@ -854,7 +854,7 @@ main(int argc, char **argv)
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
 
-    ctx.discard_cache = 1;
+    ctx.keep_cache = 0;
     ctx.uid = (uid_t)-1;
     ctx.gid = (gid_t)-1;
 

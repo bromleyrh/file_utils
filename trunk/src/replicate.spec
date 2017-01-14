@@ -1,7 +1,7 @@
 <conf> = {
     <copy_creds?>
     <debug?>
-    <discard_cache?>
+    <keep_cache?>
     <log?>
     <transfers?>
 }
@@ -10,7 +10,7 @@
 
 <debug> = "debug" : <Boolean>
 
-<discard_cache> = "discard_cache" : <Boolean>
+<keep_cache> = "keep_cache" : <Boolean>
 
 <log> = "log" : <Boolean>
 
