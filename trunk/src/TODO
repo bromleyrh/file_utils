@@ -4,6 +4,7 @@ TODO
 - Factor out common code shared between replicate and verify into a shared
   library, or create single executable with multiple modes of operation
 - Exploit parallelism using threads with suitable scheduling parameters
+- Export progress information over DBus
 
 replicate
 
