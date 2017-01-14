@@ -674,7 +674,7 @@ copy_fn(void *arg)
     cctx.bytescopied = 0;
     cctx.lastino = 0;
 
-    fl = DIR_COPY_CALLBACK | DIR_COPY_TMPFILE;
+    fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_TMPFILE;
     if (cargs->discard_cache)
         fl |= DIR_COPY_DISCARD_CACHE;
 
