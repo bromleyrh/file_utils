@@ -55,6 +55,7 @@
 struct ctx {
     struct transfer *transfers;
     int             num_transfers;
+    int             discard_cache;
     uid_t           uid;
     gid_t           gid;
 };
@@ -70,6 +71,7 @@ struct transfer {
 struct copy_args {
     int     srcfd;
     int     dstfd;
+    int     discard_cache;
     uid_t   uid;
     gid_t   gid;
 };
@@ -103,6 +105,7 @@ static int format_cmd_filter(void *, void *, void *);
 
 static int read_copy_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
+static int read_no_cache_opt(json_val_t, void *);
 static int read_transfers_opt(json_val_t, void *);
 static int read_json_config(json_val_t, struct ctx *);
 
@@ -454,6 +457,16 @@ read_debug_opt(json_val_t opt, void *data)
 }
 
 static int
+read_no_cache_opt(json_val_t opt, void *data)
+{
+    struct ctx *ctx = (struct ctx *)data;
+
+    ctx->discard_cache = json_val_boolean_get(opt);
+
+    return 0;
+}
+
+static int
 read_log_opt(json_val_t opt, void *data)
 {
     (void)data;
@@ -525,11 +538,12 @@ read_json_config(json_val_t config, struct ctx *ctx)
     static const struct {
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
-    } opts[8] = {
-        [0] = {L"copy_creds",   &read_copy_creds_opt},
-        [1] = {L"debug",        &read_debug_opt},
-        [3] = {L"log",          &read_log_opt},
-        [5] = {L"transfers",    &read_transfers_opt}
+    } opts[16] = {
+        [0]     = {L"copy_creds",   &read_copy_creds_opt},
+        [1]     = {L"debug",        &read_debug_opt},
+        [3]     = {L"log",          &read_log_opt},
+        [11]    = {L"no_cache",     &read_no_cache_opt},
+        [5]     = {L"transfers",    &read_transfers_opt}
     }, *opt;
 
     numopt = json_val_object_get_num_elem(config);
@@ -638,6 +652,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
 static int
 copy_fn(void *arg)
 {
+    int fl;
     int ret;
     struct copy_args *cargs = (struct copy_args *)arg;
     struct copy_ctx cctx;
@@ -659,11 +674,12 @@ copy_fn(void *arg)
     cctx.bytescopied = 0;
     cctx.lastino = 0;
 
+    fl = DIR_COPY_CALLBACK | DIR_COPY_TMPFILE;
+    if (cargs->discard_cache)
+        fl |= DIR_COPY_DISCARD_CACHE;
+
     umask(0);
-    ret = dir_copy_fd(cargs->srcfd, cargs->dstfd,
-                      DIR_COPY_CALLBACK | DIR_COPY_DISCARD_CACHE
-                      | DIR_COPY_TMPFILE,
-                      &copy_cb, &cctx);
+    ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
     if (debug)
         fputc('\n', stderr);
 
@@ -749,6 +765,7 @@ do_transfers(struct ctx *ctx)
             goto err3;
         }
 
+        ca.discard_cache = ctx->discard_cache;
         ca.uid = ctx->uid;
         ca.gid = ctx->gid;
         err = do_copy(&ca);
@@ -837,6 +854,7 @@ main(int argc, char **argv)
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
 
+    ctx.discard_cache = 1;
     ctx.uid = (uid_t)-1;
     ctx.gid = (gid_t)-1;
 

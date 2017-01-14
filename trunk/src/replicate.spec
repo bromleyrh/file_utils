@@ -1,6 +1,7 @@
 <conf> = {
     <copy_creds?>
     <debug?>
+    <discard_cache?>
     <log?>
     <transfers?>
 }
@@ -8,6 +9,8 @@
 <copy_creds> = "copy_creds" : (<copy_uidgid> | <copy_usrgrp>)
 
 <debug> = "debug" : <Boolean>
+
+<discard_cache> = "discard_cache" : <Boolean>
 
 <log> = "log" : <Boolean>
 
