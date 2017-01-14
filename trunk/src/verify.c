@@ -56,6 +56,7 @@
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -122,6 +123,9 @@ struct verif_args {
 };
 
 struct verif_walk_ctx {
+    off_t               fsbytesused;
+    off_t               bytesverified;
+    off_t               lastoff;
     regex_t             *reg_excl;
     struct radix_tree   *input_data;
     char                *buf1;
@@ -191,11 +195,11 @@ static int input_data_walk_cb(const char *, void *, void *);
 static int scan_input_file(const char *, struct radix_tree **);
 static int print_input_data(FILE *, struct radix_tree *);
 
-static int calc_chksums_cb(int, off_t);
+static int calc_chksums_cb(int, off_t, void *);
 
 static int calc_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
                         unsigned char *, unsigned char *, unsigned *,
-                        int (*)(int, off_t));
+                        int (*)(int, off_t, void *), void *);
 
 static int verify_record_arg_conv(XDR *, void *);
 static int do_verify_record(struct radix_tree *, const char *, off_t,
@@ -1004,10 +1008,19 @@ print_input_data(FILE *f, struct radix_tree *input_data)
 }
 
 static int
-calc_chksums_cb(int fd, off_t flen)
+calc_chksums_cb(int fd, off_t flen, void *ctx)
 {
+    struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
+
     (void)fd;
-    (void)flen;
+
+    wctx->bytesverified += flen - wctx->lastoff;
+    wctx->lastoff = flen;
+
+    if (debug) {
+        fprintf(stderr, "\rProgress: %.6f%%",
+                (double)100 * wctx->bytesverified / wctx->fsbytesused);
+    }
 
     return quit ? -EINTR : 0;
 }
@@ -1015,12 +1028,13 @@ calc_chksums_cb(int fd, off_t flen)
 static int
 calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
              EVP_MD_CTX *sumctx, unsigned char *initsum, unsigned char *sum,
-             unsigned *sumlen, int (*cb)(int, off_t))
+             unsigned *sumlen, int (*cb)(int, off_t, void *), void *ctx)
 {
     char *buf;
     const struct aiocb *aiocbp;
     int err;
     off_t flen = 0, initrem = 512;
+    size_t len;
     struct aiocb aiocb;
 
     if ((EVP_DigestInit_ex(sumctx, EVP_sha1(), NULL) != 1)
@@ -1037,7 +1051,6 @@ calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
 
     for (;;) {
         char *nextbuf;
-        size_t len;
 
         if (aio_suspend(&aiocbp, 1, NULL) == -1)
             goto err;
@@ -1049,7 +1062,7 @@ calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
         }
         flen += len;
 
-        err = (*cb)(fd, flen);
+        err = (*cb)(fd, flen, ctx);
         if (err)
             return err;
 
@@ -1070,6 +1083,10 @@ calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
 
         buf = nextbuf;
     }
+
+    err = (*cb)(fd, flen + len, ctx);
+    if (err)
+        return err;
 
     return ((EVP_DigestFinal_ex(initsumctx, initsum, sumlen) == 1)
             && (EVP_DigestFinal_ex(sumctx, sum, sumlen) == 1)) ? 0 : -EIO;
@@ -1242,10 +1259,17 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (err)
         return err;
 
+    wctx->lastoff = 0;
     err = calc_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
-                       &wctx->sumctx, initsum, sum, &sumlen, &calc_chksums_cb);
-    if (err)
+                       &wctx->sumctx, initsum, sum, &sumlen, &calc_chksums_cb,
+                       wctx);
+    if (err) {
+        if (debug)
+            fputc('\n', stderr);
         return err;
+    }
+    if (debug)
+        fprintf(stderr, " (verified %s/%s)\n", wctx->prefix, path);
 
     /* FIXME: later, verify first checksum as soon as min(s->st_size, 512) bytes
        read */
@@ -1268,6 +1292,7 @@ static int
 verif_fn(void *arg)
 {
     int err;
+    struct statvfs s;
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
 
@@ -1280,6 +1305,11 @@ verif_fn(void *arg)
         error(0, errno, "Error changing user");
         return errno;
     }
+
+    if (fstatvfs(vargs->srcfd, &s) == -1)
+        return errno;
+    wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
+    wctx.bytesverified = 0;
 
     wctx.buf1 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
                      MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE, -1, 0);
