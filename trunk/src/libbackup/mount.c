@@ -185,9 +185,6 @@ mount_filesystem(const char *devpath, const char *mntpath, int read)
 
     /* requires CAP_SYS_ADMIN */
     ret = mnt_context_mount(mntctx);
-
-    mnt_free_context(mntctx);
-
     if (ret != 0)
         goto err2;
 
@@ -195,12 +192,14 @@ mount_filesystem(const char *devpath, const char *mntpath, int read)
     ret = open(mntpath, O_DIRECTORY | O_RDONLY);
     if (ret == -1) {
         ret = -errno;
+        unmount_filesystem(mntpath, -1);
         goto err2;
     }
 
     return ret;
 
 err2:
+    mnt_free_context(mntctx);
     return (ret > 0) ? -ret : ret;
 
 err1:
@@ -225,11 +224,12 @@ unmount_filesystem(const char *path, int rootfd)
         return -EIO;
     }
 
-    /* explicitly synchronize filesystem for greater assurance of data
-       integrity if filesystem is writable */
-    syncfs(rootfd);
-
-    close(rootfd);
+    if (rootfd >= 0) {
+        /* explicitly synchronize filesystem for greater assurance of data
+           integrity if filesystem is writable */
+        syncfs(rootfd);
+        close(rootfd);
+    }
 
     /* requires CAP_SYS_ADMIN */
     ret = mnt_context_umount(mntctx);
