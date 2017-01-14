@@ -77,10 +77,11 @@ struct copy_args {
 };
 
 struct copy_ctx {
-    off_t fsbytesused;
-    off_t bytescopied;
-    off_t lastoff;
-    ino_t lastino;
+    off_t       fsbytesused;
+    off_t       bytescopied;
+    off_t       lastoff;
+    ino_t       lastino;
+    const char  *lastpath;
 };
 
 static volatile sig_atomic_t quit;
@@ -634,8 +635,13 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         struct copy_ctx *cctx = (struct copy_ctx *)(dcpctx->ctx);
 
         if (s->st_ino != cctx->lastino) {
+            if (debug && (cctx->lastpath != NULL)) {
+                fprintf(stderr, " (copied %s)\n", cctx->lastpath);
+                free((void *)(cctx->lastpath));
+            }
             cctx->bytescopied += dcpctx->off;
             cctx->lastino = s->st_ino;
+            cctx->lastpath = strdup(path);
         } else
             cctx->bytescopied += dcpctx->off - cctx->lastoff;
         cctx->lastoff = dcpctx->off;
@@ -673,6 +679,7 @@ copy_fn(void *arg)
     cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     cctx.bytescopied = 0;
     cctx.lastino = 0;
+    cctx.lastpath = NULL;
 
     fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_TMPFILE;
     if (!(cargs->keep_cache))
@@ -682,6 +689,8 @@ copy_fn(void *arg)
     ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
     if (debug)
         fputc('\n', stderr);
+    if (cctx.lastpath != NULL)
+        free((void *)(cctx.lastpath));
 
     return ret;
 }
