@@ -43,6 +43,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -71,6 +72,13 @@ struct copy_args {
     int     dstfd;
     uid_t   uid;
     gid_t   gid;
+};
+
+struct copy_ctx {
+    off_t fsbytesused;
+    off_t bytescopied;
+    off_t lastoff;
+    ino_t lastino;
 };
 
 static volatile sig_atomic_t quit;
@@ -600,12 +608,29 @@ static int
 copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         void *ctx)
 {
+    struct dir_copy_ctx *dcpctx = (struct dir_copy_ctx *)ctx;
+
     (void)fd;
     (void)dirfd;
     (void)name;
     (void)path;
     (void)s;
-    (void)ctx;
+
+    if (dcpctx->off >= 0) {
+        struct copy_ctx *cctx = (struct copy_ctx *)(dcpctx->ctx);
+
+        if (s->st_ino != cctx->lastino) {
+            cctx->bytescopied += dcpctx->off;
+            cctx->lastino = s->st_ino;
+        } else
+            cctx->bytescopied += dcpctx->off - cctx->lastoff;
+        cctx->lastoff = dcpctx->off;
+
+        if (debug) {
+            fprintf(stderr, "Progress: %.6f%%\n",
+                    (double)100 * cctx->bytescopied / cctx->fsbytesused);
+        }
+    }
 
     return quit ? -EINTR : 0;
 }
@@ -613,7 +638,10 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
 static int
 copy_fn(void *arg)
 {
+    int ret;
     struct copy_args *cargs = (struct copy_args *)arg;
+    struct copy_ctx cctx;
+    struct statvfs s;
 
     if ((cargs->gid != (gid_t)-1)
         && ((setgroups(0, NULL) == -1) || (setgid(cargs->gid) == -1))) {
@@ -625,11 +653,21 @@ copy_fn(void *arg)
         return errno;
     }
 
+    if (fstatvfs(cargs->srcfd, &s) == -1)
+        return errno;
+    cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
+    cctx.bytescopied = 0;
+    cctx.lastino = 0;
+
     umask(0);
-    return dir_copy_fd(cargs->srcfd, cargs->dstfd,
-                       DIR_COPY_CALLBACK | DIR_COPY_DISCARD_CACHE
-                       | DIR_COPY_TMPFILE,
-                       &copy_cb, NULL);
+    ret = dir_copy_fd(cargs->srcfd, cargs->dstfd,
+                      DIR_COPY_CALLBACK | DIR_COPY_DISCARD_CACHE
+                      | DIR_COPY_TMPFILE,
+                      &copy_cb, &cctx);
+    if (debug)
+        fputc('\n', stderr);
+
+    return ret;
 }
 
 static int
