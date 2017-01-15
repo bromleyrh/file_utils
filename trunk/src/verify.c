@@ -21,6 +21,7 @@
 
 #include <backup.h>
 
+#include <avl_tree.h>
 #include <hashes.h>
 #include <radix_tree.h>
 #include <strings_ext.h>
@@ -90,10 +91,16 @@ struct parse_ctx {
     size_t      regexlen;
 };
 
-struct input_record {
+struct verif_record {
     off_t           size;
     unsigned char   initsum[EVP_MAX_MD_SIZE];
     unsigned char   sum[EVP_MAX_MD_SIZE];
+};
+
+struct verif_record_output {
+    dev_t               dev;
+    ino_t               ino;
+    struct verif_record record;
 };
 
 struct verify_record_xdr {
@@ -132,6 +139,7 @@ struct verif_walk_ctx {
     char                *buf2;
     EVP_MD_CTX          initsumctx;
     EVP_MD_CTX          sumctx;
+    struct avl_tree     *output_data;
     FILE                *dstf;
     const char          *prefix;
 };
@@ -194,6 +202,8 @@ static int input_data_walk_cb(const char *, void *, void *);
 
 static int scan_input_file(const char *, struct radix_tree **);
 static int print_input_data(FILE *, struct radix_tree *);
+
+static int verif_record_cmp(const void *, const void *, void *);
 
 static int calc_chksums_cb(int, off_t, void *);
 
@@ -948,14 +958,14 @@ scan_input_file(const char *path, struct radix_tree **data)
         return -errno;
     }
 
-    res = radix_tree_new(&ret, sizeof(struct input_record));
+    res = radix_tree_new(&ret, sizeof(struct verif_record));
     if (res != 0)
         goto err1;
 
     errno = 0;
     for (linenum = 1;; linenum++) {
         char buf1[16], buf2[256], buf3[256], buf4[PATH_MAX];
-        struct input_record record;
+        struct verif_record record;
 
         if (getline(&ln, &n, f) == -1) {
             if (errno != 0) {
@@ -1005,6 +1015,20 @@ static int
 print_input_data(FILE *f, struct radix_tree *input_data)
 {
     return radix_tree_walk(input_data, &input_data_walk_cb, (void *)f);
+}
+
+static int
+verif_record_cmp(const void *k1, const void *k2, void *ctx)
+{
+    struct verif_record_output *record1 = (struct verif_record_output *)k1;
+    struct verif_record_output *record2 = (struct verif_record_output *)k2;
+
+    (void)ctx;
+
+    if (record1->dev != record2->dev)
+        return (record1->dev > record2->dev) - (record1->dev < record2->dev);
+
+    return (record1->ino > record2->ino) - (record1->ino < record2->ino);
 }
 
 static int
@@ -1127,7 +1151,7 @@ do_verify_record(struct radix_tree *input_data, const char *path, off_t size,
                  unsigned char *initsum, unsigned char *sum)
 {
     int ret;
-    struct input_record record;
+    struct verif_record record;
 
     ret = radix_tree_search(input_data, path, &record);
     if (ret != 1) {
@@ -1230,10 +1254,11 @@ static int
 verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
               struct stat *s, void *ctx)
 {
-    int err;
+    int mult_links;
+    int res;
+    struct verif_record_output record;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
     unsigned sumlen;
-    unsigned char initsum[EVP_MAX_MD_SIZE], sum[EVP_MAX_MD_SIZE];
 
     (void)dirfd;
     (void)name;
@@ -1255,18 +1280,39 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         }
     }
 
-    err = set_direct_io(fd);
-    if (err)
-        return err;
+    /* if multiple hard links, check if already checksummed */
+    mult_links = (s->st_nlink > 1);
+    if (mult_links) {
+        record.dev = s->st_dev;
+        record.ino = s->st_ino;
+        res = avl_tree_search(wctx->output_data, &record, &record);
+        if (res != 0) {
+            if (res < 0)
+                return res;
+            if (record.record.size != s->st_size)
+                return -EIO;
+            res = output_record(wctx->dstf, record.record.size,
+                                record.record.initsum, record.record.sum, 20,
+                                wctx->prefix, path);
+            if (res != 0)
+                return res;
+            goto end;
+        }
+    }
 
+    res = set_direct_io(fd);
+    if (res != 0)
+        return res;
+
+    record.record.size = s->st_size;
     wctx->lastoff = 0;
-    err = calc_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
-                       &wctx->sumctx, initsum, sum, &sumlen, &calc_chksums_cb,
-                       wctx);
-    if (err) {
+    res = calc_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
+                       &wctx->sumctx, record.record.initsum, record.record.sum,
+                       &sumlen, &calc_chksums_cb, wctx);
+    if (res != 0) {
         if (debug)
             fputc('\n', stderr);
-        return err;
+        return res;
     }
     if (debug)
         fprintf(stderr, " (verified %s/%s)\n", wctx->prefix, path);
@@ -1274,17 +1320,25 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     /* FIXME: later, verify first checksum as soon as min(s->st_size, 512) bytes
        read */
     if (wctx->input_data != NULL) {
-        err = verify_record(wctx->input_data, wctx->prefix, path, s->st_size,
-                            initsum, sum, sumlen);
-        if (err)
-            return err;
+        res = verify_record(wctx->input_data, wctx->prefix, path,
+                            record.record.size, record.record.initsum,
+                            record.record.sum, sumlen);
+        if (res != 0)
+            return res;
     }
 
-    err = output_record(wctx->dstf, s->st_size, initsum, sum, sumlen,
-                        wctx->prefix, path);
-    if (err)
-        return err;
+    res = output_record(wctx->dstf, record.record.size, record.record.initsum,
+                        record.record.sum, sumlen, wctx->prefix, path);
+    if (res != 0)
+        return res;
 
+    if (mult_links) {
+        res = avl_tree_insert(wctx->output_data, &record);
+        if (res != 0)
+            return res;
+    }
+
+end:
     return -posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED);
 }
 
@@ -1328,6 +1382,11 @@ verif_fn(void *arg)
         goto end2;
     }
 
+    err = avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
+                       &verif_record_cmp, NULL);
+    if (err)
+        goto end3;
+
     wctx.reg_excl = vargs->reg_excl;
     wctx.input_data = vargs->input_data;
     wctx.dstf = vargs->dstf;
@@ -1336,9 +1395,11 @@ verif_fn(void *arg)
     err = -dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
                        (void *)&wctx);
 
+    avl_tree_free(wctx.output_data);
+
+end3:
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
-
     /* FIXME: determine huge page size at runtime */
 end2:
     munmap(wctx.buf2, 4 * 1024 * 1024);
