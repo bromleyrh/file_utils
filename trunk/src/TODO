@@ -15,7 +15,9 @@ replicate
 
 verify
 
-- Speed up processing of files with multiple hard links
+- Add option to disable hard link optimization (some filesystems, such as some
+  FUSE filesystems, do not guarantee that different files have different inode
+  numbers)
 - Verify checksum for first min(file_size, 512) bytes of file as soon as this
   number of bytes is read
 - Disable direct I/O if not supported
