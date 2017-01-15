@@ -170,6 +170,10 @@ static void cancel_aio(struct aiocb *);
 
 static int svc_run_fn(void *);
 
+/* NOTE: registerrpc() declaration missing from system RPC headers on some
+   systems */
+int registerrpc(unsigned long, unsigned long, unsigned long, char *(*)(char *),
+                xdrproc_t, xdrproc_t);
 static int do_svc_run(void);
 
 static int init_rpc(void);
@@ -484,7 +488,9 @@ init_rpc()
     uuid_generate(rpc_cookie);
 
     return ((registerrpc(RPC_PROGNUM, RPC_VERSNUM, RPC_PROCNUM_VERIFY_RECORD,
-                         &verify_record_proc, &verify_record_arg_conv, &xdr_int)
+                         &verify_record_proc,
+                         (xdrproc_t)&verify_record_arg_conv,
+                         (xdrproc_t)&xdr_int)
              == 0)
             && (do_svc_run() == 0))
            ? 0 : -EIO;
