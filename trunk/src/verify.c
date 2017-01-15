@@ -77,6 +77,7 @@ struct ctx {
     int                 num_verifs;
     const char          *base_dir;
     regex_t             *reg_excl;
+    int                 detect_hard_links;
     const char          *input_file;
     struct radix_tree   *input_data;
     const char          *output_file;
@@ -123,6 +124,7 @@ struct verif_args {
     int                 srcfd;
     FILE                *dstf;
     regex_t             *reg_excl;
+    int                 detect_hard_links;
     struct radix_tree   *input_data;
     const char          *prefix;
     uid_t               uid;
@@ -134,6 +136,7 @@ struct verif_walk_ctx {
     off_t               bytesverified;
     off_t               lastoff;
     regex_t             *reg_excl;
+    int                 detect_hard_links;
     struct radix_tree   *input_data;
     char                *buf1;
     char                *buf2;
@@ -188,6 +191,7 @@ static int parse_json_config(const char *, const struct json_parser *,
 static int read_base_dir_opt(json_val_t, void *);
 static int read_creds_opt(json_val_t, void *);
 static int read_debug_opt(json_val_t, void *);
+static int read_detect_hard_links_opt(json_val_t, void *);
 static int read_exclude_opt(json_val_t, void *);
 static int read_input_file_opt(json_val_t, void *);
 static int read_output_file_opt(json_val_t, void *);
@@ -686,6 +690,16 @@ read_debug_opt(json_val_t opt, void *data)
 }
 
 static int
+read_detect_hard_links_opt(json_val_t opt, void *data)
+{
+    struct parse_ctx *pctx = (struct parse_ctx *)data;
+
+    pctx->ctx.detect_hard_links = json_val_boolean_get(opt);
+
+    return 0;
+}
+
+static int
 read_exclude_opt(json_val_t opt, void *data)
 {
     int err;
@@ -818,14 +832,15 @@ read_json_config(json_val_t config, struct parse_ctx *ctx)
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
     } opts[64] = {
-        [27]    = {L"base_dir",     &read_base_dir_opt},
-        [11]    = {L"creds",        &read_creds_opt},
-        [57]    = {L"debug",        &read_debug_opt},
-        [59]    = {L"exclude",      &read_exclude_opt},
-        [23]    = {L"input_file",   &read_input_file_opt},
-        [51]    = {L"log",          &read_log_opt},
-        [6]     = {L"output_file",  &read_output_file_opt},
-        [15]    = {L"verifs",       &read_verifs_opt}
+        [27]    = {L"base_dir",             &read_base_dir_opt},
+        [11]    = {L"creds",                &read_creds_opt},
+        [57]    = {L"debug",                &read_debug_opt},
+        [43]    = {L"detect_hard_links",    &read_detect_hard_links_opt},
+        [59]    = {L"exclude",              &read_exclude_opt},
+        [23]    = {L"input_file",           &read_input_file_opt},
+        [51]    = {L"log",                  &read_log_opt},
+        [6]     = {L"output_file",          &read_output_file_opt},
+        [15]    = {L"verifs",               &read_verifs_opt}
     }, *opt;
 
     numopt = json_val_object_get_num_elem(config);
@@ -1287,7 +1302,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     }
 
     /* if multiple hard links, check if already checksummed */
-    mult_links = (s->st_nlink > 1);
+    mult_links = wctx->detect_hard_links && (s->st_nlink > 1);
     if (mult_links) {
         record.dev = s->st_dev;
         record.ino = s->st_ino;
@@ -1394,6 +1409,7 @@ verif_fn(void *arg)
         goto end3;
 
     wctx.reg_excl = vargs->reg_excl;
+    wctx.detect_hard_links = vargs->detect_hard_links;
     wctx.input_data = vargs->input_data;
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
@@ -1480,6 +1496,7 @@ do_verifs(struct ctx *ctx)
         }
 
         va.reg_excl = ctx->reg_excl;
+        va.detect_hard_links = ctx->detect_hard_links;
         va.input_data = ctx->input_data;
         va.dstf = dstf;
         va.prefix = verif->srcpath;
@@ -1588,6 +1605,7 @@ main(int argc, char **argv)
 
     ctx = &pctx.ctx;
     ctx->base_dir = NULL;
+    ctx->detect_hard_links = 1;
     ctx->input_file = NULL;
     ctx->input_data = NULL;
     ctx->uid = (uid_t)-1;
