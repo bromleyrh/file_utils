@@ -98,6 +98,9 @@ static int get_uid(const char *, uid_t *);
 
 static int set_capabilities(void);
 
+static void print_usage(const char *);
+static int parse_cmdline(int, char **, const char **);
+
 static int get_conf_path(const char *, const char **);
 
 static int parse_json_config(const char *, const struct json_parser *,
@@ -281,6 +284,44 @@ set_capabilities()
 err:
     cap_free(caps);
     return -errno;
+}
+
+static void
+print_usage(const char *progname)
+{
+    printf("Usage: %s [options]\n"
+           "\n"
+           "    -c PATH use specified configuration file\n"
+           "    -h      output help\n",
+           progname);
+}
+
+static int
+parse_cmdline(int argc, char **argv, const char **confpath)
+{
+    for (;;) {
+        int opt = getopt(argc, argv, "c:h");
+
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'c':
+            *confpath = strdup(optarg);
+            if (*confpath == NULL) {
+                error(0, errno, "Couldn't allocate memory");
+                return -1;
+            }
+            break;
+        case 'h':
+            print_usage(argv[0]);
+            return -2;
+        default:
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 static int
@@ -865,9 +906,6 @@ main(int argc, char **argv)
     int ret;
     struct ctx ctx;
 
-    (void)argc;
-    (void)argv;
-
     ret = set_capabilities();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
@@ -876,9 +914,15 @@ main(int argc, char **argv)
     ctx.uid = (uid_t)-1;
     ctx.gid = (gid_t)-1;
 
-    ret = get_conf_path(CONFIG_PATH, &confpath);
+    ret = parse_cmdline(argc, argv, &confpath);
     if (ret != 0)
-        return EXIT_FAILURE;
+        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+
+    if (confpath == NULL) {
+        ret = get_conf_path(CONFIG_PATH, &confpath);
+        if (ret != 0)
+            return EXIT_FAILURE;
+    }
 
     ret = parse_config(confpath, &ctx);
     free((void *)confpath);

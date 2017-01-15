@@ -183,6 +183,9 @@ static int init_rpc(void);
 
 static int set_capabilities(void);
 
+static void print_usage(const char *);
+static int parse_cmdline(int, char **, const char **);
+
 static int get_conf_path(const char *, const char **);
 
 static int parse_json_config(const char *, const struct json_parser *,
@@ -498,6 +501,44 @@ init_rpc()
              == 0)
             && (do_svc_run() == 0))
            ? 0 : -EIO;
+}
+
+static void
+print_usage(const char *progname)
+{
+    printf("Usage: %s [options]\n"
+           "\n"
+           "    -c PATH use specified configuration file\n"
+           "    -h      output help\n",
+           progname);
+}
+
+static int
+parse_cmdline(int argc, char **argv, const char **confpath)
+{
+    for (;;) {
+        int opt = getopt(argc, argv, "c:h");
+
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'c':
+            *confpath = strdup(optarg);
+            if (*confpath == NULL) {
+                error(0, errno, "Couldn't allocate memory");
+                return -1;
+            }
+            break;
+        case 'h':
+            print_usage(argv[0]);
+            return -2;
+        default:
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 static int
@@ -1581,9 +1622,6 @@ main(int argc, char **argv)
     struct ctx *ctx;
     struct parse_ctx pctx;
 
-    (void)argc;
-    (void)argv;
-
     /* Note: Remote procedure calls are used for communication between the
        parent process and the verification child process, instead of using
        clone(CLONE_VM) to share memory, in order to work around an apparent bug
@@ -1599,9 +1637,15 @@ main(int argc, char **argv)
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
 
-    ret = get_conf_path(CONFIG_PATH, &confpath);
+    ret = parse_cmdline(argc, argv, &confpath);
     if (ret != 0)
-        return EXIT_FAILURE;
+        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+
+    if (confpath == NULL) {
+        ret = get_conf_path(CONFIG_PATH, &confpath);
+        if (ret != 0)
+            return EXIT_FAILURE;
+    }
 
     ctx = &pctx.ctx;
     ctx->base_dir = NULL;
