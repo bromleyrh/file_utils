@@ -542,11 +542,11 @@ read_json_config(json_val_t config, struct ctx *ctx)
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
     } opts[16] = {
-        [0] = {L"copy_creds",   &read_copy_creds_opt},
-        [1] = {L"debug",        &read_debug_opt},
-        [2] = {L"keep_cache",   &read_keep_cache_opt},
-        [3] = {L"log",          &read_log_opt},
-        [5] = {L"transfers",    &read_transfers_opt}
+        [2] = {L"copy_creds",   &read_copy_creds_opt},
+        [7] = {L"debug",        &read_debug_opt},
+        [0] = {L"keep_cache",   &read_keep_cache_opt},
+        [6] = {L"log",          &read_log_opt},
+        [1] = {L"transfers",    &read_transfers_opt}
     }, *opt;
 
     numopt = json_val_object_get_num_elem(config);
@@ -557,7 +557,7 @@ read_json_config(json_val_t config, struct ctx *ctx)
         if (err)
             return err;
 
-        opt = &opts[(hash_str(elem.key, -1) >> 2) & 7];
+        opt = &opts[(hash_wcs(elem.key, -1) >> 6) & 7];
         if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
             return -EIO;
 

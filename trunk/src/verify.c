@@ -817,15 +817,15 @@ read_json_config(json_val_t config, struct parse_ctx *ctx)
     static const struct {
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
-    } opts[16] = {
-        [2]     = {L"base_dir",     &read_base_dir_opt},
-        [3]     = {L"creds",        &read_creds_opt},
-        [4]     = {L"debug",        &read_debug_opt},
-        [5]     = {L"exclude",      &read_exclude_opt},
-        [9]     = {L"input_file",   &read_input_file_opt},
-        [12]    = {L"log",          &read_log_opt},
-        [15]    = {L"output_file",  &read_output_file_opt},
-        [6]     = {L"verifs",       &read_verifs_opt}
+    } opts[64] = {
+        [27]    = {L"base_dir",     &read_base_dir_opt},
+        [11]    = {L"creds",        &read_creds_opt},
+        [57]    = {L"debug",        &read_debug_opt},
+        [59]    = {L"exclude",      &read_exclude_opt},
+        [23]    = {L"input_file",   &read_input_file_opt},
+        [51]    = {L"log",          &read_log_opt},
+        [6]     = {L"output_file",  &read_output_file_opt},
+        [15]    = {L"verifs",       &read_verifs_opt}
     }, *opt;
 
     numopt = json_val_object_get_num_elem(config);
@@ -836,7 +836,7 @@ read_json_config(json_val_t config, struct parse_ctx *ctx)
         if (err)
             return err;
 
-        opt = &opts[hash_str(elem.key, -1) & 15];
+        opt = &opts[(hash_wcs(elem.key, -1) >> 3) & 63];
         if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
             return -EIO;
 
