@@ -255,6 +255,7 @@ set_capabilities()
     cap_t caps;
 
     static const cap_value_t capvals[] = {
+        CAP_CHOWN,
         CAP_DAC_READ_SEARCH,
         CAP_SETGID,
         CAP_SETUID,
