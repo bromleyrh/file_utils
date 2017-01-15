@@ -65,6 +65,7 @@ struct transfer {
     const char  *dstpath;
     const char  *dstmntpath;
     const char  *format_cmd;
+    int         force_write;
     int         setro;
 };
 
@@ -497,6 +498,8 @@ read_transfers_opt(json_val_t opt, void *data)
          TRANSFER_PARAM(dstmntpath)},
         {L"format_cmd", JSON_TYPE_STRING, 1, 0, 1, &format_cmd_filter, NULL,
          NULL, TRANSFER_PARAM(format_cmd)},
+        {L"force_write", JSON_TYPE_BOOLEAN, 0, 0, 1, NULL, NULL, NULL,
+         TRANSFER_PARAM(force_write)},
         {L"setro", JSON_TYPE_BOOLEAN, 0, 0, 1, NULL, NULL, NULL,
          TRANSFER_PARAM(setro)}
     };
@@ -509,6 +512,7 @@ read_transfers_opt(json_val_t opt, void *data)
 
     for (i = 0; i < ctx->num_transfers; i++) {
         json_val_t val;
+        struct transfer *transfer = &ctx->transfers[i];
 
         val = json_val_array_get_elem(opt, i);
         if (val == NULL) {
@@ -516,9 +520,10 @@ read_transfers_opt(json_val_t opt, void *data)
             goto err;
         }
 
-        ctx->transfers[i].setro = 0;
-        err = json_oscanf(&ctx->transfers[i], spec,
-                          (int)(sizeof(spec)/sizeof(spec[0])), val);
+        transfer->force_write = 1;
+        transfer->setro = 0;
+        err = json_oscanf(transfer, spec, (int)(sizeof(spec)/sizeof(spec[0])),
+                          val);
         if (err)
             goto err;
     }
@@ -740,7 +745,7 @@ do_transfers(struct ctx *ctx)
         log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
 
-        ca.srcfd = mount_filesystem(NULL, transfer->srcpath, 1);
+        ca.srcfd = mount_filesystem(NULL, transfer->srcpath, MNT_FS_READ);
         if (ca.srcfd < 0) {
             error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
             return ca.srcfd;
@@ -763,7 +768,9 @@ do_transfers(struct ctx *ctx)
             goto err2;
         }
 
-        ca.dstfd = mount_filesystem(transfer->dstpath, transfer->dstmntpath, 0);
+        ca.dstfd = mount_filesystem(transfer->dstpath, transfer->dstmntpath,
+                                    transfer->force_write
+                                    ? MNT_FS_FORCE_WRITE : MNT_FS_WRITE);
         if (ca.dstfd < 0) {
             error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
             err = ca.dstfd;

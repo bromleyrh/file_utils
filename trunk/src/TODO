@@ -8,7 +8,6 @@ TODO
 
 replicate
 
-- Add option not to override "ro" /etc/fstab option for target
 - Add command-line option to specify configuration file path
 - Determine if safe to set block device read-only immediately after mount
 - Improve diagnostic output

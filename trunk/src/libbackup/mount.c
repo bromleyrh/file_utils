@@ -155,7 +155,7 @@ err:
 }
 
 int
-mount_filesystem(const char *devpath, const char *mntpath, int read)
+mount_filesystem(const char *devpath, const char *mntpath, int flags)
 {
     int mflags;
     int ret;
@@ -168,13 +168,14 @@ mount_filesystem(const char *devpath, const char *mntpath, int read)
         return -ENOMEM;
 
     mflags = MS_NODEV | MS_NOEXEC;
-    if (read)
+    if (flags == MNT_FS_READ)
         mflags |= MS_RDONLY;
 
     if (mnt_context_set_mflags(mntctx, mflags) != 0)
         goto err1;
 
-    if (!read && (mnt_context_set_options(mntctx, "rw") != 0))
+    if ((flags == MNT_FS_FORCE_WRITE)
+        && (mnt_context_set_options(mntctx, "rw") != 0))
         goto err1;
 
     if (devpath != NULL) {

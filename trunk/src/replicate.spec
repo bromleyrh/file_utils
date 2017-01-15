@@ -21,6 +21,7 @@
     <transfer_destination>
     <transfer_dstpath>
     <transfer_format_cmd>
+    <transfer_force_write?>
     <transfer_setro?>
 }
 
@@ -41,6 +42,8 @@
 <transfer_dstpath> = "dstpath" : <string>
 
 <transfer_format_cmd> = "format_cmd" : <string>
+
+<transfer_force_write> = "force_write" : <Boolean>
 
 <transfer_setro> = "setro" : <Boolean>
 
