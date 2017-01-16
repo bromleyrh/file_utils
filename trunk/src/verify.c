@@ -1529,7 +1529,8 @@ do_verifs(struct ctx *ctx)
                 goto err1;
         }
 
-        va.srcfd = mount_filesystem(verif->devpath, verif->srcpath, 1);
+        va.srcfd = mount_filesystem(verif->devpath, verif->srcpath,
+                                    MNT_FS_READ);
         if (va.srcfd < 0) {
             error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
             err = va.srcfd;
