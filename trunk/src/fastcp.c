@@ -71,7 +71,7 @@ main(int argc, char **argv)
     if (close(fd2) == -1)
         error(EXIT_FAILURE, errno, "Error closing file");
 
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return EXIT_SUCCESS;
 
 err2:
     close(fd2);
