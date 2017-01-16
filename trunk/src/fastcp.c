@@ -61,8 +61,8 @@ main(int argc, char **argv)
         goto err1;
     }
 
-    ret = file_copy_fd(fd1, fd2, 0);
-    if (ret != 0) {
+    if (((ret = file_copy_fd(fd1, fd2, 0)) != 0)
+        || ((ret = file_copy_attrs_fd(fd1, fd2)) != 0)) {
         error(0, -ret, "Error copying file");
         goto err2;
     }
