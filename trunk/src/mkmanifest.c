@@ -9,20 +9,70 @@
 #include <error.h>
 #include <limits.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <wordexp.h>
 
 #include <sys/wait.h>
 
+#define CONF_PATH "\"$HOME/.verify.conf\""
 #define TEMPLATE_PATH "\"$HOME/.manifest_temp\""
 
-static int get_template_path(const char *, char *);
+static void print_usage(const char *);
+static int parse_cmdline(int, char **, char *, char *);
+
+static int get_path(const char *, char *);
 
 static int set_signal_handlers(void);
 
+static void
+print_usage(const char *progname)
+{
+    printf("Usage: %s [options]\n"
+           "\n"
+           "    -c PATH use specified verify configuration file\n"
+           "    -h      output help\n"
+           "    -t PATH use specified manifest template file\n",
+           progname);
+}
+
 static int
-get_template_path(const char *pathspec, char *path)
+parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
+{
+    for (;;) {
+        int opt = getopt(argc, argv, "c:ht:");
+
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'c':
+            if (strlcpy(conf_path, optarg, PATH_MAX) >= PATH_MAX)
+                goto path_err;
+            break;
+        case 'h':
+            print_usage(argv[0]);
+            return -2;
+        case 't':
+            if (strlcpy(template_path, optarg, PATH_MAX) >= PATH_MAX)
+                goto path_err;
+            break;
+        default:
+            return -1;
+        }
+    }
+
+    return 0;
+
+path_err:
+    error(0, 0, "Path name too long");
+    return -1;
+}
+
+static int
+get_path(const char *pathspec, char *path)
 {
     wordexp_t words;
 
@@ -67,11 +117,11 @@ set_signal_handlers()
 int
 main(int argc, char **argv)
 {
-    int err;
+    int ret;
 
-    static char template_path[PATH_MAX];
+    static char conf_path[PATH_MAX] = "", template_path[PATH_MAX] = "";
 
-    static char *const cmd1[] = {"verify", NULL};
+    static char *const cmd1[] = {"verify", "-c", conf_path, NULL};
     static char *const cmd2[] = {"osort", "-k3", NULL};
     static char *const cmd3[] = {"cat", template_path, "-", NULL};
 
@@ -82,18 +132,21 @@ main(int argc, char **argv)
     };
     static const int ncmds = (int)(sizeof(cmds)/sizeof(cmds[0]));
 
-    (void)argc;
-    (void)argv;
+    ret = parse_cmdline(argc, argv, conf_path, template_path);
+    if (ret != 0)
+        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
 
-    if (get_template_path(TEMPLATE_PATH, template_path) != 0)
+    if (((conf_path[0] == '\0') && (get_path(CONF_PATH, conf_path) != 0))
+        || ((template_path[0] == '\0')
+            && (get_path(TEMPLATE_PATH, template_path) != 0)))
         return EXIT_FAILURE;
 
     if (set_signal_handlers() != 0)
         return EXIT_FAILURE;
 
-    err = pipeline(cmds, ncmds);
-    if (err)
-        error(EXIT_FAILURE, -err, "Error executing");
+    ret = pipeline(cmds, ncmds);
+    if (ret != 0)
+        error(EXIT_FAILURE, -ret, "Error executing");
 
     for (;;) {
         int status;
@@ -103,11 +156,11 @@ main(int argc, char **argv)
                 break;
             error(EXIT_FAILURE, errno, "Error");
         }
-        if (!err && (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)))
-            err = -EIO;
+        if ((ret == 0) && (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)))
+            ret = -EIO;
     }
 
-    return err ? EXIT_FAILURE : EXIT_SUCCESS;
+    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /* vi: set expandtab sw=4 ts=4: */
