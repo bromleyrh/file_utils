@@ -750,7 +750,7 @@ do_copy(struct copy_args *copy_args)
 
     debug_print("Performing copy");
 
-    ret = copy_fn(copy_args);
+    ret = -copy_fn(copy_args);
     if (ret != 0) {
         int tmp; /* silence compiler warnings */
 
