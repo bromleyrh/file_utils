@@ -1355,7 +1355,7 @@ do_verif(struct verif_args *verif_args)
 
     debug_print("Performing verification");
 
-    ret = verif_fn(verif_args);
+    ret = -verif_fn(verif_args);
     if (ret != 0) {
         int tmp; /* silence compiler warnings */
 
