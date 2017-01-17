@@ -1298,25 +1298,28 @@ verif_fn(void *arg)
 
     wctx.buf1 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
                      MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE, -1, 0);
-    if (wctx.buf1 == MAP_FAILED)
-        return errno;
+    if (wctx.buf1 == MAP_FAILED) {
+        err = errno;
+        goto alloc_err;
+    }
     wctx.buf2 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
                      MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE, -1, 0);
     if (wctx.buf2 == MAP_FAILED) {
         err = errno;
-        goto end1;
+        munmap(wctx.buf1, 4 * 1024 * 1024);
+        goto alloc_err;
     }
 
     if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
         || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
         err = EIO;
-        goto end2;
+        goto end1;
     }
 
     err = avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
                        &verif_record_cmp, NULL);
     if (err)
-        goto end3;
+        goto end2;
 
     wctx.reg_excl = vargs->reg_excl;
     wctx.detect_hard_links = vargs->detect_hard_links;
@@ -1329,14 +1332,19 @@ verif_fn(void *arg)
 
     avl_tree_free(wctx.output_data);
 
-end3:
+end2:
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
-    /* FIXME: determine huge page size at runtime */
-end2:
-    munmap(wctx.buf2, 4 * 1024 * 1024);
 end1:
+    /* FIXME: determine huge page size at runtime */
+    munmap(wctx.buf2, 4 * 1024 * 1024);
     munmap(wctx.buf1, 4 * 1024 * 1024);
+    return err;
+
+alloc_err:
+    error(0, err, "Couldn't allocate memory%s",
+          (err == ENOMEM)
+          ? " (check /proc/sys/vm/nr_hugepages is at least 2)" : "");
     return err;
 }
 
