@@ -713,11 +713,11 @@ copy_fn(void *arg)
     struct statvfs s;
 
     if ((cargs->gid != (gid_t)-1)
-        && ((setgroups(0, NULL) == -1) || (setgid(cargs->gid) == -1))) {
+        && ((setgroups(0, NULL) == -1) || (setegid(cargs->gid) == -1))) {
         error(0, errno, "Error changing group");
         return errno;
     }
-    if ((cargs->uid != (uid_t)-1) && (setuid(cargs->uid) == -1)) {
+    if ((cargs->uid != (uid_t)-1) && (seteuid(cargs->uid) == -1)) {
         error(0, errno, "Error changing user");
         return errno;
     }
@@ -746,29 +746,22 @@ copy_fn(void *arg)
 static int
 do_copy(struct copy_args *copy_args)
 {
-    int status;
-    pid_t pid;
-
-    static char copy_stack[16 * 1024 * 1024];
+    int ret;
 
     debug_print("Performing copy");
 
-    pid = clone(&copy_fn, copy_stack + sizeof(copy_stack),
-                CLONE_FILES | CLONE_VM, copy_args);
-    if (pid == -1) {
-        error(0, errno, "Error creating process");
-        return -errno;
+    ret = copy_fn(copy_args);
+    if (ret != 0) {
+        int tmp; /* silence compiler warnings */
+
+        tmp = seteuid(0);
+        tmp = setegid(0);
+        (void)tmp;
+
+        return ret;
     }
 
-    while (waitpid(pid, &status, __WCLONE) == -1) {
-        if (errno != EINTR)
-            return errno;
-    }
-
-    if (!WIFEXITED(status))
-        return -EIO;
-
-    return -WEXITSTATUS(status);
+    return ((seteuid(0) == 0) && (setegid(0) == 0)) ? 0 : -errno;
 }
 
 static int
@@ -906,6 +899,7 @@ main(int argc, char **argv)
     int ret;
     struct ctx ctx;
 
+    /* FIXME: drop supplementary group privileges during initialization */
     ret = set_capabilities();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");

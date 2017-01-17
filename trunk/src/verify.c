@@ -17,8 +17,6 @@
 
 #include <openssl/evp.h>
 
-#include <uuid/uuid.h>
-
 #include <backup.h>
 
 #include <avl_tree.h>
@@ -50,8 +48,6 @@
 #include <wchar.h>
 #include <wordexp.h>
 
-#include <rpc/rpc.h>
-
 #include <sys/capability.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -65,10 +61,6 @@
 #define CONFIG_ROOT_ID "conf"
 
 #define CHECK_CMD_SRC_SPECIFIER "$dev"
-
-#define RPC_PROGNUM 0x20000001
-#define RPC_VERSNUM 1
-#define RPC_PROCNUM_VERIFY_RECORD 1
 
 #define BUFSIZE (1024 * 1024)
 
@@ -102,16 +94,6 @@ struct verif_record_output {
     dev_t               dev;
     ino_t               ino;
     struct verif_record record;
-};
-
-struct verify_record_xdr {
-    u_char  rpc_cookie[sizeof(uuid_t)];
-    u_long  input_data;
-    char    path[PATH_MAX];
-    u_long  size_ms;
-    u_long  size_ls;
-    u_char  initsum[EVP_MAX_MD_SIZE];
-    u_char  sum[EVP_MAX_MD_SIZE];
 };
 
 struct verif {
@@ -152,8 +134,6 @@ static volatile sig_atomic_t quit;
 static int debug;
 static int log;
 
-static uuid_t rpc_cookie;
-
 static void debug_print(const char *, ...);
 static void log_print(int, const char *, ...);
 
@@ -170,16 +150,6 @@ static int get_uid(const char *, uid_t *);
 static int set_direct_io(int);
 
 static void cancel_aio(struct aiocb *);
-
-static int svc_run_fn(void *);
-
-/* NOTE: registerrpc() declaration missing from system RPC headers on some
-   systems */
-int registerrpc(unsigned long, unsigned long, unsigned long, char *(*)(char *),
-                xdrproc_t, xdrproc_t);
-static int do_svc_run(void);
-
-static int init_rpc(void);
 
 static int set_capabilities(void);
 
@@ -222,10 +192,8 @@ static int calc_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
                         unsigned char *, unsigned char *, unsigned *,
                         int (*)(int, off_t, void *), void *);
 
-static int verify_record_arg_conv(XDR *, void *);
 static int do_verify_record(struct radix_tree *, const char *, off_t,
                             unsigned char *, unsigned char *);
-static char *verify_record_proc(char *);
 
 static int verify_record(struct radix_tree *, const char *, const char *, off_t,
                          unsigned char *, unsigned char *, unsigned);
@@ -464,43 +432,6 @@ cancel_aio(struct aiocb *cb)
     }
 
     aio_return(cb);
-}
-
-static int
-svc_run_fn(void *arg)
-{
-    (void)arg;
-
-    svc_run();
-    return -1;
-}
-
-static int
-do_svc_run()
-{
-    static char svc_run_stack[16 * 1024 * 1024];
-
-    if (clone(&svc_run_fn, svc_run_stack + sizeof(svc_run_stack),
-              CLONE_SIGHAND | CLONE_THREAD | CLONE_VM, NULL) == -1) {
-        error(0, errno, "Error creating process");
-        return -errno;
-    }
-
-    return 0;
-}
-
-static int
-init_rpc()
-{
-    uuid_generate(rpc_cookie);
-
-    return ((registerrpc(RPC_PROGNUM, RPC_VERSNUM, RPC_PROCNUM_VERIFY_RECORD,
-                         &verify_record_proc,
-                         (xdrproc_t)&verify_record_arg_conv,
-                         (xdrproc_t)&xdr_int)
-             == 0)
-            && (do_svc_run() == 0))
-           ? 0 : -EIO;
 }
 
 static void
@@ -1184,31 +1115,6 @@ err:
 }
 
 static int
-verify_record_arg_conv(XDR *xdrs, void *obj)
-{
-    char *path;
-    struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
-
-    if (xdrs->x_op == XDR_FREE)
-        return TRUE;
-
-    path = vr->path;
-
-    xdr_vector(xdrs, (char *)&vr->rpc_cookie, sizeof(vr->rpc_cookie),
-               sizeof(*(vr->rpc_cookie)), (xdrproc_t)&xdr_char);
-    xdr_u_long(xdrs, &vr->input_data);
-    xdr_string(xdrs, &path, sizeof(vr->path));
-    xdr_u_long(xdrs, &vr->size_ms);
-    xdr_u_long(xdrs, &vr->size_ls);
-    xdr_vector(xdrs, (char *)&vr->initsum, sizeof(vr->initsum),
-               sizeof(*(vr->initsum)), (xdrproc_t)&xdr_char);
-    xdr_vector(xdrs, (char *)&vr->sum, sizeof(vr->sum), sizeof(*(vr->sum)),
-               (xdrproc_t)&xdr_char);
-
-    return TRUE;
-}
-
-static int
 do_verify_record(struct radix_tree *input_data, const char *path, off_t size,
                  unsigned char *initsum, unsigned char *sum)
 {
@@ -1230,26 +1136,6 @@ do_verify_record(struct radix_tree *input_data, const char *path, off_t size,
     }
 
     return radix_tree_delete(input_data, path);
-}
-
-static char *
-verify_record_proc(char *obj)
-{
-    off_t size;
-    static int ret;
-    struct verify_record_xdr *vr = (struct verify_record_xdr *)obj;
-
-    if (memcmp(rpc_cookie, vr->rpc_cookie, sizeof(uuid_t)) != 0) {
-        ret = -EACCES;
-        return (char *)&ret;
-    }
-
-    size = (((uint64_t)(vr->size_ms)) << 32) | vr->size_ls;
-
-    ret = do_verify_record((struct radix_tree *)(vr->input_data), vr->path,
-                           size, vr->initsum, vr->sum);
-
-    return (char *)&ret;
 }
 
 static int
@@ -1283,33 +1169,16 @@ verify_record(struct radix_tree *input_data, const char *prefix,
               const char *path, off_t size, unsigned char *initsum,
               unsigned char *sum, unsigned sumlen)
 {
-    int ret;
-    struct verify_record_xdr vr;
-    uint64_t usize;
+    char fullpath[PATH_MAX];
 
     if (sumlen != 20)
         return -EIO;
 
-    if (snprintf(vr.path, sizeof(vr.path), "%s/%s", prefix, path)
-        >= (int)sizeof(vr.path))
+    if (snprintf(fullpath, sizeof(fullpath), "%s/%s", prefix, path)
+        >= (int)sizeof(fullpath))
         return -EIO;
 
-    memcpy(vr.rpc_cookie, rpc_cookie, sizeof(rpc_cookie));
-
-    usize = (uint64_t)size;
-    vr.size_ms = (usize & 0xffffffff00000000) >> 32;
-    vr.size_ls = usize & 0xffffffff;
-
-    vr.input_data = (u_long)input_data;
-    memcpy(vr.initsum, initsum, EVP_MAX_MD_SIZE);
-    memcpy(vr.sum, sum, EVP_MAX_MD_SIZE);
-
-    return (callrpc("localhost", RPC_PROGNUM, RPC_VERSNUM,
-                    RPC_PROCNUM_VERIFY_RECORD,
-                    (xdrproc_t)&verify_record_arg_conv, (const char *)&vr,
-                    (xdrproc_t)&xdr_int, (char *)&ret)
-            == 0)
-           ? ret : -EIO;
+    return do_verify_record(input_data, fullpath, size, initsum, sum);
 }
 
 static int
@@ -1413,11 +1282,11 @@ verif_fn(void *arg)
     struct verif_walk_ctx wctx;
 
     if ((vargs->gid != (gid_t)-1)
-        && ((setgroups(0, NULL) == -1) || (setgid(vargs->gid) == -1))) {
+        && ((setgroups(0, NULL) == -1) || (setegid(vargs->gid) == -1))) {
         error(0, errno, "Error changing group");
         return errno;
     }
-    if ((vargs->uid != (uid_t)-1) && (setuid(vargs->uid) == -1)) {
+    if ((vargs->uid != (uid_t)-1) && (seteuid(vargs->uid) == -1)) {
         error(0, errno, "Error changing user");
         return errno;
     }
@@ -1474,26 +1343,22 @@ end1:
 static int
 do_verif(struct verif_args *verif_args)
 {
-    int status;
-    pid_t pid;
-
-    static char verif_stack[16 * 1024 * 1024];
+    int ret;
 
     debug_print("Performing verification");
 
-    pid = clone(&verif_fn, verif_stack + sizeof(verif_stack), CLONE_FILES,
-                verif_args);
-    if (pid == -1) {
-        error(0, errno, "Error creating process");
-        return -errno;
+    ret = verif_fn(verif_args);
+    if (ret != 0) {
+        int tmp; /* silence compiler warnings */
+
+        tmp = seteuid(0);
+        tmp = setegid(0);
+        (void)tmp;
+
+        return ret;
     }
 
-    while (waitpid(pid, &status, __WCLONE) == -1) {
-        if (errno != EINTR)
-            return errno;
-    }
-
-    return WIFEXITED(status) ? -WEXITSTATUS(status) : -EIO;
+    return ((seteuid(0) == 0) && (setegid(0) == 0)) ? 0 : -errno;
 }
 
 static int
@@ -1623,17 +1488,7 @@ main(int argc, char **argv)
     struct ctx *ctx;
     struct parse_ctx pctx;
 
-    /* Note: Remote procedure calls are used for communication between the
-       parent process and the verification child process, instead of using
-       clone(CLONE_VM) to share memory, in order to work around an apparent bug
-       in the glibc asynchronous I/O implementation when clone(CLONE_VM) is
-       used */
-    /* FIXME: remove RPC thread capabilities */
-    if (init_rpc() != 0) {
-        error(0, 0, "Error initializing");
-        return -EIO;
-    }
-
+    /* FIXME: drop supplementary group privileges during initialization */
     ret = set_capabilities();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting capabilities");
