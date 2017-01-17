@@ -1,10 +1,13 @@
 TODO
 
-- Verify child process stack sizes sufficient
+- Modify replicate and verify to run in setuid mode, allowing or denying
+  execution according to trusted configuration information
+- Verify replicate and verify child process stack sizes sufficient
 - Factor out common code shared between replicate and verify into a shared
   library, or create single executable with multiple modes of operation
-- Exploit parallelism using threads with suitable scheduling parameters
-- Export progress information over DBus
+- Exploit parallelism in replicate and verify using threads with suitable
+  scheduling parameters
+- Export replicate and verify progress information over DBus
 
 replicate
 
