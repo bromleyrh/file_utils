@@ -188,15 +188,11 @@ static int verif_record_cmp(const void *, const void *, void *);
 
 static int calc_chksums_cb(int, off_t, void *);
 
-static int calc_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
-                        unsigned char *, unsigned char *, unsigned *,
-                        int (*)(int, off_t, void *), void *);
+static int verif_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
+                         struct verif_record *, unsigned char *,
+                         unsigned char *, unsigned *,
+                         int (*)(int, off_t, void *), void *);
 
-static int do_verify_record(struct radix_tree *, const char *, off_t,
-                            unsigned char *, unsigned char *);
-
-static int verify_record(struct radix_tree *, const char *, const char *, off_t,
-                         unsigned char *, unsigned char *, unsigned);
 static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
                          unsigned, const char *, const char *);
 
@@ -1043,13 +1039,15 @@ calc_chksums_cb(int fd, off_t flen, void *ctx)
 }
 
 static int
-calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
-             EVP_MD_CTX *sumctx, unsigned char *initsum, unsigned char *sum,
-             unsigned *sumlen, int (*cb)(int, off_t, void *), void *ctx)
+verif_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
+              EVP_MD_CTX *sumctx, struct verif_record *record_in,
+              unsigned char *initsum, unsigned char *sum, unsigned *sumlen,
+              int (*cb)(int, off_t, void *), void *ctx)
 {
     char *buf;
     const struct aiocb *aiocbp;
     int err;
+    int init_verif = 0;
     off_t flen = 0, initrem = 512;
     size_t len;
     struct aiocb aiocb;
@@ -1095,6 +1093,15 @@ calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
                 goto err;
             initrem -= sz;
         }
+        if (!init_verif && (initrem == 0)) {
+            if (EVP_DigestFinal_ex(initsumctx, initsum, sumlen) != 1)
+                goto err;
+            if ((record_in != NULL)
+                && ((*sumlen != 20)
+                    || (memcmp(initsum, record_in->initsum, *sumlen) != 0)))
+                goto verif_err;
+            init_verif = 1;
+        }
         if (EVP_DigestUpdate(sumctx, buf, len) != 1)
             goto err;
 
@@ -1105,37 +1112,30 @@ calc_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
     if (err)
         return err;
 
-    return ((EVP_DigestFinal_ex(initsumctx, initsum, sumlen) == 1)
-            && (EVP_DigestFinal_ex(sumctx, sum, sumlen) == 1)) ? 0 : -EIO;
+    if (!init_verif) {
+        if (EVP_DigestFinal_ex(initsumctx, initsum, sumlen) != 1)
+            return -EIO;
+        if ((record_in != NULL)
+            && ((*sumlen != 20)
+                || (memcmp(initsum, record_in->initsum, *sumlen) != 0)))
+            return 1;
+    }
+    if (EVP_DigestFinal_ex(sumctx, sum, sumlen) != 1)
+        return -EIO;
+    if ((record_in != NULL)
+        && ((*sumlen != 20) || (memcmp(sum, record_in->sum, *sumlen) != 0)))
+        return 1;
+
+    return 0;
+
+verif_err:
+    cancel_aio(&aiocb);
+    return 1;
 
 err:
     err = -((errno == 0) ? EIO : errno);
     cancel_aio(&aiocb);
     return -err;
-}
-
-static int
-do_verify_record(struct radix_tree *input_data, const char *path, off_t size,
-                 unsigned char *initsum, unsigned char *sum)
-{
-    int ret;
-    struct verif_record record;
-
-    ret = radix_tree_search(input_data, path, &record);
-    if (ret != 1) {
-        if (ret != 0)
-            return ret;
-        error(0, 0, "Verification error: %s added", path);
-        return -EIO;
-    }
-
-    if ((size != record.size) || (memcmp(initsum, record.initsum, 20) != 0)
-        || (memcmp(sum, record.sum, 20) != 0)) {
-        error(0, 0, "Verification error: %s failed verification", path);
-        return -EIO;
-    }
-
-    return radix_tree_delete(input_data, path);
 }
 
 static int
@@ -1165,28 +1165,13 @@ err:
 }
 
 static int
-verify_record(struct radix_tree *input_data, const char *prefix,
-              const char *path, off_t size, unsigned char *initsum,
-              unsigned char *sum, unsigned sumlen)
-{
-    char fullpath[PATH_MAX];
-
-    if (sumlen != 20)
-        return -EIO;
-
-    if (snprintf(fullpath, sizeof(fullpath), "%s/%s", prefix, path)
-        >= (int)sizeof(fullpath))
-        return -EIO;
-
-    return do_verify_record(input_data, fullpath, size, initsum, sum);
-}
-
-static int
 verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
               struct stat *s, void *ctx)
 {
+    char fullpath[PATH_MAX];
     int mult_links;
     int res;
+    struct verif_record record_in, *p_record_in;
     struct verif_record_output record;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
     unsigned sumlen;
@@ -1200,15 +1185,14 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (!S_ISREG(s->st_mode))
         return 0;
 
-    if (wctx->reg_excl != NULL) { /* check if file excluded */
-        char buf[PATH_MAX];
+    if (snprintf(fullpath, sizeof(fullpath), "%s/%s", wctx->prefix, path)
+        >= (int)sizeof(fullpath))
+        return -EIO;
 
-        if ((snprintf(buf, sizeof(buf), "%s/%s", wctx->prefix, path)
-             < (int)sizeof(buf))
-            && (regexec(wctx->reg_excl, buf, 0, NULL, 0) == 0)) {
-            fprintf(stderr, "%s excluded\n", buf);
-            return 0;
-        }
+    if ((wctx->reg_excl != NULL) /* check if excluded */
+        && (regexec(wctx->reg_excl, fullpath, 0, NULL, 0) == 0)) {
+        fprintf(stderr, "%s excluded\n", fullpath);
+        return 0;
     }
 
     /* if multiple hard links, check if already checksummed */
@@ -1231,29 +1215,44 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         }
     }
 
+    if (wctx->input_data != NULL) {
+        res = radix_tree_search(wctx->input_data, fullpath, &record_in);
+        if (res != 1) {
+            if (res != 0)
+                return res;
+            error(0, 0, "Verification error: %s added", fullpath);
+            return -EIO;
+        }
+
+        /* verify file size */
+        if (s->st_size != record_in.size)
+            goto verif_err;
+
+        p_record_in = &record_in;
+    } else
+        p_record_in = NULL;
+
     res = set_direct_io(fd);
     if (res != 0)
         return res;
 
     record.record.size = s->st_size;
     wctx->lastoff = 0;
-    res = calc_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
-                       &wctx->sumctx, record.record.initsum, record.record.sum,
-                       &sumlen, &calc_chksums_cb, wctx);
+    res = verif_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
+                        &wctx->sumctx, p_record_in, record.record.initsum,
+                        record.record.sum, &sumlen, &calc_chksums_cb, wctx);
     if (res != 0) {
         if (debug)
             fputc('\n', stderr);
+        if (res == 1)
+            goto verif_err;
         return res;
     }
     if (debug)
         fprintf(stderr, " (verified %s/%s)\n", wctx->prefix, path);
 
-    /* FIXME: later, verify first checksum as soon as min(s->st_size, 512) bytes
-       read */
     if (wctx->input_data != NULL) {
-        res = verify_record(wctx->input_data, wctx->prefix, path,
-                            record.record.size, record.record.initsum,
-                            record.record.sum, sumlen);
+        res = radix_tree_delete(wctx->input_data, fullpath);
         if (res != 0)
             return res;
     }
@@ -1271,6 +1270,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
 end:
     return -posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED);
+
+verif_err:
+    error(0, 0, "Verification error: %s failed verification", fullpath);
+    return -EIO;
 }
 
 static int
