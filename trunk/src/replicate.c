@@ -97,6 +97,7 @@ static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
 static int set_capabilities(void);
+static int init_privs(void);
 
 static void print_usage(const char *);
 static int parse_cmdline(int, char **, const char **);
@@ -284,6 +285,12 @@ set_capabilities()
 err:
     cap_free(caps);
     return -errno;
+}
+
+static int
+init_privs()
+{
+    return (setgroups(0, NULL) == -1) ? -errno : set_capabilities();
 }
 
 static void
@@ -712,8 +719,7 @@ copy_fn(void *arg)
     struct copy_ctx cctx;
     struct statvfs s;
 
-    if ((cargs->gid != (gid_t)-1)
-        && ((setgroups(0, NULL) == -1) || (setegid(cargs->gid) == -1))) {
+    if ((cargs->gid != (gid_t)-1) && (setegid(cargs->gid) == -1)) {
         error(0, errno, "Error changing group");
         return errno;
     }
@@ -899,10 +905,9 @@ main(int argc, char **argv)
     int ret;
     struct ctx ctx;
 
-    /* FIXME: drop supplementary group privileges during initialization */
-    ret = set_capabilities();
+    ret = init_privs();
     if (ret != 0)
-        error(EXIT_FAILURE, -ret, "Error setting capabilities");
+        error(EXIT_FAILURE, -ret, "Error setting process privileges");
 
     ctx.keep_cache = 0;
     ctx.uid = (uid_t)-1;

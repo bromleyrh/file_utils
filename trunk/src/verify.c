@@ -152,6 +152,7 @@ static int set_direct_io(int);
 static void cancel_aio(struct aiocb *);
 
 static int set_capabilities(void);
+static int init_privs(void);
 
 static void print_usage(const char *);
 static int parse_cmdline(int, char **, const char **);
@@ -498,6 +499,12 @@ set_capabilities()
 err:
     cap_free(caps);
     return -errno;
+}
+
+static int
+init_privs()
+{
+    return (setgroups(0, NULL) == -1) ? -errno : set_capabilities();
 }
 
 static int
@@ -1284,8 +1291,7 @@ verif_fn(void *arg)
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
 
-    if ((vargs->gid != (gid_t)-1)
-        && ((setgroups(0, NULL) == -1) || (setegid(vargs->gid) == -1))) {
+    if ((vargs->gid != (gid_t)-1) && (setegid(vargs->gid) == -1)) {
         error(0, errno, "Error changing group");
         return errno;
     }
@@ -1499,10 +1505,9 @@ main(int argc, char **argv)
     struct ctx *ctx;
     struct parse_ctx pctx;
 
-    /* FIXME: drop supplementary group privileges during initialization */
-    ret = set_capabilities();
+    ret = init_privs();
     if (ret != 0)
-        error(EXIT_FAILURE, -ret, "Error setting capabilities");
+        error(EXIT_FAILURE, -ret, "Error setting process privileges");
 
     ret = parse_cmdline(argc, argv, &confpath);
     if (ret != 0)
