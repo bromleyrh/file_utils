@@ -14,6 +14,8 @@ else
 CFLAGS = -O2 -s -Wall -Wextra
 endif
 
+cflags_verify = -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
+
 prefix = /usr/local
 bindir = $(prefix)/bin
 libdir = $(prefix)/lib
@@ -58,13 +60,21 @@ replicate.c: replicate.h
 replicate.h: replicate.spec
 	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
-verify: verify.o
+verify: verify.o verify_conf.o verify_scan.o
 	gcc -o $@ -lcap -lmount -lrt -luuid -lbackup `pkg-config --libs libjson` \
 	`pkg-config --libs libutil` `pkg-config --libs openssl` $^
 
 verify.o: verify.c
-	gcc -c $(CFLAGS) `pkg-config --cflags libjson` \
+	gcc -c $(CFLAGS) $(cflags_verify) `pkg-config --cflags libutil` \
+	`pkg-config --cflags openssl` $^
+
+verify_conf.o: verify_conf.c
+	gcc -c $(CFLAGS) $(cflags_verify) `pkg-config --cflags libjson` \
 	`pkg-config --cflags libutil` `pkg-config --cflags openssl` $^
+
+verify_scan.o: verify_scan.c
+	gcc -c $(CFLAGS) $(cflags_verify) `pkg-config --cflags libutil` \
+	`pkg-config --cflags openssl` $^
 
 verify.c: verify.h
 
