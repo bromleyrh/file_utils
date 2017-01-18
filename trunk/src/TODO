@@ -2,6 +2,8 @@ TODO
 
 - Modify replicate and verify to run in setuid mode, allowing or denying
   execution according to trusted configuration information
+- Save and restore supplementary group privileges of root user in replicate and
+  verify programs
 - Factor out common code shared between replicate and verify into a shared
   library, or create single executable with multiple modes of operation
 - Exploit parallelism in replicate and verify using threads with suitable
