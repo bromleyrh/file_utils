@@ -14,6 +14,7 @@ else
 CFLAGS = -O2 -s -Wall -Wextra
 endif
 
+cflags_replicate = -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 cflags_verify = -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
 prefix = /usr/local
@@ -47,17 +48,23 @@ mkmanifest: mkmanifest.o
 mkmanifest.o: mkmanifest.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
-replicate: replicate.o
+replicate: replicate.o replicate_conf.o replicate_trans.o
 	gcc -o $@ -lcap -lmount -lbackup `pkg-config --libs libjson` \
 	`pkg-config --libs libutil` $^
 
 replicate.o: replicate.c
-	gcc -c $(CFLAGS) `pkg-config --cflags libjson` \
+	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags libutil` $^
+
+replicate_conf.o: replicate_conf.c
+	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags libjson` \
 	`pkg-config --cflags libutil` $^
 
-replicate.c: replicate.h
+replicate_trans.o: replicate_trans.c
+	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags libutil` $^
 
-replicate.h: replicate.spec
+replicate.c: replicate_gram.h
+
+replicate_gram.h: replicate.spec
 	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
 verify: verify.o verify_conf.o verify_scan.o
@@ -76,9 +83,9 @@ verify_scan.o: verify_scan.c
 	gcc -c $(CFLAGS) $(cflags_verify) `pkg-config --cflags libutil` \
 	`pkg-config --cflags openssl` $^
 
-verify.c: verify.h
+verify.c: verify_gram.h
 
-verify.h: verify.spec
+verify_gram.h: verify.spec
 	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
 libdirectio.o: libdirectio.c

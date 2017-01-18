@@ -2,31 +2,20 @@
  * replicate.c
  */
 
-#define _FILE_OFFSET_BITS 64
-#define _GNU_SOURCE
-
-#include "replicate.h"
-
-#include <json.h>
-
-#include <json/grammar.h>
-#include <json/grammar_parse.h>
-#include <json/native.h>
+#include "replicate_common.h"
+#include "replicate_conf.h"
+#include "replicate_trans.h"
 
 #include <libmount/libmount.h>
 
 #include <backup.h>
 
-#include <hashes.h>
 #include <strings_ext.h>
-
-#include <files/util.h>
 
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <pwd.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -36,65 +25,17 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <wchar.h>
 #include <wordexp.h>
 
 #include <sys/capability.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 
 #define CONFIG_PATH "\"$HOME/.replicate.conf\""
-#define CONFIG_ROOT_ID "conf"
 
-#define FORMAT_CMD_DEST_SPECIFIER "$dest"
-
-struct ctx {
-    struct transfer *transfers;
-    int             num_transfers;
-    int             keep_cache;
-    uid_t           uid;
-    gid_t           gid;
-};
-
-struct transfer {
-    const char  *srcpath;
-    const char  *dstpath;
-    const char  *dstmntpath;
-    const char  *format_cmd;
-    int         force_write;
-    int         setro;
-};
-
-struct copy_args {
-    int     srcfd;
-    int     dstfd;
-    int     keep_cache;
-    uid_t   uid;
-    gid_t   gid;
-};
-
-struct copy_ctx {
-    off_t       fsbytesused;
-    off_t       bytescopied;
-    off_t       lastoff;
-    ino_t       lastino;
-    const char  *lastpath;
-};
-
-static volatile sig_atomic_t quit;
-
-static int debug;
-static int log;
-
-static void debug_print(const char *, ...);
-static void log_print(int, const char *, ...);
-
-static int get_gid(const char *, gid_t *);
-static int get_uid(const char *, uid_t *);
+int debug = 0;
+int log_transfers = 0;
 
 static int set_capabilities(void);
 static int init_privs(void);
@@ -104,34 +45,11 @@ static int parse_cmdline(int, char **, const char **);
 
 static int get_conf_path(const char *, const char **);
 
-static int parse_json_config(const char *, const struct json_parser *,
-                             json_val_t *);
-
-static int format_cmd_filter(void *, void *, void *);
-
-static int read_copy_creds_opt(json_val_t, void *);
-static int read_debug_opt(json_val_t, void *);
-static int read_keep_cache_opt(json_val_t, void *);
-static int read_transfers_opt(json_val_t, void *);
-static int read_json_config(json_val_t, struct ctx *);
-
-static int parse_config(const char *, struct ctx *);
-
 static void int_handler(int);
 
 static int set_signal_handlers(void);
 
-static int copy_cb(int, int, const char *, const char *, struct stat *, void *);
-
-static int copy_fn(void *);
-
-static int do_copy(struct copy_args *);
-
-static int do_transfers(struct ctx *);
-static void print_transfers(FILE *, struct transfer *, int);
-static void free_transfers(struct transfer *, int);
-
-static void
+void
 debug_print(const char *fmt, ...)
 {
     if (debug) {
@@ -144,114 +62,16 @@ debug_print(const char *fmt, ...)
     }
 }
 
-static void
+void
 log_print(int priority, const char *fmt, ...)
 {
-    if (log) {
+    if (log_transfers) {
         va_list ap;
 
         va_start(ap, fmt);
         vsyslog(priority, fmt, ap);
         va_end(ap);
     }
-}
-
-static int
-get_gid(const char *name, gid_t *gid)
-{
-    char *buf;
-    int err;
-    size_t bufsize;
-    struct group grp, *res;
-
-    bufsize = (size_t)sysconf(_SC_GETGR_R_SIZE_MAX);
-    if (bufsize == (size_t)-1)
-        bufsize = 1024;
-
-    buf = malloc(bufsize);
-    if (buf == NULL)
-        return -errno;
-
-    for (;;) {
-        char *tmp;
-
-        err = getgrnam_r(name, &grp, buf, bufsize, &res);
-        if (!err)
-            break;
-        if (err != ERANGE)
-            goto err;
-
-        bufsize *= 2;
-        tmp = realloc(buf, bufsize);
-        if (tmp == NULL) {
-            err = -errno;
-            goto err;
-        }
-        buf = tmp;
-    }
-    if (res == NULL) {
-        err = -ENOENT;
-        goto err;
-    }
-
-    *gid = grp.gr_gid;
-
-    free(buf);
-
-    return 0;
-
-err:
-    free(buf);
-    return err;
-}
-
-static int
-get_uid(const char *name, uid_t *uid)
-{
-    char *buf;
-    int err;
-    size_t bufsize;
-    struct passwd pwd, *res;
-
-    bufsize = (size_t)sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (bufsize == (size_t)-1)
-        bufsize = 1024;
-
-    buf = malloc(bufsize);
-    if (buf == NULL)
-        return -errno;
-
-    for (;;) {
-        char *tmp;
-
-        err = getpwnam_r(name, &pwd, buf, bufsize, &res);
-        if (!err)
-            break;
-        if (err != ERANGE)
-            goto err;
-
-        bufsize *= 2;
-        tmp = realloc(buf, bufsize);
-        if (tmp == NULL) {
-            err = -errno;
-            goto err;
-        }
-        buf = tmp;
-    }
-    if (res == NULL) {
-        err = -ENOENT;
-        goto err;
-    }
-
-    *uid = pwd.pw_uid;
-
-    free(buf);
-
-    return 0;
-
-err:
-    free(buf);
-    return err;
 }
 
 static int
@@ -359,295 +179,11 @@ err1:
     return -EIO;
 }
 
-static int
-parse_json_config(const char *path, const struct json_parser *parser,
-                  json_val_t *config)
-{
-    char *conf;
-    int err;
-    int fd;
-    struct stat s;
-
-    fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        error(0, errno, "Error opening %s", path);
-        return -1;
-    }
-
-    if (fstat(fd, &s) == -1) {
-        error(0, errno, "Error accessing %s", path);
-        goto err;
-    }
-
-    conf = mmap(NULL, s.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-    if (conf == MAP_FAILED) {
-        error(0, errno, "Error accessing %s", path);
-        goto err;
-    }
-    conf[s.st_size-1] = '\0';
-
-    close(fd);
-
-    err = json_grammar_validate(conf, NULL, NULL, parser, config);
-
-    munmap((void *)conf, s.st_size);
-
-    if (err) {
-        error(0, -err, "Error parsing %s", path);
-        return -1;
-    }
-
-    return 0;
-
-err:
-    close(fd);
-    return -1;
-}
-
-static int
-format_cmd_filter(void *src, void *dst, void *arg)
-{
-    char *tmp;
-    const char *format_cmd = *(const char **)src;
-
-    (void)arg;
-
-    tmp = strstr(format_cmd, FORMAT_CMD_DEST_SPECIFIER);
-    if (tmp == NULL) {
-        error(0, 0, "\"format_cmd\" option missing \"" FORMAT_CMD_DEST_SPECIFIER
-              "\"");
-        return -EINVAL;
-    }
-
-    tmp = strstr(tmp + sizeof(FORMAT_CMD_DEST_SPECIFIER) - 1,
-                 FORMAT_CMD_DEST_SPECIFIER);
-    if (tmp != NULL) {
-        error(0, 0, "\"format_cmd\" option must contain only one instance of \""
-                    FORMAT_CMD_DEST_SPECIFIER "\"");
-        return -EINVAL;
-    }
-
-    tmp = strdup(format_cmd);
-    if (tmp == NULL)
-        return -errno;
-
-    *(const char **)dst = tmp;
-    return 0;
-}
-
-static int
-read_copy_creds_opt(json_val_t opt, void *data)
-{
-    char *buf;
-    int err;
-    json_object_elem_t elem;
-    mbstate_t s;
-    struct ctx *ctx = (struct ctx *)data;
-
-    memset(&s, 0, sizeof(s));
-
-    err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
-    if (!err) {
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
-            return -errno;
-        ctx->uid = atoi(buf);
-        free(buf);
-
-        err = json_val_object_get_elem_by_key(opt, L"gid", &elem);
-        if (err)
-            return err;
-        memset(&s, 0, sizeof(s));
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
-            return -errno;
-        ctx->gid = atoi(buf);
-        free(buf);
-    } else if (err == -EINVAL) {
-        err = json_val_object_get_elem_by_key(opt, L"user", &elem);
-        if (err)
-            return err;
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
-            return -errno;
-        err = get_uid(buf, &ctx->uid);
-        free(buf);
-        if (err)
-            return err;
-
-        err = json_val_object_get_elem_by_key(opt, L"group", &elem);
-        if (err)
-            return err;
-        memset(&s, 0, sizeof(s));
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
-            return -errno;
-        if (strcmp(buf, "-") == 0)
-            ctx->gid = (gid_t)-1;
-        else {
-            err = get_gid(buf, &ctx->gid);
-            if (err) {
-                free(buf);
-                return err;
-            }
-        }
-        free(buf);
-    } else
-        return err;
-
-    return 0;
-}
-
-static int
-read_debug_opt(json_val_t opt, void *data)
-{
-    (void)data;
-
-    debug = backup_debug = json_val_boolean_get(opt);
-
-    return 0;
-}
-
-static int
-read_keep_cache_opt(json_val_t opt, void *data)
-{
-    struct ctx *ctx = (struct ctx *)data;
-
-    ctx->keep_cache = json_val_boolean_get(opt);
-
-    return 0;
-}
-
-static int
-read_log_opt(json_val_t opt, void *data)
-{
-    (void)data;
-
-    log = json_val_boolean_get(opt);
-
-    return 0;
-}
-
-#define TRANSFER_PARAM(param) offsetof(struct transfer, param)
-
-static int
-read_transfers_opt(json_val_t opt, void *data)
-{
-    int err;
-    int i;
-    struct ctx *ctx = (struct ctx *)data;
-
-    static const struct json_scan_spec spec[] = {
-        {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(srcpath)},
-        {L"dest", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(dstpath)},
-        {L"dstpath", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(dstmntpath)},
-        {L"format_cmd", JSON_TYPE_STRING, 1, 0, 1, &format_cmd_filter, NULL,
-         NULL, TRANSFER_PARAM(format_cmd)},
-        {L"force_write", JSON_TYPE_BOOLEAN, 0, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(force_write)},
-        {L"setro", JSON_TYPE_BOOLEAN, 0, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(setro)}
-    };
-
-    ctx->num_transfers = json_val_array_get_num_elem(opt);
-
-    ctx->transfers = calloc(ctx->num_transfers, sizeof(*(ctx->transfers)));
-    if (ctx->transfers == NULL)
-        return -errno;
-
-    for (i = 0; i < ctx->num_transfers; i++) {
-        json_val_t val;
-        struct transfer *transfer = &ctx->transfers[i];
-
-        val = json_val_array_get_elem(opt, i);
-        if (val == NULL) {
-            err = -EIO;
-            goto err;
-        }
-
-        transfer->force_write = 1;
-        transfer->setro = 0;
-        err = json_oscanf(transfer, spec, (int)(sizeof(spec)/sizeof(spec[0])),
-                          val);
-        if (err)
-            goto err;
-    }
-
-    return 0;
-
-err:
-    free_transfers(ctx->transfers, i);
-    return err;
-}
-
-#undef TRANSFER_PARAM
-
-static int
-read_json_config(json_val_t config, struct ctx *ctx)
-{
-    int err;
-    int i, numopt;
-
-    static const struct {
-        const wchar_t   *opt;
-        int             (*fn)(json_val_t, void *);
-    } opts[16] = {
-        [2] = {L"copy_creds",   &read_copy_creds_opt},
-        [7] = {L"debug",        &read_debug_opt},
-        [0] = {L"keep_cache",   &read_keep_cache_opt},
-        [6] = {L"log",          &read_log_opt},
-        [1] = {L"transfers",    &read_transfers_opt}
-    }, *opt;
-
-    numopt = json_val_object_get_num_elem(config);
-    for (i = 0; i < numopt; i++) {
-        json_object_elem_t elem;
-
-        err = json_val_object_get_elem_by_idx(config, i, &elem);
-        if (err)
-            return err;
-
-        opt = &opts[(hash_wcs(elem.key, -1) >> 6) & 7];
-        if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
-            return -EIO;
-
-        err = (*(opt->fn))(elem.value, ctx);
-        if (err)
-            return err;
-    }
-
-    return 0;
-}
-
-static int
-parse_config(const char *path, struct ctx *ctx)
-{
-    int err;
-    json_val_t config;
-    struct json_parser *parser;
-
-    err = json_parser_init(CONFIG_GRAM, CONFIG_ROOT_ID, &parser);
-    if (err)
-        return err;
-
-    err = parse_json_config(path, parser, &config);
-    json_parser_destroy(parser);
-    if (err)
-        return err;
-
-    err = read_json_config(config, ctx);
-
-    json_val_free(config);
-
-    return err;
-}
-
 static void
 int_handler(int signum)
 {
+    extern volatile sig_atomic_t quit;
+
     (void)signum;
 
     /* flag checked in copy_cb() */
@@ -674,104 +210,8 @@ set_signal_handlers()
     return 0;
 }
 
-static int
-copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
-        void *ctx)
-{
-    struct dir_copy_ctx *dcpctx = (struct dir_copy_ctx *)ctx;
-
-    (void)fd;
-    (void)dirfd;
-    (void)name;
-    (void)path;
-    (void)s;
-
-    if (dcpctx->off >= 0) {
-        struct copy_ctx *cctx = (struct copy_ctx *)(dcpctx->ctx);
-
-        if (s->st_ino != cctx->lastino) {
-            if (debug && (cctx->lastpath != NULL)) {
-                fprintf(stderr, " (copied %s)\n", cctx->lastpath);
-                free((void *)(cctx->lastpath));
-            }
-            cctx->bytescopied += dcpctx->off;
-            cctx->lastino = s->st_ino;
-            cctx->lastpath = strdup(path);
-        } else
-            cctx->bytescopied += dcpctx->off - cctx->lastoff;
-        cctx->lastoff = dcpctx->off;
-
-        if (debug) {
-            fprintf(stderr, "\rProgress: %.6f%%",
-                    (double)100 * cctx->bytescopied / cctx->fsbytesused);
-        }
-    }
-
-    return quit ? -EINTR : 0;
-}
-
-static int
-copy_fn(void *arg)
-{
-    int fl;
-    int ret;
-    struct copy_args *cargs = (struct copy_args *)arg;
-    struct copy_ctx cctx;
-    struct statvfs s;
-
-    if ((cargs->gid != (gid_t)-1) && (setegid(cargs->gid) == -1)) {
-        error(0, errno, "Error changing group");
-        return errno;
-    }
-    if ((cargs->uid != (uid_t)-1) && (seteuid(cargs->uid) == -1)) {
-        error(0, errno, "Error changing user");
-        return errno;
-    }
-
-    if (fstatvfs(cargs->srcfd, &s) == -1)
-        return errno;
-    cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
-    cctx.bytescopied = 0;
-    cctx.lastino = 0;
-    cctx.lastpath = NULL;
-
-    fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_TMPFILE;
-    if (!(cargs->keep_cache))
-        fl |= DIR_COPY_DISCARD_CACHE;
-
-    umask(0);
-    ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
-    if (debug)
-        fputc('\n', stderr);
-    if (cctx.lastpath != NULL)
-        free((void *)(cctx.lastpath));
-
-    return ret;
-}
-
-static int
-do_copy(struct copy_args *copy_args)
-{
-    int ret;
-
-    debug_print("Performing copy");
-
-    ret = -copy_fn(copy_args);
-    if (ret != 0) {
-        int tmp; /* silence compiler warnings */
-
-        tmp = seteuid(0);
-        tmp = setegid(0);
-        (void)tmp;
-
-        return ret;
-    }
-
-    return ((seteuid(0) == 0) && (setegid(0) == 0)) ? 0 : -errno;
-}
-
-static int
-do_transfers(struct ctx *ctx)
+int
+do_transfers(struct replicate_ctx *ctx)
 {
     int err;
     int i;
@@ -860,7 +300,7 @@ err1:
     return err;
 }
 
-static void
+void
 print_transfers(FILE *f, struct transfer *transfers, int num)
 {
     int i;
@@ -882,7 +322,7 @@ print_transfers(FILE *f, struct transfer *transfers, int num)
     }
 }
 
-static void
+void
 free_transfers(struct transfer *transfers, int num)
 {
     int i;
@@ -903,7 +343,7 @@ main(int argc, char **argv)
 {
     const char *confpath = NULL;
     int ret;
-    struct ctx ctx;
+    struct replicate_ctx ctx;
 
     ret = init_privs();
     if (ret != 0)
@@ -933,7 +373,7 @@ main(int argc, char **argv)
         fprintf(stderr, "UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
     }
 
-    if (log)
+    if (log_transfers)
         openlog(NULL, LOG_PID, LOG_USER);
 
     ret = mount_ns_unshare();
@@ -947,7 +387,7 @@ main(int argc, char **argv)
     ret = do_transfers(&ctx);
 
 end:
-    if (log)
+    if (log_transfers)
         closelog();
     free_transfers(ctx.transfers, ctx.num_transfers);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
