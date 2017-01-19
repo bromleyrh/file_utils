@@ -406,8 +406,10 @@ verif_fn(void *arg)
         return errno;
     }
     if ((vargs->uid != (uid_t)-1) && (seteuid(vargs->uid) == -1)) {
-        error(0, errno, "Error changing user");
-        return errno;
+        err = errno;
+        error(0, err, "Error changing user");
+        setegid(0);
+        return err;
     }
 
     if (fstatvfs(vargs->srcfd, &s) == -1)
