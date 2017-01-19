@@ -66,7 +66,7 @@ static void cancel_aio(struct aiocb *);
 
 static int verif_record_cmp(const void *, const void *, void *);
 
-static int calc_chksums_cb(int, off_t, void *);
+static int verif_chksums_cb(int, off_t, void *);
 
 static int verif_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
                          struct verif_record *, unsigned char *,
@@ -138,7 +138,7 @@ verif_record_cmp(const void *k1, const void *k2, void *ctx)
 }
 
 static int
-calc_chksums_cb(int fd, off_t flen, void *ctx)
+verif_chksums_cb(int fd, off_t flen, void *ctx)
 {
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
 
@@ -357,7 +357,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     wctx->lastoff = 0;
     res = verif_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
                         &wctx->sumctx, p_record_in, record.record.initsum,
-                        record.record.sum, &sumlen, &calc_chksums_cb, wctx);
+                        record.record.sum, &sumlen, &verif_chksums_cb, wctx);
     if (res != 0) {
         if (debug)
             fputc('\n', stderr);
