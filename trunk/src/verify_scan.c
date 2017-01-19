@@ -18,11 +18,14 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <regex.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -58,6 +61,8 @@ struct verif_walk_ctx {
 
 volatile sig_atomic_t quit;
 
+static int getsgids(gid_t **);
+
 static int print_chksum(FILE *, unsigned char *, unsigned);
 
 static int set_direct_io(int);
@@ -80,6 +85,30 @@ static int verif_walk_fn(int, int, const char *, const char *, struct stat *,
                          void *);
 
 static int verif_fn(void *);
+
+static int
+getsgids(gid_t **sgids)
+{
+    gid_t *ret;
+    int nsgids, tmp;
+
+    nsgids = getgroups(0, NULL);
+    if (nsgids == -1)
+        return -errno;
+
+    ret = malloc(nsgids * sizeof(*ret));
+    if (ret == NULL)
+        return -errno;
+
+    tmp = getgroups(nsgids, ret);
+    if (tmp != nsgids) {
+        free(ret);
+        return (tmp == -1) ? -errno : -EIO;
+    }
+
+    *sgids = ret;
+    return nsgids;
+}
 
 static int
 print_chksum(FILE *f, unsigned char *sum, unsigned sumlen)
@@ -401,17 +430,6 @@ verif_fn(void *arg)
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
 
-    if ((vargs->gid != (gid_t)-1) && (setegid(vargs->gid) == -1)) {
-        error(0, errno, "Error changing group");
-        return errno;
-    }
-    if ((vargs->uid != (uid_t)-1) && (seteuid(vargs->uid) == -1)) {
-        err = errno;
-        error(0, err, "Error changing user");
-        setegid(0);
-        return err;
-    }
-
     if (fstatvfs(vargs->srcfd, &s) == -1)
         return errno;
     wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
@@ -472,22 +490,59 @@ alloc_err:
 int
 do_verif(struct verif_args *verif_args)
 {
-    int ret;
+    gid_t egid, *sgids = NULL;
+    int nsgids;
+    int ret, tmp;
+    uid_t euid;
+
+
+    nsgids = getsgids(&sgids);
+    if (nsgids == -1) {
+        error(0, -nsgids, "Error getting groups");
+        return -nsgids;
+    }
+    if (setgroups(0, NULL) == -1) {
+        error(0, errno, "Error setting groups");
+        free(sgids);
+        return errno;
+    }
+
+    egid = getegid();
+    if ((verif_args->gid != (gid_t)-1) && (setegid(verif_args->gid) == -1)) {
+        ret = errno;
+        error(0, ret, "Error changing group");
+        goto err1;
+    }
+    euid = geteuid();
+    if ((verif_args->uid != (uid_t)-1) && (seteuid(verif_args->uid) == -1)) {
+        ret = errno;
+        error(0, ret, "Error changing user");
+        goto err2;
+    }
 
     debug_print("Performing verification");
 
     ret = -verif_fn(verif_args);
-    if (ret != 0) {
-        int tmp; /* silence compiler warnings */
+    if (ret != 0)
+        goto err3;
 
-        tmp = seteuid(0);
-        tmp = setegid(0);
-        (void)tmp;
+    ret = ((seteuid(euid) == 0) && (setegid(egid) == 0)
+           && (setgroups(nsgids, sgids) == 0))
+          ? 0 : -errno;
 
-        return ret;
-    }
+    free(sgids);
 
-    return ((seteuid(0) == 0) && (setegid(0) == 0)) ? 0 : -errno;
+    return ret;
+
+err3:
+    tmp = seteuid(euid);
+err2:
+    tmp = setegid(egid);
+    (void)tmp;
+err1:
+    setgroups(nsgids, sgids);
+    free(sgids);
+    return ret;
 }
 
 /* vi: set expandtab sw=4 ts=4: */

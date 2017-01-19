@@ -110,7 +110,7 @@ err:
 static int
 init_privs()
 {
-    return (setgroups(0, NULL) == -1) ? -errno : set_capabilities();
+    return set_capabilities();
 }
 
 static void

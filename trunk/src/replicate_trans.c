@@ -11,6 +11,7 @@
 
 #include <errno.h>
 #include <error.h>
+#include <grp.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -30,9 +31,35 @@ struct copy_ctx {
 
 volatile sig_atomic_t quit;
 
+static int getsgids(gid_t **);
+
 static int copy_cb(int, int, const char *, const char *, struct stat *, void *);
 
 static int copy_fn(void *);
+
+static int
+getsgids(gid_t **sgids)
+{
+    gid_t *ret;
+    int nsgids, tmp;
+
+    nsgids = getgroups(0, NULL);
+    if (nsgids == -1)
+        return -errno;
+
+    ret = malloc(nsgids * sizeof(*ret));
+    if (ret == NULL)
+        return -errno;
+
+    tmp = getgroups(nsgids, ret);
+    if (tmp != nsgids) {
+        free(ret);
+        return (tmp == -1) ? -errno : -EIO;
+    }
+
+    *sgids = ret;
+    return nsgids;
+}
 
 static int
 copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
@@ -79,15 +106,6 @@ copy_fn(void *arg)
     struct copy_ctx cctx;
     struct statvfs s;
 
-    if ((cargs->gid != (gid_t)-1) && (setegid(cargs->gid) == -1)) {
-        error(0, errno, "Error changing group");
-        return errno;
-    }
-    if ((cargs->uid != (uid_t)-1) && (seteuid(cargs->uid) == -1)) {
-        error(0, errno, "Error changing user");
-        return errno;
-    }
-
     if (fstatvfs(cargs->srcfd, &s) == -1)
         return errno;
     cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
@@ -112,22 +130,58 @@ copy_fn(void *arg)
 int
 do_copy(struct copy_args *copy_args)
 {
-    int ret;
+    gid_t egid, *sgids = NULL;
+    int nsgids;
+    int ret, tmp;
+    uid_t euid;
+
+    nsgids = getsgids(&sgids);
+    if (nsgids < 0) {
+        error(0, -nsgids, "Error getting groups");
+        return -nsgids;
+    }
+    if (setgroups(0, NULL) == -1) {
+        error(0, errno, "Error setting groups");
+        free(sgids);
+        return errno;
+    }
+
+    egid = getegid();
+    if ((copy_args->gid != (gid_t)-1) && (setegid(copy_args->gid) == -1)) {
+        ret = errno;
+        error(0, errno, "Error changing group");
+        goto err1;
+    }
+    euid = geteuid();
+    if ((copy_args->uid != (uid_t)-1) && (seteuid(copy_args->uid) == -1)) {
+        ret = errno;
+        error(0, errno, "Error changing user");
+        goto err2;
+    }
 
     debug_print("Performing copy");
 
     ret = -copy_fn(copy_args);
-    if (ret != 0) {
-        int tmp; /* silence compiler warnings */
+    if (ret != 0)
+        goto err3;
 
-        tmp = seteuid(0);
-        tmp = setegid(0);
-        (void)tmp;
+    ret = ((seteuid(euid) == 0) && (setegid(egid) == 0)
+           && (setgroups(nsgids, sgids) == 0))
+          ? 0 : -errno;
 
-        return ret;
-    }
+    free(sgids);
 
-    return ((seteuid(0) == 0) && (setegid(0) == 0)) ? 0 : -errno;
+    return ret;
+
+err3:
+    tmp = seteuid(euid);
+err2:
+    tmp = setegid(egid);
+    (void)tmp;
+err1:
+    setgroups(nsgids, sgids);
+    free(sgids);
+    return ret;
 }
 
 /* vi: set expandtab sw=4 ts=4: */
