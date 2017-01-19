@@ -62,6 +62,7 @@ struct verif_walk_ctx {
 volatile sig_atomic_t quit;
 
 static int getsgids(gid_t **);
+static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
 static int print_chksum(FILE *, unsigned char *, unsigned);
 
@@ -108,6 +109,15 @@ getsgids(gid_t **sgids)
 
     *sgids = ret;
     return nsgids;
+}
+
+static int
+check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid)
+{
+    if ((ruid == 0) || (ruid == uid))
+        return 0;
+
+    return ((rgid == gid) || group_member(gid)) ? 0 : -EPERM;
 }
 
 static int
@@ -495,6 +505,11 @@ do_verif(struct verif_args *verif_args)
     int ret, tmp;
     uid_t euid;
 
+    ret = check_creds(ruid, rgid, verif_args->uid, verif_args->gid);
+    if (ret != 0) {
+        error(0, 0, "Credentials invalid");
+        return ret;
+    }
 
     nsgids = getsgids(&sgids);
     if (nsgids == -1) {

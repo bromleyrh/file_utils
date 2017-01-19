@@ -36,6 +36,8 @@
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
+static int config_trusted(struct stat *);
+
 static int format_cmd_filter(void *, void *, void *);
 
 static int read_copy_creds_opt(json_val_t, void *);
@@ -143,6 +145,26 @@ get_uid(const char *name, uid_t *uid)
 err:
     free(buf);
     return err;
+}
+
+static int
+config_trusted(struct stat *s)
+{
+    mode_t mode;
+
+    if (s->st_uid != 0) {
+        error(0, 0, "Configuration file not owned by root");
+        return 0;
+    }
+
+    mode = s->st_mode;
+
+    if (((mode & S_IWGRP) && (s->st_gid != 0)) || (mode & S_IWOTH)) {
+        error(0, 0, "Configuration file writable by non-root users");
+        return 0;
+    }
+
+    return 1;
 }
 
 static int
@@ -382,6 +404,9 @@ parse_json_config(const char *path, const struct json_parser *parser,
         error(0, errno, "Error accessing %s", path);
         goto err;
     }
+
+    if (!config_trusted(&s))
+        goto err;
 
     conf = mmap(NULL, s.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
     if (conf == MAP_FAILED) {

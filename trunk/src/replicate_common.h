@@ -30,6 +30,9 @@ struct replicate_ctx {
 extern int debug;
 extern int log_transfers;
 
+extern uid_t ruid;
+extern gid_t rgid;
+
 void debug_print(const char *fmt, ...);
 void log_print(int priority, const char *fmt, ...);
 

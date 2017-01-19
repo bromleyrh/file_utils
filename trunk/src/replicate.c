@@ -37,6 +37,9 @@
 int debug = 0;
 int log_transfers = 0;
 
+uid_t ruid;
+gid_t rgid;
+
 static int set_capabilities(void);
 static int init_privs(void);
 
@@ -110,6 +113,12 @@ err:
 static int
 init_privs()
 {
+    ruid = getuid();
+    rgid = getgid();
+
+    if ((setreuid(0, -1) == -1) || (setregid(0, -1) == -1))
+        return -errno;
+
     return set_capabilities();
 }
 

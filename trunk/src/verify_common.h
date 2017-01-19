@@ -19,6 +19,9 @@
 extern int debug;
 extern int log_verifs;
 
+extern uid_t ruid;
+extern gid_t rgid;
+
 struct verif {
     const char *devpath;
     const char *srcpath;

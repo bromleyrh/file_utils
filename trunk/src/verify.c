@@ -42,6 +42,9 @@
 int debug = 0;
 int log_verifs = 0;
 
+uid_t ruid;
+gid_t rgid;
+
 static char from_hex(char);
 
 static int scan_chksum(const char *, unsigned char *, unsigned);
@@ -171,6 +174,7 @@ set_capabilities()
     cap_t caps;
 
     static const cap_value_t capvals[] = {
+        CAP_CHOWN, /* fchown("/etc/mtab") performed by libmount */
         CAP_DAC_READ_SEARCH,
         CAP_SETGID,
         CAP_SETUID,
@@ -200,6 +204,12 @@ err:
 static int
 init_privs()
 {
+    ruid = getuid();
+    rgid = getgid();
+
+    if ((setreuid(0, -1) == -1) || (setregid(0, -1) == -1))
+        return -errno;
+
     return set_capabilities();
 }
 

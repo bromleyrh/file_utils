@@ -103,6 +103,7 @@ install-git-helpers:
 install-progs: $(progs)
 	install -D -g root -o root $(progs) $(bindir)
 	ln -fs open $(bindir)/delete_input
+	chmod u+s $(bindir)/replicate $(bindir)/verify
 
 install-libs: libdirectio
 	install -D -g root -o root $(ldio_so) $(libdir)/$(ldio_so)
