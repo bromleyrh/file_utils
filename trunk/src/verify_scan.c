@@ -139,10 +139,10 @@ set_direct_io(int fd)
     int fl;
 
     fl = fcntl(fd, F_GETFL);
-    if (fl == -1)
-        return -errno;
-
-    return (fcntl(fd, F_SETFL, fl | O_DIRECT) == -1) ? -errno : 0;
+    return ((fl != -1)
+            && ((fcntl(fd, F_SETFL, fl | O_DIRECT) != -1) || (errno == EINVAL)))
+           ? 0 : -errno; /* EINVAL from fcntl(F_SETFL, fl | O_DIRECT) means
+                            O_DIRECT not supported by filesystem */
 }
 
 static void

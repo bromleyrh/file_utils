@@ -13,5 +13,4 @@ replicate
 
 verify
 
-- Disable direct I/O if not supported
 - Allow selection of different hash algorithms
