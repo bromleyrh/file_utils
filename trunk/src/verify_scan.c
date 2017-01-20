@@ -15,6 +15,7 @@
 #include <files/util.h>
 
 #include <aio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -24,6 +25,7 @@
 #include <regex.h>
 #include <signal.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,6 +67,8 @@ static int getsgids(gid_t **);
 static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
 static int print_chksum(FILE *, unsigned char *, unsigned);
+
+static int64_t get_huge_page_size(void);
 
 static int set_direct_io(int);
 
@@ -132,6 +136,55 @@ print_chksum(FILE *f, unsigned char *sum, unsigned sumlen)
 
     return 0;
 }
+
+#define MEMINFO "/proc/meminfo"
+#define HUGE_PAGE_SIZE_KEY "Hugepagesize:"
+
+static int64_t
+get_huge_page_size()
+{
+    char unit_prefix;
+    char *ln = NULL;
+    FILE *f;
+    int64_t ret = 0;
+    intmax_t num;
+    size_t n;
+
+    static const int64_t prefix_map[256] = {
+        ['k'] = (int64_t)1 << 10,
+        ['M'] = (int64_t)1 << 20,
+        ['G'] = (int64_t)1 << 30,
+        ['T'] = (int64_t)1 << 40
+    };
+
+    f = fopen(MEMINFO, "r");
+    if (f == NULL) {
+        error(0, errno, "Error opening " MEMINFO);
+        return -errno;
+    }
+
+    for (;;) {
+        errno = 0;
+        if (getline(&ln, &n, f) == -1) {
+            if (errno != 0)
+                ret = errno;
+            goto end;
+        }
+        if (sscanf(ln, HUGE_PAGE_SIZE_KEY " %jd %cB", &num, &unit_prefix) == 2)
+            break;
+    }
+
+    ret = num * prefix_map[(unsigned char)unit_prefix];
+
+end:
+    fclose(f);
+    if (ln != NULL)
+        free(ln);
+    return ret;
+}
+
+#undef MEMINFO
+#undef HUGE_PAGE_SIZE_KEY
 
 static int
 set_direct_io(int fd)
@@ -436,9 +489,23 @@ static int
 verif_fn(void *arg)
 {
     int err;
+    int hugetlbfl;
+    int64_t fullbufsize;
     struct statvfs s;
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
+
+    fullbufsize = get_huge_page_size();
+    if (fullbufsize <= 0) {
+        hugetlbfl = 0;
+        fullbufsize = BUFSIZE;
+    } else {
+        hugetlbfl = MAP_HUGETLB;
+        if (fullbufsize < BUFSIZE) {
+            fullbufsize = (BUFSIZE + fullbufsize - 1) / fullbufsize
+                          * fullbufsize;
+        }
+    }
 
     if (fstatvfs(vargs->srcfd, &s) == -1)
         return errno;
@@ -446,16 +513,16 @@ verif_fn(void *arg)
     wctx.bytesverified = 0;
 
     wctx.buf1 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
-                     MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE, -1, 0);
+                     MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
     if (wctx.buf1 == MAP_FAILED) {
         err = errno;
         goto alloc_err;
     }
     wctx.buf2 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
-                     MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE, -1, 0);
+                     MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
     if (wctx.buf2 == MAP_FAILED) {
         err = errno;
-        munmap(wctx.buf1, 4 * 1024 * 1024);
+        munmap(wctx.buf1, fullbufsize);
         goto alloc_err;
     }
 
@@ -485,14 +552,13 @@ end2:
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
 end1:
-    /* FIXME: determine huge page size at runtime */
-    munmap(wctx.buf2, 4 * 1024 * 1024);
-    munmap(wctx.buf1, 4 * 1024 * 1024);
+    munmap(wctx.buf2, fullbufsize);
+    munmap(wctx.buf1, fullbufsize);
     return err;
 
 alloc_err:
     error(0, err, "Couldn't allocate memory%s",
-          (err == ENOMEM)
+          ((err == ENOMEM) && (hugetlbfl != 0))
           ? " (check /proc/sys/vm/nr_hugepages is at least 2)" : "");
     return err;
 }
