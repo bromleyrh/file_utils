@@ -5,6 +5,8 @@
 #include "replicate_common.h"
 #include "replicate_trans.h"
 
+#include <dbus/dbus.h>
+
 #include <strings_ext.h>
 
 #include <files/util.h>
@@ -22,11 +24,12 @@
 #include <sys/statvfs.h>
 
 struct copy_ctx {
-    off_t       fsbytesused;
-    off_t       bytescopied;
-    off_t       lastoff;
-    ino_t       lastino;
-    const char  *lastpath;
+    DBusConnection  *busconn;
+    off_t           fsbytesused;
+    off_t           bytescopied;
+    off_t           lastoff;
+    ino_t           lastino;
+    const char      *lastpath;
 };
 
 volatile sig_atomic_t quit;
@@ -34,6 +37,7 @@ volatile sig_atomic_t quit;
 static int getsgids(gid_t **);
 static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
+static int broadcast_progress(DBusConnection *, double);
 static int copy_cb(int, int, const char *, const char *, struct stat *, void *);
 
 static int copy_fn(void *);
@@ -72,9 +76,38 @@ check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid)
 }
 
 static int
+broadcast_progress(DBusConnection *busconn, double pcnt)
+{
+    DBusMessage *msg;
+    DBusMessageIter msgargs;
+    dbus_uint32_t serial;
+
+    msg = dbus_message_new_signal("/replicate/signal/progress",
+                                  "replicate.signal.Progress", "Progress");
+    if (msg == NULL)
+        goto err;
+
+    dbus_message_iter_init_append(msg, &msgargs);
+    if (dbus_message_iter_append_basic(&msgargs, DBUS_TYPE_DOUBLE, &pcnt)
+        == 0)
+        goto err;
+
+    if (dbus_connection_send(busconn, msg, &serial) == 0)
+        goto err;
+
+    dbus_message_unref(msg);
+
+    return 0;
+
+err:
+    return -ENOMEM;
+}
+
+static int
 copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         void *ctx)
 {
+    double pcnt;
     struct dir_copy_ctx *dcpctx = (struct dir_copy_ctx *)ctx;
 
     (void)fd;
@@ -98,10 +131,10 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
             cctx->bytescopied += dcpctx->off - cctx->lastoff;
         cctx->lastoff = dcpctx->off;
 
-        if (debug) {
-            fprintf(stderr, "\rProgress: %.6f%%",
-                    (double)100 * cctx->bytescopied / cctx->fsbytesused);
-        }
+        pcnt = (double)100 * cctx->bytescopied / cctx->fsbytesused;
+        if (debug)
+            fprintf(stderr, "\rProgress: %.6f%%", pcnt);
+        broadcast_progress(cctx->busconn, pcnt);
     }
 
     return quit ? -EINTR : 0;
@@ -118,6 +151,7 @@ copy_fn(void *arg)
 
     if (fstatvfs(cargs->srcfd, &s) == -1)
         return errno;
+    cctx.busconn = cargs->busconn;
     cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     cctx.bytescopied = 0;
     cctx.lastino = 0;

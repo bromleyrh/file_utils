@@ -4,7 +4,6 @@ TODO
   library, or create single executable with multiple modes of operation
 - Exploit parallelism in replicate and verify using threads with suitable
   scheduling parameters
-- Export replicate and verify progress information over DBus
 
 replicate
 

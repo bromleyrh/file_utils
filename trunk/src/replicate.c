@@ -6,6 +6,8 @@
 #include "replicate_conf.h"
 #include "replicate_trans.h"
 
+#include <dbus/dbus.h>
+
 #include <libmount/libmount.h>
 
 #include <backup.h>
@@ -51,6 +53,9 @@ static int get_conf_path(const char *, const char **);
 static void int_handler(int);
 
 static int set_signal_handlers(void);
+
+static int init_dbus(DBusConnection **);
+static void end_dbus(DBusConnection *);
 
 void
 debug_print(const char *fmt, ...)
@@ -116,7 +121,7 @@ init_privs()
     ruid = getuid();
     rgid = getgid();
 
-    if ((setreuid(0, -1) == -1) || (setregid(0, -1) == -1))
+    if ((setresuid(0, 0, 0) == -1) || (setresgid(0, 0, 0) == -1))
         return -errno;
 
     return set_capabilities();
@@ -219,6 +224,49 @@ set_signal_handlers()
     return 0;
 }
 
+static int
+init_dbus(DBusConnection **busconn)
+{
+    DBusConnection *ret;
+    DBusError buserr;
+    int res;
+
+    dbus_error_init(&buserr);
+
+    ret = dbus_bus_get(DBUS_BUS_SESSION, &buserr);
+    if (dbus_error_is_set(&buserr))
+        goto err1;
+    if (ret == NULL)
+        goto err3;
+
+    res = dbus_bus_request_name(ret, "replicate.replicate", 0, &buserr);
+    if (dbus_error_is_set(&buserr))
+        goto err2;
+    if (res != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER)
+        goto err4;
+
+    *busconn = ret;
+    return 0;
+
+err4:
+    dbus_connection_close(ret);
+err3:
+    return -EIO;
+
+err2:
+    dbus_connection_close(ret);
+err1:
+    error(0, 0, "Error connecting to session bus: %s", buserr.message);
+    dbus_error_free(&buserr);
+    return -EIO;
+}
+
+static void
+end_dbus(DBusConnection *busconn)
+{
+    dbus_connection_close(busconn);
+}
+
 int
 do_transfers(struct replicate_ctx *ctx)
 {
@@ -273,6 +321,7 @@ do_transfers(struct replicate_ctx *ctx)
         }
 
         ca.keep_cache = ctx->keep_cache;
+        ca.busconn = ctx->busconn;
         ca.uid = ctx->uid;
         ca.gid = ctx->gid;
         err = do_copy(&ca);
@@ -393,7 +442,13 @@ main(int argc, char **argv)
     if (ret != 0)
         goto end;
 
+    ret = init_dbus(&ctx.busconn);
+    if (ret != 0)
+        goto end;
+
     ret = do_transfers(&ctx);
+
+    end_dbus(ctx.busconn);
 
 end:
     if (log_transfers)

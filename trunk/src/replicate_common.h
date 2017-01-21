@@ -5,6 +5,8 @@
 #ifndef _REPLICATE_COMMON_H
 #define _REPLICATE_COMMON_H
 
+#include <dbus/dbus.h>
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -22,6 +24,7 @@ struct transfer {
 struct replicate_ctx {
     struct transfer *transfers;
     int             num_transfers;
+    DBusConnection  *busconn;
     int             keep_cache;
     uid_t           uid;
     gid_t           gid;

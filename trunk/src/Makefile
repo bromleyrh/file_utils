@@ -49,18 +49,20 @@ mkmanifest.o: mkmanifest.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
 replicate: replicate.o replicate_conf.o replicate_trans.o
-	gcc -o $@ -lcap -lmount -lbackup `pkg-config --libs libjson` \
-	`pkg-config --libs libutil` $^
+	gcc -o $@ -lcap -lmount -lbackup `pkg-config --libs dbus-1` \
+	`pkg-config --libs libjson` `pkg-config --libs libutil` $^
 
 replicate.o: replicate.c
-	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags libutil` $^
-
-replicate_conf.o: replicate_conf.c
-	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags libjson` \
+	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags dbus-1` \
 	`pkg-config --cflags libutil` $^
 
+replicate_conf.o: replicate_conf.c
+	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags dbus-1` \
+	`pkg-config --cflags libjson` `pkg-config --cflags libutil` $^
+
 replicate_trans.o: replicate_trans.c
-	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags libutil` $^
+	gcc -c $(CFLAGS) $(cflags_replicate) `pkg-config --cflags dbus-1` \
+	`pkg-config --cflags libutil` $^
 
 replicate.c: replicate_gram.h
 
