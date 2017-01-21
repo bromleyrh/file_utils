@@ -6,6 +6,8 @@
 #include "verify_conf.h"
 #include "verify_scan.h"
 
+#include <dbus/dbus.h>
+
 #include <libmount/libmount.h>
 
 #include <backup.h>
@@ -67,6 +69,9 @@ static int input_data_walk_cb(const char *, void *, void *);
 
 static int scan_input_file(const char *, struct radix_tree **);
 static int print_input_data(FILE *, struct radix_tree *);
+
+static int init_dbus(DBusConnection **);
+static void end_dbus(DBusConnection *);
 
 void
 debug_print(const char *fmt, ...)
@@ -207,7 +212,7 @@ init_privs()
     ruid = getuid();
     rgid = getgid();
 
-    if ((setreuid(0, -1) == -1) || (setregid(0, -1) == -1))
+    if ((setresuid(0, 0, 0) == -1) || (setresgid(0, 0, 0) == -1))
         return -errno;
 
     return set_capabilities();
@@ -395,6 +400,49 @@ print_input_data(FILE *f, struct radix_tree *input_data)
     return radix_tree_walk(input_data, &input_data_walk_cb, (void *)f);
 }
 
+static int
+init_dbus(DBusConnection **busconn)
+{
+    DBusConnection *ret;
+    DBusError buserr;
+    int res;
+
+    dbus_error_init(&buserr);
+
+    ret = dbus_bus_get(DBUS_BUS_SESSION, &buserr);
+    if (dbus_error_is_set(&buserr))
+        goto err1;
+    if (ret == NULL)
+        goto err3;
+
+    res = dbus_bus_request_name(ret, "verify.verify", 0, &buserr);
+    if (dbus_error_is_set(&buserr))
+        goto err2;
+    if (res != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER)
+        goto err4;
+
+    *busconn = ret;
+    return 0;
+
+err4:
+    dbus_connection_close(ret);
+err3:
+    return -EIO;
+
+err2:
+    dbus_connection_close(ret);
+err1:
+    error(0, 0, "Error connecting to session bus: %s", buserr.message);
+    dbus_error_free(&buserr);
+    return -EIO;
+}
+
+static void
+end_dbus(DBusConnection *busconn)
+{
+    dbus_connection_close(busconn);
+}
+
 int
 do_verifs(struct verify_ctx *ctx)
 {
@@ -439,6 +487,7 @@ do_verifs(struct verify_ctx *ctx)
         va.reg_excl = ctx->reg_excl;
         va.detect_hard_links = ctx->detect_hard_links;
         va.input_data = ctx->input_data;
+        va.busconn = ctx->busconn;
         va.dstf = dstf;
         va.prefix = verif->srcpath;
         va.uid = ctx->uid;
@@ -588,7 +637,13 @@ main(int argc, char **argv)
     if (ret != 0)
         goto end2;
 
+    ret = init_dbus(&ctx->busconn);
+    if (ret != 0)
+        goto end2;
+
     ret = do_verifs(ctx);
+
+    end_dbus(ctx->busconn);
 
 end2:
     if (log_verifs)

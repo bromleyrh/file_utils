@@ -5,6 +5,8 @@
 #ifndef _VERIFY_COMMON_H
 #define _VERIFY_COMMON_H
 
+#include <dbus/dbus.h>
+
 #include <openssl/evp.h>
 
 #include <radix_tree.h>
@@ -31,6 +33,7 @@ struct verif {
 struct verify_ctx {
     struct verif        *verifs;
     int                 num_verifs;
+    DBusConnection      *busconn;
     const char          *base_dir;
     regex_t             *reg_excl;
     int                 detect_hard_links;

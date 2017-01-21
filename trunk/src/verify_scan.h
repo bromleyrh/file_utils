@@ -5,6 +5,8 @@
 #ifndef _VERIFY_SCAN_H
 #define _VERIFY_SCAN_H
 
+#include <dbus/dbus.h>
+
 #include <radix_tree.h>
 
 #include <regex.h>
@@ -17,6 +19,7 @@ struct verif_args {
     regex_t             *reg_excl;
     int                 detect_hard_links;
     struct radix_tree   *input_data;
+    DBusConnection      *busconn;
     const char          *prefix;
     uid_t               uid;
     gid_t               gid;

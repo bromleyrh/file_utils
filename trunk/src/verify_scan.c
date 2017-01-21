@@ -7,6 +7,8 @@
 
 #include <backup.h>
 
+#include <dbus/dbus.h>
+
 #include <openssl/evp.h>
 
 #include <avl_tree.h>
@@ -56,6 +58,7 @@ struct verif_walk_ctx {
     char                *buf2;
     EVP_MD_CTX          initsumctx;
     EVP_MD_CTX          sumctx;
+    DBusConnection      *busconn;
     struct avl_tree     *output_data;
     FILE                *dstf;
     const char          *prefix;
@@ -76,6 +79,7 @@ static void cancel_aio(struct aiocb *);
 
 static int verif_record_cmp(const void *, const void *, void *);
 
+static int broadcast_progress(DBusConnection *, double);
 static int verif_chksums_cb(int, off_t, void *);
 
 static int verif_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
@@ -230,8 +234,37 @@ verif_record_cmp(const void *k1, const void *k2, void *ctx)
 }
 
 static int
+broadcast_progress(DBusConnection *busconn, double pcnt)
+{
+    DBusMessage *msg;
+    DBusMessageIter msgargs;
+    dbus_uint32_t serial;
+
+    msg = dbus_message_new_signal("/verify/signal/progress",
+                                  "verify.signal.Progress", "Progress");
+    if (msg == NULL)
+        goto err;
+
+    dbus_message_iter_init_append(msg, &msgargs);
+    if (dbus_message_iter_append_basic(&msgargs, DBUS_TYPE_DOUBLE, &pcnt)
+        == 0)
+        goto err;
+
+    if (dbus_connection_send(busconn, msg, &serial) == 0)
+        goto err;
+
+    dbus_message_unref(msg);
+
+    return 0;
+
+err:
+    return -ENOMEM;
+}
+
+static int
 verif_chksums_cb(int fd, off_t flen, void *ctx)
 {
+    double pcnt;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
 
     (void)fd;
@@ -239,10 +272,10 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     wctx->bytesverified += flen - wctx->lastoff;
     wctx->lastoff = flen;
 
-    if (debug) {
-        fprintf(stderr, "\rProgress: %.6f%%",
-                (double)100 * wctx->bytesverified / wctx->fsbytesused);
-    }
+    pcnt = (double)100 * wctx->bytesverified / wctx->fsbytesused;
+    if (debug)
+        fprintf(stderr, "\rProgress: %.6f%%", pcnt);
+    broadcast_progress(wctx->busconn, pcnt);
 
     return quit ? -EINTR : 0;
 }
@@ -540,6 +573,7 @@ verif_fn(void *arg)
     wctx.reg_excl = vargs->reg_excl;
     wctx.detect_hard_links = vargs->detect_hard_links;
     wctx.input_data = vargs->input_data;
+    wctx.busconn = vargs->busconn;
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
 
