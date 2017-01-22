@@ -39,7 +39,7 @@
 #include <sys/statvfs.h>
 #include <sys/types.h>
 
-#define BUFSIZE (1024 * 1024)
+#define BUFSIZE (2 * 1024 * 1024) /* must be divisible by 2 */
 
 struct verif_record_output {
     dev_t               dev;
@@ -299,7 +299,7 @@ verif_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
         return -EIO;
 
     memset(&aiocb, 0, sizeof(aiocb));
-    aiocb.aio_nbytes = BUFSIZE;
+    aiocb.aio_nbytes = BUFSIZE / 2;
     aiocb.aio_fildes = fd;
     aiocb.aio_buf = buf = buf1;
     if (aio_read(&aiocb) == -1)
@@ -551,13 +551,7 @@ verif_fn(void *arg)
         err = errno;
         goto alloc_err;
     }
-    wctx.buf2 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
-                     MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
-    if (wctx.buf2 == MAP_FAILED) {
-        err = errno;
-        munmap(wctx.buf1, fullbufsize);
-        goto alloc_err;
-    }
+    wctx.buf2 = wctx.buf1 + BUFSIZE / 2;
 
     if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
         || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
@@ -586,7 +580,6 @@ end2:
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
 end1:
-    munmap(wctx.buf2, fullbufsize);
     munmap(wctx.buf1, fullbufsize);
     return err;
 
