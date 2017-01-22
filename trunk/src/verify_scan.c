@@ -39,7 +39,7 @@
 #include <sys/statvfs.h>
 #include <sys/types.h>
 
-#define BUFSIZE (2 * 1024 * 1024) /* must be divisible by 2 */
+#define BUFSIZE (4 * 1024 * 1024) /* must be divisible by 2 */
 
 struct verif_record_output {
     dev_t               dev;
