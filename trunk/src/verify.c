@@ -646,8 +646,13 @@ main(int argc, char **argv)
     end_dbus(ctx->busconn);
 
 end2:
-    if (log_verifs)
+    if (log_verifs) {
+        if (ret == 0)
+            syslog(LOG_NOTICE, "Verification process successful");
+        else
+            syslog(LOG_ERR, "Verification process returned error status");
         closelog();
+    }
     radix_tree_free(ctx->input_data);
 end1:
     if (ctx->base_dir != NULL)

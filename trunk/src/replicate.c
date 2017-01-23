@@ -451,8 +451,13 @@ main(int argc, char **argv)
     end_dbus(ctx.busconn);
 
 end:
-    if (log_transfers)
+    if (log_transfers) {
+        if (ret == 0)
+            syslog(LOG_NOTICE, "Transfer process successful");
+        else
+            syslog(LOG_ERR, "Transfer process returned error status");
         closelog();
+    }
     free_transfers(ctx.transfers, ctx.num_transfers);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
