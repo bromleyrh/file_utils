@@ -536,7 +536,7 @@ verif_fn(void *arg)
 {
     int err;
     int fexcepts = 0;
-    int hugetlbfl;
+    int hugetlbfl, nhugep;
     int64_t fullbufsize;
     struct statvfs s;
     struct verif_args *vargs = (struct verif_args *)arg;
@@ -548,10 +548,9 @@ verif_fn(void *arg)
         fullbufsize = BUFSIZE;
     } else {
         hugetlbfl = MAP_HUGETLB;
-        if (fullbufsize < BUFSIZE) {
-            fullbufsize = (BUFSIZE + fullbufsize - 1) / fullbufsize
-                          * fullbufsize;
-        }
+        nhugep = (BUFSIZE + fullbufsize - 1) / fullbufsize;
+        if (fullbufsize < BUFSIZE)
+            fullbufsize *= nhugep;
     }
 
     if (fstatvfs(vargs->srcfd, &s) == -1)
@@ -613,9 +612,12 @@ end1:
     return err;
 
 alloc_err:
-    error(0, err, "Couldn't allocate memory%s",
-          ((err == ENOMEM) && (hugetlbfl != 0))
-          ? " (check /proc/sys/vm/nr_hugepages is at least 2)" : "");
+    if ((err != ENOMEM) || (hugetlbfl == 0))
+        error(0, err, "Couldn't allocate memory");
+    else {
+        error(0, 0, "Couldn't allocate memory (check /proc/sys/vm/nr_hugepages "
+                    "is at least %d)", nhugep);
+    }
     return err;
 }
 
