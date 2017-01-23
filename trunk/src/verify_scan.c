@@ -44,6 +44,8 @@
 
 #define BUFSIZE (4 * 1024 * 1024) /* must be divisible by 2 */
 
+#define NR_HUGEPAGES "/proc/sys/vm/nr_hugepages"
+
 struct verif_record_output {
     dev_t               dev;
     ino_t               ino;
@@ -615,8 +617,8 @@ alloc_err:
     if ((err != ENOMEM) || (hugetlbfl == 0))
         error(0, err, "Couldn't allocate memory");
     else {
-        error(0, 0, "Couldn't allocate memory (check /proc/sys/vm/nr_hugepages "
-                    "is at least %d)", nhugep);
+        error(0, 0, "Couldn't allocate memory (check " NR_HUGEPAGES " is at "
+                    "least %d)", nhugep);
     }
     return err;
 }
