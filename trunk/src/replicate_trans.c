@@ -8,22 +8,26 @@
 #include <dbus/dbus.h>
 
 #include <strings_ext.h>
+#include <time_ext.h>
 
 #include <files/util.h>
 
 #include <errno.h>
 #include <error.h>
+#include <fenv.h>
 #include <grp.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 
 struct copy_ctx {
+    struct timespec starttm;
     DBusConnection  *busconn;
     off_t           fsbytesused;
     off_t           bytescopied;
@@ -132,8 +136,18 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         cctx->lastoff = dcpctx->off;
 
         pcnt = (double)100 * cctx->bytescopied / cctx->fsbytesused;
-        if (debug)
-            fprintf(stderr, "\rProgress: %.6f%%", pcnt);
+        if (debug) {
+            double throughput;
+            struct timespec curtm, difftm;
+
+            clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
+            timespec_diff(&curtm, &cctx->starttm, &difftm);
+            throughput = cctx->bytescopied
+                         / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
+                         / (1024 * 1024);
+            fprintf(stderr, "\rProgress: %.6f%% (%.6f MiB/s)", pcnt,
+                    throughput);
+        }
         broadcast_progress(cctx->busconn, pcnt);
     }
 
@@ -143,6 +157,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
 static int
 copy_fn(void *arg)
 {
+    int fexcepts = 0;
     int fl;
     int ret;
     struct copy_args *cargs = (struct copy_args *)arg;
@@ -162,9 +177,22 @@ copy_fn(void *arg)
         fl |= DIR_COPY_DISCARD_CACHE;
 
     umask(0);
+
+    if (debug) {
+        /* disable floating-point traps from calculations for debugging
+           output */
+        fexcepts = fedisableexcept(FE_ALL_EXCEPT);
+        if (fexcepts == -1)
+            return EIO;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &cctx.starttm);
+
     ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
-    if (debug)
+    if (debug) {
+        feenableexcept(fexcepts);
         fputc('\n', stderr);
+    }
     if (cctx.lastpath != NULL)
         free((void *)(cctx.lastpath));
 

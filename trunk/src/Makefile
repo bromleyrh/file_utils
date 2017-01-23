@@ -49,7 +49,7 @@ mkmanifest.o: mkmanifest.c
 	gcc -c -Wall -Wextra `pkg-config --cflags libutil` $^
 
 replicate: replicate.o replicate_conf.o replicate_trans.o
-	gcc -o $@ -lcap -lmount -lbackup `pkg-config --libs dbus-1` \
+	gcc -o $@ -lcap -lm -lmount -lbackup `pkg-config --libs dbus-1` \
 	`pkg-config --libs libjson` `pkg-config --libs libutil` $^
 
 replicate.o: replicate.c
@@ -70,7 +70,7 @@ replicate_gram.h: replicate.spec
 	scripts/spec_to_h.pl $^ CONFIG_GRAM > $@
 
 verify: verify.o verify_conf.o verify_scan.o
-	gcc -o $@ -lcap -lmount -lrt -lbackup `pkg-config --libs dbus-1` \
+	gcc -o $@ -lcap -lm -lmount -lrt -lbackup `pkg-config --libs dbus-1` \
 	`pkg-config --libs libjson` `pkg-config --libs libutil` \
 	`pkg-config --libs openssl` $^
 

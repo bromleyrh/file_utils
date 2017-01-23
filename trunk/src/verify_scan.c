@@ -13,6 +13,7 @@
 
 #include <avl_tree.h>
 #include <radix_tree.h>
+#include <time_ext.h>
 
 #include <files/util.h>
 
@@ -21,6 +22,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <fenv.h>
 #include <grp.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -31,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <sys/mman.h>
@@ -53,6 +56,7 @@ struct verif_walk_ctx {
     off_t               lastoff;
     regex_t             *reg_excl;
     int                 detect_hard_links;
+    struct timespec     starttm;
     struct radix_tree   *input_data;
     char                *buf1;
     char                *buf2;
@@ -273,8 +277,17 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     wctx->lastoff = flen;
 
     pcnt = (double)100 * wctx->bytesverified / wctx->fsbytesused;
-    if (debug)
-        fprintf(stderr, "\rProgress: %.6f%%", pcnt);
+    if (debug) {
+        double throughput;
+        struct timespec curtm, difftm;
+
+        clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
+        timespec_diff(&curtm, &wctx->starttm, &difftm);
+        throughput = wctx->bytesverified
+                     / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
+                     / (1024 * 1024);
+        fprintf(stderr, "\rProgress: %.6f%% (%.6f MiB/s)", pcnt, throughput);
+    }
     broadcast_progress(wctx->busconn, pcnt);
 
     return quit ? -EINTR : 0;
@@ -522,6 +535,7 @@ static int
 verif_fn(void *arg)
 {
     int err;
+    int fexcepts = 0;
     int hugetlbfl;
     int64_t fullbufsize;
     struct statvfs s;
@@ -571,11 +585,26 @@ verif_fn(void *arg)
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
 
+    if (debug) {
+        /* disable floating-point traps from calculations for debugging
+           output */
+        fexcepts = fedisableexcept(FE_ALL_EXCEPT);
+        if (fexcepts == -1) {
+            err = EIO;
+            goto end3;
+        }
+    }
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &wctx.starttm);
+
     err = -dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
                        (void *)&wctx);
 
-    avl_tree_free(wctx.output_data);
+    if (debug)
+        feenableexcept(fexcepts);
 
+end3:
+    avl_tree_free(wctx.output_data);
 end2:
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
