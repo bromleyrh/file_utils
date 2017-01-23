@@ -42,7 +42,10 @@
 #include <sys/statvfs.h>
 #include <sys/types.h>
 
-#define BUFSIZE (4 * 1024 * 1024) /* must be divisible by 2 */
+/* FIXME: test for presence of XFS headers during build process */
+#include <xfs/xfs.h>
+
+#define BUFSIZE (2 * 1024 * 1024)
 
 #define NR_HUGEPAGES "/proc/sys/vm/nr_hugepages"
 
@@ -62,6 +65,7 @@ struct verif_walk_ctx {
     struct radix_tree   *input_data;
     char                *buf1;
     char                *buf2;
+    size_t              bufsz;
     EVP_MD_CTX          initsumctx;
     EVP_MD_CTX          sumctx;
     DBusConnection      *busconn;
@@ -77,6 +81,7 @@ static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
 static int print_chksum(FILE *, unsigned char *, unsigned);
 
+static ssize_t get_io_size(int);
 static int64_t get_huge_page_size(void);
 
 static int set_direct_io(int);
@@ -88,8 +93,8 @@ static int verif_record_cmp(const void *, const void *, void *);
 static int broadcast_progress(DBusConnection *, double);
 static int verif_chksums_cb(int, off_t, void *);
 
-static int verif_chksums(int, char *, char *, EVP_MD_CTX *, EVP_MD_CTX *,
-                         struct verif_record *, unsigned char *,
+static int verif_chksums(int, char *, char *, size_t, EVP_MD_CTX *,
+                         EVP_MD_CTX *, struct verif_record *, unsigned char *,
                          unsigned char *, unsigned *,
                          int (*)(int, off_t, void *), void *);
 
@@ -145,6 +150,18 @@ print_chksum(FILE *f, unsigned char *sum, unsigned sumlen)
     }
 
     return 0;
+}
+
+static ssize_t
+get_io_size(int rootfd)
+{
+    struct stat s;
+
+    if (!platform_test_xfs_fd(rootfd))
+        return BUFSIZE;
+
+    /* FIXME: ensure XFS filesystems are mounted with "largeio" mount option */
+    return (fstat(rootfd, &s) == 0) ? s.st_blksize : -errno;
 }
 
 #define MEMINFO "/proc/meminfo"
@@ -296,9 +313,10 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
 }
 
 static int
-verif_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
-              EVP_MD_CTX *sumctx, struct verif_record *record_in,
-              unsigned char *initsum, unsigned char *sum, unsigned *sumlen,
+verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
+              EVP_MD_CTX *initsumctx, EVP_MD_CTX *sumctx,
+              struct verif_record *record_in, unsigned char *initsum,
+              unsigned char *sum, unsigned *sumlen,
               int (*cb)(int, off_t, void *), void *ctx)
 {
     char *buf;
@@ -314,7 +332,7 @@ verif_chksums(int fd, char *buf1, char *buf2, EVP_MD_CTX *initsumctx,
         return -EIO;
 
     memset(&aiocb, 0, sizeof(aiocb));
-    aiocb.aio_nbytes = BUFSIZE / 2;
+    aiocb.aio_nbytes = bufsz / 2;
     aiocb.aio_fildes = fd;
     aiocb.aio_buf = buf = buf1;
     if (aio_read(&aiocb) == -1)
@@ -495,9 +513,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
     record.record.size = s->st_size;
     wctx->lastoff = 0;
-    res = verif_chksums(fd, wctx->buf1, wctx->buf2, &wctx->initsumctx,
-                        &wctx->sumctx, p_record_in, record.record.initsum,
-                        record.record.sum, &sumlen, &verif_chksums_cb, wctx);
+    res = verif_chksums(fd, wctx->buf1, wctx->buf2, wctx->bufsz,
+                        &wctx->initsumctx, &wctx->sumctx, p_record_in,
+                        record.record.initsum, record.record.sum, &sumlen,
+                        &verif_chksums_cb, wctx);
     if (res != 0) {
         if (debug)
             fputc('\n', stderr);
@@ -540,18 +559,24 @@ verif_fn(void *arg)
     int fexcepts = 0;
     int hugetlbfl, nhugep;
     int64_t fullbufsize;
+    ssize_t bufsz;
     struct statvfs s;
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
 
+    bufsz = get_io_size(vargs->srcfd);
+    if (bufsz < 1)
+        return (bufsz == 0) ? EIO : -bufsz;
+    wctx.bufsz = bufsz * 2;
+
     fullbufsize = get_huge_page_size();
     if (fullbufsize <= 0) {
         hugetlbfl = 0;
-        fullbufsize = BUFSIZE;
+        fullbufsize = wctx.bufsz;
     } else {
         hugetlbfl = MAP_HUGETLB;
-        nhugep = (BUFSIZE + fullbufsize - 1) / fullbufsize;
-        if (fullbufsize < BUFSIZE)
+        nhugep = (wctx.bufsz + fullbufsize - 1) / fullbufsize;
+        if (fullbufsize < wctx.bufsz)
             fullbufsize *= nhugep;
     }
 
@@ -560,13 +585,13 @@ verif_fn(void *arg)
     wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     wctx.bytesverified = 0;
 
-    wctx.buf1 = mmap(NULL, BUFSIZE, PROT_READ | PROT_WRITE,
+    wctx.buf1 = mmap(NULL, wctx.bufsz, PROT_READ | PROT_WRITE,
                      MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
     if (wctx.buf1 == MAP_FAILED) {
         err = errno;
         goto alloc_err;
     }
-    wctx.buf2 = wctx.buf1 + BUFSIZE / 2;
+    wctx.buf2 = wctx.buf1 + wctx.bufsz / 2;
 
     if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
         || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
