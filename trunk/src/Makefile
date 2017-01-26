@@ -21,8 +21,8 @@ prefix = /usr/local
 bindir = $(prefix)/bin
 libdir = $(prefix)/lib
 
-progs = attr_idx cp_mem fastcp mkmanifest open open_pipes replicate tmpfile \
-	verify xfsutil
+progs = attr_idx cp_mem fastcat fastcp mkmanifest open open_pipes replicate \
+	tmpfile verify xfsutil
 libs = $(ldio_so)
 
 all: $(progs) libdirectio
