@@ -123,12 +123,12 @@ main(int argc, char **argv)
 
     static char *const cmd1[] = {"verify", "-c", conf_path, NULL};
     static char *const cmd2[] = {"osort", "-k3", NULL};
-    static char *const cmd3[] = {"cat", template_path, "-", NULL};
+    static char *const cmd3[] = {"fastcat", template_path, "-", NULL};
 
     struct proc cmds[] = {
         {.file = "verify", .argv = cmd1},
         {.file = "osort", .argv = cmd2},
-        {.file = "cat", .argv = cmd3}
+        {.file = "fastcat", .argv = cmd3}
     };
     static const int ncmds = (int)(sizeof(cmds)/sizeof(cmds[0]));
 
