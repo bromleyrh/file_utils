@@ -576,7 +576,7 @@ verif_fn(void *arg)
     } else {
         hugetlbfl = MAP_HUGETLB;
         nhugep = (wctx.bufsz + fullbufsize - 1) / fullbufsize;
-        if (fullbufsize < wctx.bufsz)
+        if ((size_t)fullbufsize < wctx.bufsz)
             fullbufsize *= nhugep;
     }
 
