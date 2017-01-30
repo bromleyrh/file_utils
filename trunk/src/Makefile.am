@@ -19,7 +19,8 @@ EXTRA_DIST =
 include %reldir%/scripts/Makefile.am
 
 noinst_HEADERS = replicate_common.h replicate_conf.h replicate_gram.h \
-	replicate_trans.h verify_common.h verify_conf.h verify_gram.h verify_scan.h
+	replicate_trans.h verify_common.h verify_conf.h verify_gram.h verify_io.h \
+	verify_scan.h
 
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM
@@ -79,7 +80,7 @@ replicate_LDFLAGS = -lcap -lm -lmount $(backup_link) $(backup_link_dep) \
 	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
 replicate_DEPENDENCIES = %reldir%/libbackup/libbackup.la
 
-verify_SOURCES = verify.c verify_conf.c verify_scan.c
+verify_SOURCES = verify.c verify_conf.c verify_io.c verify_scan.c
 verify_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Ilibbackup/include @dbus_cflags@ @libjson_cflags@ @libutil_cflags@ \
 	@openssl_cflags@

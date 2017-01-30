@@ -3,6 +3,7 @@
  */
 
 #include "verify_common.h"
+#include "verify_io.h"
 #include "verify_scan.h"
 
 #include <backup.h>
@@ -56,6 +57,8 @@ struct verif_record_output {
 };
 
 struct verif_walk_ctx {
+    struct io_state     *io_state;
+    size_t              transfer_size;
     off_t               fsbytesused;
     off_t               bytesverified;
     off_t               lastoff;
@@ -157,7 +160,7 @@ get_io_size(int rootfd)
 {
     struct stat s;
 
-    if (!platform_test_xfs_fd(rootfd))
+    if (1 || !platform_test_xfs_fd(rootfd))
         return BUFSIZE;
 
     /* FIXME: ensure XFS filesystems are mounted with "largeio" mount option */
@@ -287,7 +290,8 @@ err:
 static int
 verif_chksums_cb(int fd, off_t flen, void *ctx)
 {
-    double pcnt;
+    double pcnt, throughput;
+    struct timespec curtm, difftm;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
 
     (void)fd;
@@ -296,18 +300,18 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     wctx->lastoff = flen;
 
     pcnt = (double)100 * wctx->bytesverified / wctx->fsbytesused;
-    if (debug) {
-        double throughput;
-        struct timespec curtm, difftm;
 
-        clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
-        timespec_diff(&curtm, &wctx->starttm, &difftm);
-        throughput = wctx->bytesverified
-                     / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
-                     / (1024 * 1024);
-        fprintf(stderr, "\rProgress: %.6f%% (%.6f MiB/s)", pcnt, throughput);
-    }
+    clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
+    timespec_diff(&curtm, &wctx->starttm, &difftm);
+    throughput = wctx->bytesverified
+                 / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
+                 / (1024 * 1024);
+    debug_print("\rProgress: %.6f%% (%.6f MiB/s)", pcnt, throughput);
+
     broadcast_progress(wctx->busconn, pcnt);
+
+    wctx->transfer_size = io_state_update(wctx->io_state,
+                                          (size_t)(wctx->bytesverified), -1.0);
 
     return quit ? -EINTR : 0;
 }
@@ -326,13 +330,16 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
     off_t flen = 0, initrem = 512;
     size_t len;
     struct aiocb aiocb;
+    struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
+
+    (void)bufsz;
 
     if ((EVP_DigestInit_ex(sumctx, EVP_sha1(), NULL) != 1)
         || (EVP_DigestInit_ex(initsumctx, EVP_sha1(), NULL) != 1))
         return -EIO;
 
     memset(&aiocb, 0, sizeof(aiocb));
-    aiocb.aio_nbytes = bufsz / 2;
+    aiocb.aio_nbytes = wctx->transfer_size;
     aiocb.aio_fildes = fd;
     aiocb.aio_buf = buf = buf1;
     if (aio_read(&aiocb) == -1)
@@ -356,6 +363,7 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
         if (err)
             return err;
 
+        aiocb.aio_nbytes = wctx->transfer_size;
         aiocb.aio_offset = flen;
         aiocb.aio_buf = nextbuf = (buf == buf1) ? buf2 : buf1;
         if (aio_read(&aiocb) == -1)
@@ -621,14 +629,21 @@ verif_fn(void *arg)
         }
     }
 
+    wctx.transfer_size = 512 * 1024;
+    err = io_state_init(&wctx.io_state);
+    if (err)
+        goto end4;
+
     clock_gettime(CLOCK_MONOTONIC_RAW, &wctx.starttm);
 
     err = -dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
                        (void *)&wctx);
 
+    io_state_free(wctx.io_state);
+
+end4:
     if (debug)
         feenableexcept(fexcepts);
-
 end3:
     avl_tree_free(wctx.output_data);
 end2:
