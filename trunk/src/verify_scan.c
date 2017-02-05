@@ -93,7 +93,8 @@ static void cancel_aio(struct aiocb *);
 
 static int verif_record_cmp(const void *, const void *, void *);
 
-static int broadcast_progress(DBusConnection *, double);
+static int broadcast_stat(DBusConnection *, double, const char *, const char *,
+                          const char *);
 static int verif_chksums_cb(int, off_t, void *);
 
 static int verif_chksums(int, char *, char *, size_t, EVP_MD_CTX *,
@@ -260,19 +261,19 @@ verif_record_cmp(const void *k1, const void *k2, void *ctx)
 }
 
 static int
-broadcast_progress(DBusConnection *busconn, double pcnt)
+broadcast_stat(DBusConnection *busconn, double stat, const char *path,
+               const char *iface, const char *name)
 {
     DBusMessage *msg;
     DBusMessageIter msgargs;
     dbus_uint32_t serial;
 
-    msg = dbus_message_new_signal("/verify/signal/progress",
-                                  "verify.signal.Progress", "Progress");
+    msg = dbus_message_new_signal(path, iface, name);
     if (msg == NULL)
         goto err;
 
     dbus_message_iter_init_append(msg, &msgargs);
-    if (dbus_message_iter_append_basic(&msgargs, DBUS_TYPE_DOUBLE, &pcnt)
+    if (dbus_message_iter_append_basic(&msgargs, DBUS_TYPE_DOUBLE, &stat)
         == 0)
         goto err;
 
@@ -308,7 +309,10 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
                  / (1024 * 1024);
     debug_print("\rProgress: %.6f%% (%.6f MiB/s)", pcnt, throughput);
 
-    broadcast_progress(wctx->busconn, pcnt);
+    broadcast_stat(wctx->busconn, pcnt, "/verify/signal/progress",
+                   "verify.signal.Progress", "Progress");
+    broadcast_stat(wctx->busconn, throughput, "/verify/signal/throughput",
+                   "verify.signal.Throughput", "Throughput");
 
     wctx->transfer_size = io_state_update(wctx->io_state,
                                           (size_t)(wctx->bytesverified), -1.0);
