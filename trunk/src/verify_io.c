@@ -95,6 +95,7 @@ sorted_stats_add(struct io_stats *stats, double ms)
 
     ret = set_insert(stats->ms_sorted, &m);
     if (ret != 0) {
+        free(m);
         if (ret != -EADDRINUSE)
             return ret;
         ret = set_search(stats->ms_sorted, &m, &m);
