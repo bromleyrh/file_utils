@@ -219,6 +219,7 @@ io_state_init(struct io_state **state)
     }
 
     ret->init = 1;
+    ret->last_throughput = 0.0;
 
     *state = ret;
     return 0;
