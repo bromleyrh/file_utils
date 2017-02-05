@@ -2,8 +2,6 @@
  * verify_io.c
  */
 
-/* TODO: use moving median to estimate throughput */
-
 #include "verify_io.h"
 
 #include <time_ext.h>
