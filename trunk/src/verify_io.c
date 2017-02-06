@@ -96,13 +96,17 @@ sorted_stats_add(struct io_stats *stats, double ms)
     if (ret == 0)
         ++(stats->num_uniq_ms);
     else {
-        free(m);
-        if (ret != -EADDRINUSE)
+        struct ms *res;
+
+        if (ret != -EADDRINUSE) {
+            free(m);
             return ret;
-        ret = set_search(stats->ms_sorted, &m, &m);
+        }
+        ret = set_search(stats->ms_sorted, &m, &res);
+        free(m);
         if (ret != 1)
             return (ret == 0) ? -EIO : ret;
-        ++(m->count);
+        ++(res->count);
     }
 
     return 0;
