@@ -61,7 +61,7 @@ static int sorted_stats_remove(struct io_stats *, double);
 static int io_stats_init(struct io_stats *, unsigned);
 static void io_stats_destroy(struct io_stats *);
 static int io_stats_add(struct io_stats *, double);
-static int io_stats_get_median(struct io_stats *, double *);
+static int io_stats_get_median(struct io_stats *, double *, double *, double *);
 
 static int
 ms_cmp(const void *k1, const void *k2)
@@ -192,8 +192,10 @@ io_stats_add(struct io_stats *stats, double ms)
 }
 
 static int
-io_stats_get_median(struct io_stats *stats, double *ms)
+io_stats_get_median(struct io_stats *stats, double *ms, double *min,
+                    double *max)
 {
+    double maximum, median, minimum;
     int mididx;
     int ret;
     struct ms *m;
@@ -204,10 +206,26 @@ io_stats_get_median(struct io_stats *stats, double *ms)
 
     ret = set_select(stats->ms_sorted, mididx, &m);
     if (ret != 1)
-        return (ret == 0) ? -EIO : ret;
+        goto err;
+    median = m->ms;
 
-    *ms = m->ms;
+    ret = set_select(stats->ms_sorted, 0, &m);
+    if (ret != 1)
+        goto err;
+    minimum = m->ms;
+
+    ret = set_select(stats->ms_sorted, stats->num_uniq_ms - 1, &m);
+    if (ret != 1)
+        goto err;
+    maximum = m->ms;
+
+    *ms = median;
+    *min = minimum;
+    *max = maximum;
     return 0;
+
+err:
+    return (ret == 0) ? -EIO : ret;
 }
 
 int
@@ -245,6 +263,7 @@ size_t
 io_state_update(struct io_state *state, size_t len, double tp)
 {
     double throughput;
+    double min, max;
     struct timespec dt, t2;
 
     if (state->init) {
@@ -277,9 +296,11 @@ io_state_update(struct io_state *state, size_t len, double tp)
         throughput = tp;
 
     if ((io_stats_add(&state->throughput_stats, throughput) != 0)
-        || (io_stats_get_median(&state->throughput_stats, &throughput) != 0))
+        || (io_stats_get_median(&state->throughput_stats, &throughput, &min,
+                                &max) != 0))
         goto end;
-    fprintf(stderr, "\rThroughput: %12.6f MiB/s", throughput);
+    fprintf(stderr, "\rThroughput: %12.6f, %12.6f, %12.6f MiB/s", min,
+            throughput, max);
 
     if ((int)(throughput * 100) == (int)(state->last_throughput * 100))
         ++(state->steadiness);
