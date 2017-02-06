@@ -14,7 +14,7 @@ pkgconfigdir = @pkgconfigdir@
 
 $(pkgconfig_DATA): config.status
 
-EXTRA_DIST =
+EXTRA_DIST = replicate.conf.sample replicate.spec verify.conf.sample verify.spec
 
 include %reldir%/scripts/Makefile.am
 
