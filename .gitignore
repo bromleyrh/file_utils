@@ -23,6 +23,9 @@ trunk/src/**/*.stamp
 
 trunk/src/**/.libs
 
+trunk/src/replicate_gram.h
+trunk/src/verify_gram.h
+
 *.jar
 trunk/src/attr_idx
 trunk/src/cp_mem
