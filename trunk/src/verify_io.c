@@ -35,6 +35,7 @@ struct io_stats {
     struct set      *ms_sorted;
     unsigned        window_size;
     unsigned        num_ms;
+    unsigned        num_uniq_ms;
 };
 
 struct io_state {
@@ -92,7 +93,9 @@ sorted_stats_add(struct io_stats *stats, double ms)
     m->count = 1;
 
     ret = set_insert(stats->ms_sorted, &m);
-    if (ret != 0) {
+    if (ret == 0)
+        ++(stats->num_uniq_ms);
+    else {
         free(m);
         if (ret != -EADDRINUSE)
             return ret;
@@ -126,6 +129,7 @@ sorted_stats_remove(struct io_stats *stats, double ms)
     if (ret != 0)
         return ret;
     free(mp);
+    --(stats->num_uniq_ms);
 
     return 0;
 }
@@ -150,7 +154,7 @@ io_stats_init(struct io_stats *stats, unsigned window_size)
     }
 
     stats->window_size = window_size;
-    stats->num_ms = 0;
+    stats->num_ms = stats->num_uniq_ms = 0;
 
     return 0;
 }
@@ -192,7 +196,7 @@ io_stats_get_median(struct io_stats *stats, double *ms)
 
     /* FIXME: account for duplicate measurements */
 
-    mididx = stats->num_ms / 2;
+    mididx = stats->num_uniq_ms / 2;
 
     ret = set_select(stats->ms_sorted, mididx, &m);
     if (ret != 1)
