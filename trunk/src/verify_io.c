@@ -22,7 +22,7 @@
 #define MAX_TRANSFER_SIZE (2 * 1024 * 1024)
 #define TRANSFER_GRAN 4096
 
-#define UPDATE_INTERVAL (64 * 1024 * 1024)
+#define UPDATE_INTERVAL (16 * 1024 * 1024)
 #define STATS_WINDOW_SIZE 64
 
 struct ms {
