@@ -22,6 +22,7 @@
 #include <grp.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <mcheck.h>
 #include <regex.h>
 #include <sched.h>
 #include <signal.h>
@@ -36,8 +37,11 @@
 
 #include <sys/capability.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#define MTRACE_FILE "mtrace.txt"
 
 #define CONFIG_PATH "\"$HOME/.verify.conf\""
 
@@ -50,6 +54,8 @@ gid_t rgid;
 static char from_hex(char);
 
 static int scan_chksum(const char *, unsigned char *, unsigned);
+
+static int enable_debugging_features(int);
 
 static int set_capabilities(void);
 static int init_privs(void);
@@ -168,6 +174,31 @@ parse_cmdline(int argc, char **argv, const char **confpath)
         default:
             return -1;
         }
+    }
+
+    return 0;
+}
+
+static int
+enable_debugging_features(int trace)
+{
+    const struct rlimit rlim = {
+        .rlim_cur = RLIM_INFINITY,
+        .rlim_max = RLIM_INFINITY
+    };
+
+    if (setrlimit(RLIMIT_CORE, &rlim) == -1) {
+        error(0, errno, "Couldn't set resource limit");
+        return -errno;
+    }
+
+    if (trace) {
+        if ((setenv("MALLOC_CHECK_", "7", 1) == -1)
+            || (setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1)) {
+            error(0, errno, "Couldn't set environment variable");
+            return -errno;
+        }
+        mtrace();
     }
 
     return 0;
@@ -574,6 +605,9 @@ main(int argc, char **argv)
     ret = init_privs();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting process privileges");
+
+    if (enable_debugging_features(0) != 0)
+        return EXIT_FAILURE;
 
     ret = parse_cmdline(argc, argv, &confpath);
     if (ret != 0)

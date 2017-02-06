@@ -18,6 +18,7 @@
 #include <error.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <mcheck.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -31,8 +32,11 @@
 
 #include <sys/capability.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#define MTRACE_FILE "mtrace.txt"
 
 #define CONFIG_PATH "\"$HOME/.replicate.conf\""
 
@@ -41,6 +45,8 @@ int log_transfers = 0;
 
 uid_t ruid;
 gid_t rgid;
+
+static int enable_debugging_features(int);
 
 static int set_capabilities(void);
 static int init_privs(void);
@@ -80,6 +86,31 @@ log_print(int priority, const char *fmt, ...)
         vsyslog(priority, fmt, ap);
         va_end(ap);
     }
+}
+
+static int
+enable_debugging_features(int trace)
+{
+    const struct rlimit rlim = {
+        .rlim_cur = RLIM_INFINITY,
+        .rlim_max = RLIM_INFINITY
+    };
+
+    if (setrlimit(RLIMIT_CORE, &rlim) == -1) {
+        error(0, errno, "Couldn't set resource limit");
+        return -errno;
+    }
+
+    if (trace) {
+        if ((setenv("MALLOC_CHECK_", "7", 1) == -1)
+            || (setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1)) {
+            error(0, errno, "Couldn't set environment variable");
+            return -errno;
+        }
+        mtrace();
+    }
+
+    return 0;
 }
 
 static int
@@ -406,6 +437,9 @@ main(int argc, char **argv)
     ret = init_privs();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting process privileges");
+
+    if (enable_debugging_features(0) != 0)
+        return EXIT_FAILURE;
 
     ctx.keep_cache = 0;
     ctx.uid = (uid_t)-1;
