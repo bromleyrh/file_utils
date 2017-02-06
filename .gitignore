@@ -1,12 +1,5 @@
 *.sw[a-z]
 
-*.la
-*.lo
-*.o
-*.class
-
-*.jar
-
 replicate.h
 replicate.conf
 verify.h

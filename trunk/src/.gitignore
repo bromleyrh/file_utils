@@ -19,6 +19,9 @@ Makefile.in
 /replicate_gram.h
 /verify_gram.h
 
+*.la
+*.lo
+
 /attr_idx
 /cp_mem
 /fastcat
