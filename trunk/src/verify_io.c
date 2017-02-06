@@ -143,7 +143,8 @@ io_stats_init(struct io_stats *stats, unsigned window_size)
 {
     int err;
 
-    assert(window_size > 0);
+    if ((window_size == 0) || (window_size > 4096 / sizeof(double)))
+        return -EINVAL;
 
     err = queue_new(&stats->ms_buf, QUEUE_FNS_CIRCULAR_BUF, sizeof(double),
                     NULL);
