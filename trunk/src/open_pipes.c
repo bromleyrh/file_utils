@@ -80,14 +80,17 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
         return -1;
     }
     pd->npipes = (i-3) / 2;
-    npipefds = pd->npipes * 2;
-    pd->pipefds = malloc(npipefds * sizeof(int));
-    if (pd->pipefds == NULL) {
-        error(0, 0, "Out of memory");
-        return -1;
-    }
-    for (i = 0; i < npipefds; i++)
-        pd->pipefds[i] = atoi(argv[2+i]);
+    if (pd->npipes > 0) {
+        npipefds = pd->npipes * 2;
+        pd->pipefds = malloc(npipefds * sizeof(int));
+        if (pd->pipefds == NULL) {
+            error(0, 0, "Out of memory");
+            return -1;
+        }
+        for (i = 0; i < npipefds; i++)
+            pd->pipefds[i] = atoi(argv[2+i]);
+    } else
+        pd->pipefds = NULL;
 
     return 0;
 }
@@ -97,6 +100,9 @@ open_pipes(struct pipe_data *pd)
 {
     int i;
     int (*pipes)[2];
+
+    if (pd->npipes == 0)
+        return 0;
 
     pipes = calloc(pd->npipes, sizeof(pipes[0]));
     if (pipes == NULL) {
