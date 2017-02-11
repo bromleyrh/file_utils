@@ -64,18 +64,16 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
         return 0;
     }
 
-    for (i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "--") == 0) {
-            ++i;
+    for (i = 2; i < argc - 1; i++) {
+        if (strcmp(argv[i], "--") == 0)
             break;
-        }
     }
 
-    if (i == argc) {
+    if (i == argc - 1) {
         error(0, 0, usage());
         return -1;
     }
-    *cmd = &argv[i];
+    *cmd = &argv[++i];
 
     if ((i-3) % 2 != 0) {
         error(0, 0, "Must specify 2 FDs per pipe");
