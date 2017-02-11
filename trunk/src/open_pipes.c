@@ -133,6 +133,7 @@ open_pipes(struct pipe_data *pd)
             close(pd->pipefds[2*i]);
             close(pd->pipefds[2*i+1]);
         }
+        free(pipes);
         return -1;
     }
 
