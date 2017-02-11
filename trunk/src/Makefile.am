@@ -54,7 +54,8 @@ attr_idx_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
 attr_idx_LDFLAGS = @libutil_link_dep@
 
 cp_mem_SOURCES = cp_mem.c
-cp_mem_CFLAGS = $(AM_CFLAGS)
+cp_mem_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
+cp_mem_LDFLAGS = @libutil_link_dep@
 
 fastcat_SOURCES = fastcat.c
 fastcat_CFLAGS = $(AM_CFLAGS)

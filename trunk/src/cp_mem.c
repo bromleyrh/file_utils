@@ -6,6 +6,8 @@
 
 #define _FILE_OFFSET_BITS 64
 
+#include <strings_ext.h>
+
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -21,6 +23,7 @@
 
 #include <linux/fs.h>
 #include <linux/magic.h>
+
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -37,7 +40,6 @@ struct dest {
     int         fd;
     struct buf  buf;
     size_t      blksize;
-    char        *zeroblock;
     int         hugetlbfs;
 };
 
@@ -228,13 +230,6 @@ dest_init(int fd, int on_hugetlbfs, struct dest *dst)
         return -1;
     }
 
-    dst->zeroblock = malloc(dst->blksize);
-    if (dst->zeroblock == NULL) {
-        error(0, 0, "Out of memory");
-        return -1;
-    }
-    memset(dst->zeroblock, 0, dst->blksize);
-
     dst->hugetlbfs = on_hugetlbfs;
 
     return 0;
@@ -281,7 +276,6 @@ dest_free(struct dest *dst)
 
     if (dst->buf.buf != NULL)
         munmap(dst->buf.buf, dst->buf.size);
-    free(dst->zeroblock);
 }
 
 static int
@@ -344,7 +338,7 @@ do_write(struct dest *dst, const void *buf, size_t count)
             blockbytes = count - byteswritten;
         else {
             blockbytes = dst->blksize;
-            if (memcmp(buf + byteswritten, dst->zeroblock, dst->blksize) == 0)
+            if (memcchr(buf + byteswritten, '\0', dst->blksize) == NULL)
                 continue;
         }
         if (do_memcpy(dst->buf.buf + byteswritten, buf + byteswritten,
