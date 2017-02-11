@@ -8,6 +8,7 @@
 
 #include <strings_ext.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -305,6 +306,8 @@ do_read(int fd, void *buf, size_t count)
 {
     size_t bytesread;
     ssize_t ret;
+
+    assert(count > 0);
 
     for (bytesread = 0; bytesread < count; bytesread += ret) {
         ret = read(fd, buf + bytesread, count - bytesread);

@@ -253,6 +253,7 @@ do_copy(struct copy_args *copy_args)
 
 err3:
     tmp = seteuid(euid);
+    (void)tmp;
 err2:
     tmp = setegid(egid);
     (void)tmp;

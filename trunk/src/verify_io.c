@@ -116,23 +116,23 @@ static int
 sorted_stats_remove(struct io_stats *stats, double ms)
 {
     int ret;
-    struct ms m, *mp;
+    struct ms m, *mp, *res;
 
     m.ms = ms;
     mp = &m;
-    ret = set_search(stats->ms_sorted, &mp, &mp);
+    ret = set_search(stats->ms_sorted, &mp, &res);
     if (ret != 1)
         return (ret == 0) ? -EIO : ret;
 
-    if (mp->count > 1) {
-        --(mp->count);
+    if (res->count > 1) {
+        --(res->count);
         return 0;
     }
 
-    ret = set_delete(stats->ms_sorted, &mp);
+    ret = set_delete(stats->ms_sorted, &res);
     if (ret != 0)
         return ret;
-    free(mp);
+    free(res);
     --(stats->num_uniq_ms);
 
     return 0;

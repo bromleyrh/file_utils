@@ -459,7 +459,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     int mult_links;
     int res;
     struct verif_record record_in, *p_record_in;
-    struct verif_record_output record;
+    struct verif_record_output record, record_res;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
     unsigned sumlen;
 
@@ -487,15 +487,15 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (mult_links) {
         record.dev = s->st_dev;
         record.ino = s->st_ino;
-        res = avl_tree_search(wctx->output_data, &record, &record);
+        res = avl_tree_search(wctx->output_data, &record, &record_res);
         if (res != 0) {
             if (res < 0)
                 return res;
-            if (record.record.size != s->st_size)
+            if (record_res.record.size != s->st_size)
                 return -EIO;
-            res = output_record(wctx->dstf, record.record.size,
-                                record.record.initsum, record.record.sum, 20,
-                                wctx->prefix, path);
+            res = output_record(wctx->dstf, record_res.record.size,
+                                record_res.record.initsum,
+                                record_res.record.sum, 20, wctx->prefix, path);
             if (res != 0)
                 return res;
             goto end;
@@ -721,6 +721,7 @@ do_verif(struct verif_args *verif_args)
 
 err3:
     tmp = seteuid(euid);
+    (void)tmp;
 err2:
     tmp = setegid(egid);
     (void)tmp;
