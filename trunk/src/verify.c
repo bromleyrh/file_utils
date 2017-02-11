@@ -154,6 +154,9 @@ print_usage(const char *progname)
 static int
 parse_cmdline(int argc, char **argv, const char **confpath)
 {
+    const char *cfpath = NULL;
+    int ret;
+
     for (;;) {
         int opt = getopt(argc, argv, "c:h");
 
@@ -162,21 +165,32 @@ parse_cmdline(int argc, char **argv, const char **confpath)
 
         switch (opt) {
         case 'c':
-            *confpath = strdup(optarg);
-            if (*confpath == NULL) {
+            if (cfpath != NULL)
+                free((void *)cfpath);
+            cfpath = strdup(optarg);
+            if (cfpath == NULL) {
                 error(0, errno, "Couldn't allocate memory");
                 return -1;
             }
             break;
         case 'h':
             print_usage(argv[0]);
-            return -2;
+            ret = -2;
+            goto exit;
         default:
-            return -1;
+            ret = -1;
+            goto exit;
         }
     }
 
+    if (cfpath != NULL)
+        *confpath = cfpath;
     return 0;
+
+exit:
+    if (cfpath != NULL)
+        free((void *)cfpath);
+    return ret;
 }
 
 static int
