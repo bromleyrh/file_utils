@@ -47,7 +47,7 @@ backup_link = -L$(abs_builddir)/libbackup/.libs -lbackup
 backup_link_dep = @libutil_link_dep@
 
 bin_PROGRAMS = attr_idx cp_mem fastcat fastcp mkmanifest open open_pipes \
-	replicate tmpfile verify xfsutil
+	replicate sparse_scan tmpfile verify xfsutil
 
 attr_idx_SOURCES = attr_idx.c
 attr_idx_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
@@ -80,6 +80,10 @@ replicate_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 replicate_LDFLAGS = -lcap -lm -lmount $(backup_link) $(backup_link_dep) \
 	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
 replicate_DEPENDENCIES = %reldir%/libbackup/libbackup.la
+
+sparse_scan_SOURCES = sparse_scan.c
+sparse_scan_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
+sparse_scan_LDFLAGS = @libutil_link_dep@
 
 verify_SOURCES = verify.c verify_conf.c verify_io.c verify_scan.c
 verify_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
