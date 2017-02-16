@@ -23,7 +23,7 @@
 
 #define BLKSIZE 4096
 
-static void print_block_range(int64_t, int64_t);
+static void process_block_range(int64_t, int64_t);
 static void scan_data(const char *, size_t, off_t, int *);
 
 static int do_zero_block_scan(int);
@@ -31,18 +31,23 @@ static int do_zero_block_scan(int);
 static int block_scan_cb(int, int, const char *, const char *, struct stat *,
                          void *);
 
+static uint64_t totbytes;
+
 static void
-print_block_range(int64_t begin, int64_t end)
+process_block_range(int64_t begin, int64_t end)
 {
     int64_t numblk, start;
 
     start = begin + 1;
     numblk = end - start;
 
-    if (numblk > 1)
-        printf("Blocks %" PRIi64 " - %" PRIi64 "\n", start, end - 1);
-    else if (numblk == 1)
-        printf("Block %" PRIi64 "\n", start);
+    if (numblk > 0) {
+        if (numblk == 1)
+            printf("Block %" PRIi64 "\n", start);
+        else
+            printf("Blocks %" PRIi64 " - %" PRIi64 "\n", start, end - 1);
+        totbytes += numblk * BLKSIZE;
+    }
 }
 
 static void
@@ -64,10 +69,10 @@ scan_data(const char *buf, size_t len, off_t off, int *lastnonzero)
     if (nonzero1) {
         int nonzero = off / BLKSIZE;
 
-        print_block_range(*lastnonzero, nonzero);
+        process_block_range(*lastnonzero, nonzero);
         *lastnonzero = nonzero2 ? nextblk : nonzero;
     } else if (nonzero2) {
-        print_block_range(*lastnonzero, nextblk);
+        process_block_range(*lastnonzero, nextblk);
         *lastnonzero = nextblk;
     }
 }
@@ -93,7 +98,7 @@ do_zero_block_scan(int fd)
         off += ret;
     }
 
-    print_block_range(lastnonzero, off / BLKSIZE);
+    process_block_range(lastnonzero, off / BLKSIZE);
 
     return 0;
 }
@@ -150,7 +155,13 @@ main(int argc, char **argv)
 
     close(fd);
 
-    return err ? EXIT_FAILURE : EXIT_SUCCESS;
+    if (err)
+        return EXIT_FAILURE;
+
+    printf("Up to %" PRIu64 " byte%s can be freed\n", totbytes,
+           (totbytes == 1) ? "" : "s");
+
+    return EXIT_SUCCESS;
 }
 
 /* vi: set expandtab sw=4 ts=4: */
