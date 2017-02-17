@@ -26,34 +26,84 @@
 
 #define BLKSIZE 4096
 
-static int do_create_holes(int, uint64_t, uint64_t);
-static int process_block_range(int, int64_t, int64_t);
+struct file_info {
+    int         fd;
+    struct stat *s;
+};
 
-static int scan_data(int, const char *, size_t, off_t, int *);
+static int parse_cmdline(int, char **, const char **);
 
-static int do_zero_block_scan(int);
+static int do_create_holes(struct file_info *, uint64_t, uint64_t);
+
+static int process_block_range(struct file_info *, int64_t, int64_t);
+
+static int scan_data(struct file_info *, const char *, size_t, off_t, int *);
+
+static int do_zero_block_scan(struct file_info *);
 
 static int block_scan_cb(int, int, const char *, const char *, struct stat *,
                          void *);
 
 static int create_holes;
+static int preserve_times;
 
 static uint64_t totbytes;
 
 static int
-do_create_holes(int fd, uint64_t begin, uint64_t end)
+parse_cmdline(int argc, char **argv, const char **path)
 {
-    if (fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
+    for (;;) {
+        int opt = getopt(argc, argv, "Hp");
+
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'H':
+            create_holes = 1;
+            break;
+        case 'p':
+            preserve_times = 1;
+            break;
+        default:
+            return -1;
+        }
+    }
+
+    if (optind == argc) {
+        error(0, 0, "Must specify file");
+        return -1;
+    }
+    *path = argv[optind];
+
+    return 0;
+}
+
+static int
+do_create_holes(struct file_info *fi, uint64_t begin, uint64_t end)
+{
+    if (fallocate(fi->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
                   begin * BLKSIZE, (end + 1 - begin) * BLKSIZE) == -1) {
         error(0, errno, "Error creating hole in file");
         return errno;
+    }
+
+    if (preserve_times) {
+        struct timespec times[2];
+
+        times[0] = fi->s->st_atim;
+        times[1] = fi->s->st_mtim;
+        if (futimens(fi->fd, times) == -1) {
+            error(0, errno, "Error changing file's timestamps");
+            return errno;
+        }
     }
 
     return 0;
 }
 
 static int
-process_block_range(int fd, int64_t begin, int64_t end)
+process_block_range(struct file_info *fi, int64_t begin, int64_t end)
 {
     int err;
     int64_t numblk;
@@ -71,7 +121,7 @@ process_block_range(int fd, int64_t begin, int64_t end)
             printf("Blocks %" PRIi64 " - %" PRIi64 "\n", start, last);
 
         if (create_holes) {
-            err = do_create_holes(fd, start, last);
+            err = do_create_holes(fi, start, last);
             if (err)
                 return err;
         }
@@ -83,7 +133,8 @@ process_block_range(int fd, int64_t begin, int64_t end)
 }
 
 static int
-scan_data(int fd, const char *buf, size_t len, off_t off, int *lastnonzero)
+scan_data(struct file_info *fi, const char *buf, size_t len, off_t off,
+          int *lastnonzero)
 {
     int err = 0;
     int nonzero1, nonzero2;
@@ -102,12 +153,12 @@ scan_data(int fd, const char *buf, size_t len, off_t off, int *lastnonzero)
     if (nonzero1) {
         int nonzero = off / BLKSIZE;
 
-        err = process_block_range(fd, *lastnonzero, nonzero);
+        err = process_block_range(fi, *lastnonzero, nonzero);
         if (err)
             goto end;
         *lastnonzero = nonzero2 ? nextblk : nonzero;
     } else if (nonzero2) {
-        err = process_block_range(fd, *lastnonzero, nextblk);
+        err = process_block_range(fi, *lastnonzero, nextblk);
         if (err)
             goto end;
         *lastnonzero = nextblk;
@@ -118,7 +169,7 @@ end:
 }
 
 static int
-do_zero_block_scan(int fd)
+do_zero_block_scan(struct file_info *fi)
 {
     int err;
     int lastnonzero = -1;
@@ -128,20 +179,20 @@ do_zero_block_scan(int fd)
         char buf[BLKSIZE];
         ssize_t ret;
 
-        ret = read(fd, buf, sizeof(buf));
+        ret = read(fi->fd, buf, sizeof(buf));
         if (ret < 1) {
             if (ret != 0)
                 return -errno;
             break;
         }
 
-        err = scan_data(fd, buf, ret, off, &lastnonzero);
+        err = scan_data(fi, buf, ret, off, &lastnonzero);
         if (err)
             goto end;
         off += ret;
     }
 
-    err = process_block_range(fd, lastnonzero, off / BLKSIZE);
+    err = process_block_range(fi, lastnonzero, off / BLKSIZE);
 
 end:
     return err;
@@ -152,7 +203,7 @@ block_scan_cb(int fd, int dirfd, const char *name, const char *path,
               struct stat *s, void *ctx)
 {
     int err;
-    int writefd;
+    struct file_info fi;
 
     (void)ctx;
 
@@ -161,20 +212,24 @@ block_scan_cb(int fd, int dirfd, const char *name, const char *path,
 
     puts(path);
 
-    if (!create_holes)
-        return do_zero_block_scan(fd);
+    fi.s = s;
 
-    writefd = openat(dirfd, name, O_NOCTTY | O_RDWR);
-    if (writefd == -1)
+    if (!create_holes) {
+        fi.fd = fd;
+        return do_zero_block_scan(&fi);
+    }
+
+    fi.fd = openat(dirfd, name, O_NOCTTY | O_RDWR);
+    if (fi.fd == -1)
         return -errno;
 
-    err = do_zero_block_scan(writefd);
+    err = do_zero_block_scan(&fi);
     if (err) {
-        close(writefd);
+        close(fi.fd);
         return err;
     }
 
-    return (close(writefd) == 0) ? 0 : -errno;
+    return (close(fi.fd) == 0) ? 0 : -errno;
 }
 
 int
@@ -188,19 +243,11 @@ main(int argc, char **argv)
 
     setlinebuf(stdout);
 
-    if (argc < 2) {
-        fprintf(stderr, "Must specify file\n");
+    err = parse_cmdline(argc, argv, &path);
+    if (err)
         return EXIT_FAILURE;
-    }
-    if ((argc > 2) && (strcmp("-H", argv[1]) == 0)) {
-        create_holes = 1;
-        path = argv[2];
-        acc = O_RDWR;
-    } else {
-        path = argv[1];
-        acc = O_RDONLY;
-    }
 
+    acc = create_holes ? O_RDWR : O_RDONLY;
     for (;;) {
         fd = open(path, acc | O_NOCTTY);
         if (fd >= 0)
@@ -221,8 +268,13 @@ main(int argc, char **argv)
 
     if (S_ISDIR(s.st_mode))
         err = dir_walk_fd(fd, &block_scan_cb, DIR_WALK_ALLOW_ERR, NULL);
-    else
-        err = do_zero_block_scan(fd);
+    else {
+        struct file_info fi;
+
+        fi.fd = fd;
+        fi.s = &s;
+        err = do_zero_block_scan(&fi);
+    }
 
     close(fd);
 
