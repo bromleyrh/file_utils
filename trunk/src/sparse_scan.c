@@ -151,8 +151,9 @@ static int
 block_scan_cb(int fd, int dirfd, const char *name, const char *path,
               struct stat *s, void *ctx)
 {
-    (void)dirfd;
-    (void)name;
+    int err;
+    int writefd;
+
     (void)ctx;
 
     if (!S_ISREG(s->st_mode))
@@ -160,7 +161,20 @@ block_scan_cb(int fd, int dirfd, const char *name, const char *path,
 
     puts(path);
 
-    return do_zero_block_scan(fd);
+    if (!create_holes)
+        return do_zero_block_scan(fd);
+
+    writefd = openat(dirfd, name, O_NOCTTY | O_RDWR);
+    if (writefd == -1)
+        return -errno;
+
+    err = do_zero_block_scan(writefd);
+    if (err) {
+        close(writefd);
+        return err;
+    }
+
+    return (close(writefd) == 0) ? 0 : -errno;
 }
 
 int
