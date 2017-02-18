@@ -448,6 +448,8 @@ main(int argc, char **argv)
     int ret;
     struct replicate_ctx ctx;
 
+    setlinebuf(stdout);
+
     ret = init_privs();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting process privileges");
