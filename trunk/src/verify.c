@@ -616,6 +616,8 @@ main(int argc, char **argv)
     struct parse_ctx pctx;
     struct verify_ctx *ctx;
 
+    setlinebuf(stdout);
+
     ret = init_privs();
     if (ret != 0)
         error(EXIT_FAILURE, -ret, "Error setting process privileges");
