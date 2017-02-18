@@ -14,6 +14,7 @@
 #include <error.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +32,13 @@ struct file_info {
     struct stat *s;
 };
 
+static volatile sig_atomic_t quit;
+
+static int create_holes;
+static int preserve_times;
+
+static uint64_t totbytes;
+
 static int parse_cmdline(int, char **, const char **);
 
 static int do_create_holes(struct file_info *, uint64_t, uint64_t);
@@ -44,10 +52,8 @@ static int do_zero_block_scan(struct file_info *);
 static int block_scan_cb(int, int, const char *, const char *, struct stat *,
                          void *);
 
-static int create_holes;
-static int preserve_times;
-
-static uint64_t totbytes;
+static void int_handler(int);
+static int set_signal_handlers(void);
 
 static int
 parse_cmdline(int argc, char **argv, const char **path)
@@ -82,10 +88,14 @@ parse_cmdline(int argc, char **argv, const char **path)
 static int
 do_create_holes(struct file_info *fi, uint64_t begin, uint64_t end)
 {
+    int err = 0;
+
     if (fallocate(fi->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
                   begin * BLKSIZE, (end + 1 - begin) * BLKSIZE) == -1) {
         error(0, errno, "Error creating hole in file");
-        return errno;
+        if (errno != EINTR)
+            return errno;
+        err = EINTR;
     }
 
     if (preserve_times) {
@@ -99,7 +109,7 @@ do_create_holes(struct file_info *fi, uint64_t begin, uint64_t end)
         }
     }
 
-    return 0;
+    return err;
 }
 
 static int
@@ -179,6 +189,11 @@ do_zero_block_scan(struct file_info *fi)
         char buf[BLKSIZE];
         ssize_t ret;
 
+        if (quit) {
+            err = EINTR;
+            goto end;
+        }
+
         ret = read(fi->fd, buf, sizeof(buf));
         if (ret < 1) {
             if (ret != 0)
@@ -207,6 +222,9 @@ block_scan_cb(int fd, int dirfd, const char *name, const char *path,
 
     (void)ctx;
 
+    if (quit)
+        return EINTR;
+
     if (!S_ISREG(s->st_mode))
         return 0;
 
@@ -232,6 +250,34 @@ block_scan_cb(int fd, int dirfd, const char *name, const char *path,
     return (close(fi.fd) == 0) ? 0 : -errno;
 }
 
+static void
+int_handler(int signum)
+{
+    (void)signum;
+
+    quit = 1;
+}
+
+static int
+set_signal_handlers()
+{
+    size_t i;
+    struct sigaction sa;
+
+    static const int intsignals[] = {SIGINT, SIGTERM};
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = &int_handler;
+    sa.sa_flags = SA_RESETHAND;
+
+    for (i = 0; i < sizeof(intsignals)/sizeof(intsignals[0]); i++) {
+        if (sigaction(intsignals[i], &sa, NULL) == -1)
+            return -errno;
+    }
+
+    return 0;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -245,7 +291,7 @@ main(int argc, char **argv)
 
     err = parse_cmdline(argc, argv, &path);
     if (err)
-        return EXIT_FAILURE;
+        goto err1;
 
     acc = create_holes ? O_RDWR : O_RDONLY;
     for (;;) {
@@ -259,9 +305,11 @@ main(int argc, char **argv)
 
     if (fstat(fd, &s) == -1) {
         error(0, errno, "Error getting stats of %s", path);
-        close(fd);
-        return EXIT_FAILURE;
+        goto err2;
     }
+
+    if (set_signal_handlers() != 0)
+        goto err2;
 
     if (S_ISDIR(s.st_mode))
         err = dir_walk_fd(fd, &block_scan_cb, DIR_WALK_ALLOW_ERR, NULL);
@@ -276,12 +324,17 @@ main(int argc, char **argv)
     close(fd);
 
     if (err)
-        return EXIT_FAILURE;
+        goto err1;
 
     printf("Up to %" PRIu64 " byte%s %s freed\n", totbytes,
            (totbytes == 1) ? "" : "s", create_holes ? "were" : "can be");
 
     return EXIT_SUCCESS;
+
+err2:
+    close(fd);
+err1:
+    return EXIT_FAILURE;
 }
 
 /* vi: set expandtab sw=4 ts=4: */
