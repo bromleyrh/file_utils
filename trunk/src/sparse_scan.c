@@ -39,6 +39,7 @@ static int preserve_times;
 
 static uint64_t totbytes;
 
+static void print_usage(const char *);
 static int parse_cmdline(int, char **, const char **);
 
 static int do_create_holes(struct file_info *, uint64_t, uint64_t);
@@ -55,11 +56,22 @@ static int block_scan_cb(int, int, const char *, const char *, struct stat *,
 static void int_handler(int);
 static int set_signal_handlers(void);
 
+static void
+print_usage(const char *progname)
+{
+    printf("Usage: %s [options] <path>\n"
+           "\n"
+           "    -H replace blocks of zeros in files with holes\n"
+           "    -h output help\n"
+           "    -p if \"-H\" given, preserve files' timestamps\n",
+           progname);
+}
+
 static int
 parse_cmdline(int argc, char **argv, const char **path)
 {
     for (;;) {
-        int opt = getopt(argc, argv, "Hp");
+        int opt = getopt(argc, argv, "Hhp");
 
         if (opt == -1)
             break;
@@ -68,6 +80,9 @@ parse_cmdline(int argc, char **argv, const char **path)
         case 'H':
             create_holes = 1;
             break;
+        case 'h':
+            print_usage(argv[0]);
+            return -2;
         case 'p':
             preserve_times = 1;
             break;
@@ -283,15 +298,15 @@ main(int argc, char **argv)
 {
     const char *path;
     int acc;
-    int err;
     int fd;
+    int ret;
     struct stat s;
 
     setlinebuf(stdout);
 
-    err = parse_cmdline(argc, argv, &path);
-    if (err)
-        goto err1;
+    ret = parse_cmdline(argc, argv, &path);
+    if (ret != 0)
+        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
 
     acc = create_holes ? O_RDWR : O_RDONLY;
     for (;;) {
@@ -312,18 +327,18 @@ main(int argc, char **argv)
         goto err2;
 
     if (S_ISDIR(s.st_mode))
-        err = dir_walk_fd(fd, &block_scan_cb, DIR_WALK_ALLOW_ERR, NULL);
+        ret = dir_walk_fd(fd, &block_scan_cb, DIR_WALK_ALLOW_ERR, NULL);
     else {
         struct file_info fi;
 
         fi.fd = fd;
         fi.s = &s;
-        err = do_zero_block_scan(&fi);
+        ret = do_zero_block_scan(&fi);
     }
 
     close(fd);
 
-    if (err)
+    if (ret != 0)
         goto err1;
 
     printf("Up to %" PRIu64 " byte%s %s freed\n", totbytes,
