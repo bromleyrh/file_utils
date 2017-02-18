@@ -89,21 +89,23 @@ broadcast_progress(DBusConnection *busconn, double pcnt)
     msg = dbus_message_new_signal("/replicate/signal/progress",
                                   "replicate.signal.Progress", "Progress");
     if (msg == NULL)
-        goto err;
+        goto err1;
 
     dbus_message_iter_init_append(msg, &msgargs);
     if (dbus_message_iter_append_basic(&msgargs, DBUS_TYPE_DOUBLE, &pcnt)
         == 0)
-        goto err;
+        goto err2;
 
     if (dbus_connection_send(busconn, msg, &serial) == 0)
-        goto err;
+        goto err2;
 
     dbus_message_unref(msg);
 
     return 0;
 
-err:
+err2:
+    dbus_message_unref(msg);
+err1:
     return -ENOMEM;
 }
 
