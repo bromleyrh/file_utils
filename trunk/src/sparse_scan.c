@@ -167,7 +167,7 @@ scan_data(struct file_info *fi, const char *buf, size_t len, off_t off,
     size_t cmplen1, cmplen2;
 
     nextblk = (off + BLKSIZE) / BLKSIZE;
-    cmplen1 = MIN(len, nextblk * BLKSIZE - off);
+    cmplen1 = MIN((int64_t)len, nextblk * BLKSIZE - off);
     cmplen2 = len - cmplen1;
     nonzero1 = nonzero2 = 1;
     if (memcchr(buf, 0, cmplen1) == NULL)
