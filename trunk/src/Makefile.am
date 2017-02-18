@@ -46,8 +46,8 @@ include %reldir%/libbackup/Makefile.am
 backup_link = -L$(abs_builddir)/libbackup/.libs -lbackup
 backup_link_dep = @libutil_link_dep@
 
-bin_PROGRAMS = attr_idx cp_mem fastcat fastcp mkmanifest open open_pipes \
-	replicate sparse_scan tmpfile verify xfsutil
+bin_PROGRAMS = attr_idx cp_mem fastcat fastcp md_verify mkmanifest open \
+	open_pipes replicate sparse_scan tmpfile verify xfsutil
 
 attr_idx_SOURCES = attr_idx.c
 attr_idx_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
@@ -63,6 +63,10 @@ fastcat_CFLAGS = $(AM_CFLAGS)
 fastcp_SOURCES = fastcp.c
 fastcp_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
 fastcp_LDFLAGS = @libutil_link_dep@
+
+md_verify_SOURCES = md_verify.c
+md_verify_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
+md_verify_LDFLAGS = @libutil_link_dep@
 
 mkmanifest_SOURCES = mkmanifest.c
 mkmanifest_CFLAGS = $(AM_CFLAGS) @libutil_cflags@

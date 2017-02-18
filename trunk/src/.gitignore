@@ -26,6 +26,7 @@ Makefile.in
 /cp_mem
 /fastcat
 /fastcp
+/md_verify
 /mkmanifest
 /open
 /open_pipes
