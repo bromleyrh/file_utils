@@ -252,16 +252,13 @@ main(int argc, char **argv)
         fd = open(path, acc | O_NOCTTY);
         if (fd >= 0)
             break;
-        if ((errno != EISDIR) || (acc == O_RDONLY)) {
-            fprintf(stderr, "Error opening %s: %s\n", path, strerror(errno));
-            return EXIT_FAILURE;
-        }
+        if ((errno != EISDIR) || (acc == O_RDONLY))
+            error(EXIT_FAILURE, errno, "Error opening %s", path);
         acc = O_RDONLY;
     }
 
     if (fstat(fd, &s) == -1) {
-        fprintf(stderr, "Error getting stats of %s: %s\n", path,
-                strerror(errno));
+        error(0, errno, "Error getting stats of %s", path);
         close(fd);
         return EXIT_FAILURE;
     }
