@@ -30,6 +30,8 @@ struct ctx {
     int                 err;
 };
 
+#define TZ_FILE "/etc/localtime"
+
 #define TM_FMT "%Y-%m-%d %H:%M:%S %z"
 #define TM_FMT_OUT "%Y-%m-%d %H:%M:%S%nxxxxxxxxxx%z"
 
@@ -38,6 +40,8 @@ static int verbose;
 
 static void print_usage(const char *);
 static int parse_cmdline(int, char **, const char **, const char ***);
+
+static int set_time_variables(void);
 
 static size_t timestamp_to_str(char *, size_t, const char *, struct timespec *);
 
@@ -101,6 +105,12 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
     *paths = (const char **)&argv[optind+1];
 
     return 0;
+}
+
+static int
+set_time_variables()
+{
+    return (setenv("TZ", ":" TZ_FILE, 0) == -1) ? -errno : 0;
 }
 
 static size_t
@@ -405,6 +415,10 @@ main(int argc, char **argv)
     ret = parse_cmdline(argc, argv, &manifest_path, &paths);
     if (ret != 0)
         return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+
+    ret = set_time_variables();
+    if (ret != 0)
+        return EXIT_FAILURE;
 
     if (scan_input_file(manifest_path, &data) != 0)
         return EXIT_FAILURE;
