@@ -349,7 +349,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
             puts(fullpath);
         puts("Incorrect timestamp\nFile timestamps:");
         print_timestamps(&s->st_atim, &s->st_mtim);
-        fputs("Correct timestamps:\n", stdout);
+        puts("Correct timestamps:");
         print_timestamps(&record.atim, &record.mtim);
         if (correct_timestamps) {
             struct timespec times[2];
@@ -388,7 +388,7 @@ process_files(const char **paths, struct radix_tree *data)
     if (err)
         return err;
     if (s.num_info_nodes != 0) {
-        fputs("Files removed:\n", stdout);
+        puts("Files removed:");
         print_input_data(stdout, data);
         return -EIO;
     }
