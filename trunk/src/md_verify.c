@@ -260,24 +260,21 @@ input_data_walk_cb(const char *str, void *val, void *ctx)
     len = timestamp_to_str(outstr, sizeof(outstr), "a:" TM_FMT_OUT,
                            &record->atim);
     if (len == 0)
-        goto err;
+        return -EIO;
 
     tmp = timestamp_to_str(outstr + len, sizeof(outstr) - len,
                            "\tm:" TM_FMT_OUT, &record->mtim);
     if (tmp == 0)
-        goto err;
+        return -EIO;
     len += tmp;
 
     tmp = sizeof(outstr) - len;
     if (snprintf(outstr + len, tmp, "\t%s\n", str) >= (int)tmp)
-        goto err;
+        return -ENAMETOOLONG;
 
     fputs(outstr, f);
 
     return 0;
-
-err:
-    return -ENAMETOOLONG;
 }
 
 static int
