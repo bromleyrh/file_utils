@@ -300,7 +300,7 @@ io_state_update(struct io_state *state, size_t len, double tp)
         || (io_stats_get_median(&state->throughput_stats, &throughput, &min,
                                 &max) != 0))
         goto end;
-    fprintf(stderr, "\rThroughput: %12.6f, %12.6f, %12.6f MiB/s", min,
+    fprintf(stderr, "\rThroughput: %11.6f, %11.6f, %11.6f MiB/s", min,
             throughput, max);
 
     if ((int)(throughput * 100) == (int)(state->last_throughput * 100))
