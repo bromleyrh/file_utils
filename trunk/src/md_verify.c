@@ -6,6 +6,8 @@
 
 #include <radix_tree.h>
 
+#include <adt/set.h>
+
 #include <files/util.h>
 
 #include <errno.h>
@@ -38,10 +40,22 @@ struct ctx {
 static int correct_timestamps;
 static int verbose;
 
+static struct set *gid_set;
+static struct set *mode_set;
+static struct set *uid_set;
+
 static void print_usage(const char *);
 static int parse_cmdline(int, char **, const char **, const char ***);
 
 static int set_time_variables(void);
+
+static int gid_cmp(const void *, const void *);
+static int mode_cmp(const void *, const void *);
+static int uid_cmp(const void *, const void *);
+
+static int add_to_gid_set(struct set **, const char *);
+static int add_to_mode_set(struct set **, const char *);
+static int add_to_uid_set(struct set **, const char *);
 
 static size_t timestamp_to_str(char *, size_t, const char *, struct timespec *);
 
@@ -55,6 +69,10 @@ static int print_input_data(FILE *, struct radix_tree *);
 static int cmp_timestamps(struct md_record *, struct stat *);
 static void print_timestamps(struct timespec *, struct timespec *);
 
+static int check_gid(struct set *, struct stat *);
+static int check_mode(struct set *, struct stat *);
+static int check_uid(struct set *, struct stat *);
+
 static int process_files_cb(int, int, const char *, const char *, struct stat *,
                             void *);
 
@@ -65,10 +83,13 @@ print_usage(const char *progname)
 {
     printf("Usage: %s [options] <manifest_path> <path>...\n"
            "\n"
-           "    -c correct file timestamps differing from those in the "
-           "manifest\n"
-           "    -h output help\n"
-           "    -v increase verbosity\n",
+           "    -c             correct file timestamps differing from those in "
+           "the manifest\n"
+           "    -g <GID_list>  verify each file has one of the given GIDs\n"
+           "    -h             output help\n"
+           "    -m <mode_list> verify each file has one of the given modes\n"
+           "    -u <UID_list>  verify each file has one of the given UIDs\n"
+           "    -v             increase verbosity\n",
            progname);
 }
 
@@ -76,8 +97,10 @@ static int
 parse_cmdline(int argc, char **argv, const char **manifest_path,
               const char ***paths)
 {
+    int ret = -1;
+
     for (;;) {
-        int opt = getopt(argc, argv, "chv");
+        int opt = getopt(argc, argv, "cg:hm:u:v");
 
         if (opt == -1)
             break;
@@ -86,9 +109,22 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
         case 'c':
             correct_timestamps = 1;
             break;
+        case 'g':
+            if (add_to_gid_set(&gid_set, optarg) != 0)
+                goto quit;
+            break;
         case 'h':
             print_usage(argv[0]);
-            return -2;
+            ret = -2;
+            goto quit;
+        case 'm':
+            if (add_to_mode_set(&mode_set, optarg) != 0)
+                goto quit;
+            break;
+        case 'u':
+            if (add_to_uid_set(&uid_set, optarg) != 0)
+                goto quit;
+            break;
         case 'v':
             verbose = 1;
             break;
@@ -105,12 +141,155 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
     *paths = (const char **)&argv[optind+1];
 
     return 0;
+
+quit:
+    if (gid_set != NULL)
+        set_free(gid_set);
+    if (mode_set != NULL)
+        set_free(mode_set);
+    if (uid_set != NULL)
+        set_free(uid_set);
+    return ret;
 }
 
 static int
 set_time_variables()
 {
     return (setenv("TZ", ":" TZ_FILE, 0) == -1) ? -errno : 0;
+}
+
+static int
+gid_cmp(const void *elem1, const void *elem2)
+{
+    gid_t gid1 = *(gid_t *)elem1;
+    gid_t gid2 = *(gid_t *)elem2;
+
+    return (gid1 > gid2) - (gid1 < gid2);
+}
+
+static int
+mode_cmp(const void *elem1, const void *elem2)
+{
+    mode_t mode1 = *(mode_t *)elem1;
+    mode_t mode2 = *(mode_t *)elem2;
+
+    return (mode1 > mode2) - (mode1 < mode2);
+}
+
+static int
+uid_cmp(const void *elem1, const void *elem2)
+{
+    uid_t uid1 = *(uid_t *)elem1;
+    uid_t uid2 = *(uid_t *)elem2;
+
+    return (uid1 > uid2) - (uid1 < uid2);
+}
+
+static int
+add_to_gid_set(struct set **gid_set, const char *str)
+{
+    int err;
+
+    if (*gid_set == NULL) {
+        err = set_new(gid_set, SET_FNS_AVL_TREE, sizeof(gid_t), &gid_cmp, NULL);
+        if (err)
+            return err;
+    }
+
+    for (;;) {
+        char *endptr;
+        gid_t gid;
+        long gidval;
+
+        gidval = strtol(str, &endptr, 10);
+        if (endptr == str)
+            return -EINVAL;
+
+        gid = gidval;
+        err = set_insert(*gid_set, &gid);
+        if (err)
+            return err;
+
+        if (*endptr == '\0')
+            break;
+        if (*endptr != ',')
+            return -EINVAL;
+        str = endptr + 1;
+    }
+
+    return 0;
+}
+
+static int
+add_to_mode_set(struct set **mode_set, const char *str)
+{
+    int err;
+
+    if (*mode_set == NULL) {
+        err = set_new(mode_set, SET_FNS_AVL_TREE, sizeof(mode_t), &mode_cmp,
+                      NULL);
+        if (err)
+            return err;
+    }
+
+    for (;;) {
+        char *endptr;
+        long modeval;
+        mode_t mode;
+
+        modeval = strtol(str, &endptr, 8);
+        if (endptr == str)
+            return -EINVAL;
+
+        mode = modeval;
+        err = set_insert(*mode_set, &mode);
+        if (err)
+            return err;
+
+        if (*endptr == '\0')
+            break;
+        if (*endptr != ',')
+            return -EINVAL;
+        str = endptr + 1;
+    }
+
+    return 0;
+}
+
+static int
+add_to_uid_set(struct set **uid_set, const char *str)
+{
+    int err;
+
+    if (*uid_set == NULL) {
+        err = set_new(uid_set, SET_FNS_AVL_TREE, sizeof(mode_t), &uid_cmp,
+                      NULL);
+        if (err)
+            return err;
+    }
+
+    for (;;) {
+        char *endptr;
+        long uidval;
+        uid_t uid;
+
+        uidval = strtol(str, &endptr, 10);
+        if (endptr == str)
+            return -EINVAL;
+
+        uid = uidval;
+        err = set_insert(*uid_set, &uid);
+        if (err)
+            return err;
+
+        if (*endptr == '\0')
+            break;
+        if (*endptr != ',')
+            return -EINVAL;
+        str = endptr + 1;
+    }
+
+    return 0;
 }
 
 static size_t
@@ -315,6 +494,45 @@ print_timestamps(struct timespec *ts1, struct timespec *ts2)
 }
 
 static int
+check_gid(struct set *set, struct stat *s)
+{
+    gid_t gid;
+    int ret;
+
+    ret = set_search(set, &s->st_gid, &gid);
+    if (ret < 0)
+        return ret;
+
+    return (ret == 1) ? 0 : 1;
+}
+
+static int
+check_mode(struct set *set, struct stat *s)
+{
+    int ret;
+    mode_t mode;
+
+    ret = set_search(set, &s->st_mode, &mode);
+    if (ret < 0)
+        return ret;
+
+    return (ret == 1) ? 0 : 1;
+}
+
+static int
+check_uid(struct set *set, struct stat *s)
+{
+    int ret;
+    uid_t uid;
+
+    ret = set_search(set, &s->st_uid, &uid);
+    if (ret < 0)
+        return ret;
+
+    return (ret == 1) ? 0 : 1;
+}
+
+static int
 process_files_cb(int fd, int dirfd, const char *name, const char *path,
                  struct stat *s, void *ctx)
 {
@@ -326,9 +544,6 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
     (void)dirfd;
     (void)name;
 
-    if (S_ISDIR(s->st_mode))
-        return 0;
-
     if (snprintf(fullpath, sizeof(fullpath), "%s/%s", pctx->rootdir, path)
         >= (int)sizeof(fullpath)) {
         error(0, 0, "Cannot process file: File name too long");
@@ -338,6 +553,44 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
 
     if (verbose)
         puts(fullpath);
+
+    /* FIXME: refactor the following code */
+    if (gid_set != NULL) {
+        ret = check_gid(gid_set, s);
+        if (ret != 0) {
+            if (ret < 0)
+                return ret;
+            if (!verbose)
+                puts(fullpath);
+            printf("Incorrect GID (%d)\n", s->st_gid);
+            pctx->err = 1;
+        }
+    }
+    if (mode_set != NULL) {
+        ret = check_mode(mode_set, s);
+        if (ret != 0) {
+            if (ret < 0)
+                return ret;
+            if (!verbose)
+                puts(fullpath);
+            printf("Incorrect mode (%o)\n", s->st_mode);
+            pctx->err = 1;
+        }
+    }
+    if (uid_set != NULL) {
+        ret = check_uid(uid_set, s);
+        if (ret != 0) {
+            if (ret < 0)
+                return ret;
+            if (!verbose)
+                puts(fullpath);
+            printf("Incorrect UID (%d)\n", s->st_uid);
+            pctx->err = 1;
+        }
+    }
+
+    if (S_ISDIR(s->st_mode)) /* currently, no checking of directory times */
+        return 0;
 
     ret = radix_tree_search(pctx->data, fullpath, &record);
     if (ret != 1) {
@@ -407,7 +660,7 @@ int
 main(int argc, char **argv)
 {
     const char *manifest_path, **paths;
-    int ret;
+    int ret, status = EXIT_FAILURE;
     struct radix_tree *data;
 
     setlinebuf(stdout);
@@ -418,19 +671,28 @@ main(int argc, char **argv)
 
     ret = set_time_variables();
     if (ret != 0)
-        return EXIT_FAILURE;
+        goto end;
 
     if (scan_input_file(manifest_path, &data) != 0)
-        return EXIT_FAILURE;
+        goto end;
 
     ret = process_files(paths, data);
 
     radix_tree_free(data);
 
-    if (ret != 0)
-        error(EXIT_FAILURE, -ret, "Error processing files");
+    if (ret == 0)
+        status = EXIT_SUCCESS;
+    else
+        error(0, -ret, "Error processing files");
 
-    return EXIT_SUCCESS;
+end:
+    if (gid_set != NULL)
+        set_free(gid_set);
+    if (mode_set != NULL)
+        set_free(mode_set);
+    if (uid_set != NULL)
+        set_free(uid_set);
+    return status;
 }
 
 /* vi: set expandtab sw=4 ts=4: */
