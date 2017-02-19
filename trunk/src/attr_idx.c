@@ -2,6 +2,8 @@
  * attr_idx.c
  */
 
+#undef _FILE_OFFSET_BITS
+
 #include "btree.h"
 #include "btree_mmap.h"
 
