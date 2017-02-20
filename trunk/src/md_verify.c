@@ -383,10 +383,14 @@ scan_input_file(const char *path, struct radix_tree **data)
     size_t n;
     struct radix_tree *ret;
 
-    f = fopen(path, "r");
-    if (f == NULL) {
-        error(0, errno, "Error opening %s", path);
-        return -errno;
+    if (strcmp("-", path) == 0)
+        f = stdin;
+    else {
+        f = fopen(path, "r");
+        if (f == NULL) {
+            error(0, errno, "Error opening %s", path);
+            return -errno;
+        }
     }
 
     res = radix_tree_new(&ret, sizeof(struct md_record));
@@ -428,7 +432,8 @@ scan_input_file(const char *path, struct radix_tree **data)
 
     if (ln != NULL)
         free(ln);
-    fclose(f);
+    if (f != stdin)
+        fclose(f);
 
     *data = ret;
     return 0;
@@ -441,7 +446,8 @@ err2:
         free(ln);
     radix_tree_free(ret);
 err1:
-    fclose(f);
+    if (f != stdin)
+        fclose(f);
     return res;
 }
 
