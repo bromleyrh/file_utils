@@ -38,6 +38,7 @@ struct ctx {
 #define TM_FMT_OUT "%Y-%m-%d %H:%M:%S%nxxxxxxxxxx%z"
 
 static int correct_timestamps;
+static int ignore_additions;
 static int verbose;
 
 static struct set *gid_set;
@@ -83,6 +84,9 @@ print_usage(const char *progname)
 {
     printf("Usage: %s [options] <manifest_path> <path>...\n"
            "\n"
+           "    -a             do not output errors for files found that are "
+           "not in the\n"
+           "                   manifest\n"
            "    -c             correct file timestamps differing from those in "
            "the manifest\n"
            "    -g <GID_list>  verify each file has one of the given GIDs\n"
@@ -100,12 +104,15 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
     int ret = -1;
 
     for (;;) {
-        int opt = getopt(argc, argv, "cg:hm:u:v");
+        int opt = getopt(argc, argv, "acg:hm:u:v");
 
         if (opt == -1)
             break;
 
         switch (opt) {
+        case 'a':
+            ignore_additions = 1;
+            break;
         case 'c':
             correct_timestamps = 1;
             break;
@@ -593,12 +600,11 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
 
     ret = radix_tree_search(pctx->data, fullpath, &record);
     if (ret != 1) {
-        if (ret == 0) {
+        if (!ignore_additions && (ret == 0)) {
             if (!verbose)
                 puts(fullpath);
             puts("File added");
             pctx->err = 1;
-            return 0;
         }
         return ret;
     }
