@@ -541,8 +541,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
     struct ctx *pctx = (struct ctx *)ctx;
     struct md_record record;
 
-    (void)dirfd;
-    (void)name;
+    (void)fd;
 
     if (snprintf(fullpath, sizeof(fullpath), "%s/%s", pctx->rootdir, path)
         >= (int)sizeof(fullpath)) {
@@ -616,7 +615,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
 
             times[0] = record.atim;
             times[1] = record.mtim;
-            if (futimens(fd, times) == -1) {
+            if (utimensat(dirfd, name, times, AT_SYMLINK_NOFOLLOW) == -1) {
                 error(0, errno, "Error changing file's timestamps");
                 pctx->err = 1;
             }
@@ -639,7 +638,8 @@ process_files(const char **paths, struct radix_tree *data)
 
     for (; *paths != NULL; paths++) {
         pctx.rootdir = *paths;
-        err = dir_walk(*paths, &process_files_cb, DIR_WALK_ALLOW_ERR, &pctx);
+        err = dir_walk(*paths, &process_files_cb,
+                       DIR_WALK_ALLOW_ERR | DIR_WALK_NOOPEN, &pctx);
         if (err)
             return err;
     }
