@@ -121,6 +121,7 @@ set_capabilities()
     static const cap_value_t capvals[] = {
         CAP_CHOWN,
         CAP_DAC_READ_SEARCH,
+        CAP_FSETID,
         CAP_SETGID,
         CAP_SETUID,
         CAP_SYS_ADMIN

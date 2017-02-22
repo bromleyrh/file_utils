@@ -23,6 +23,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <sys/capability.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 
@@ -204,9 +205,11 @@ copy_fn(void *arg)
 int
 do_copy(struct copy_args *copy_args)
 {
+    cap_t caps;
     gid_t egid, *sgids = NULL;
     int nsgids;
     int ret, tmp;
+    static const cap_value_t capval_fsetid = CAP_FSETID;
     uid_t euid;
 
     ret = check_creds(ruid, rgid, copy_args->uid, copy_args->gid);
@@ -238,6 +241,20 @@ do_copy(struct copy_args *copy_args)
         error(0, errno, "Error changing user");
         goto err2;
     }
+
+    /* allow preservation of set-group-ID mode bits */
+    caps = cap_get_proc();
+    if (caps == NULL) {
+        ret = errno;
+        goto err3;
+    }
+    if ((cap_set_flag(caps, CAP_EFFECTIVE, 1, &capval_fsetid, CAP_SET) == -1)
+        || (cap_set_proc(caps) == -1)) {
+        ret = errno;
+        error(0, errno, "Error setting process privileges");
+        goto err3;
+    }
+    cap_free(caps);
 
     debug_print("Performing copy");
 
