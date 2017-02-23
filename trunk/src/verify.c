@@ -257,6 +257,8 @@ init_privs()
     ruid = getuid();
     rgid = getgid();
 
+    /* FIXME: needed to mount filesystems; prevents invoking user from sending
+       signals to verify */
     if ((setresuid(0, 0, 0) == -1) || (setresgid(0, 0, 0) == -1))
         return -errno;
 
