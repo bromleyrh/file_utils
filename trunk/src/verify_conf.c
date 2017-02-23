@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <pwd.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,7 @@ static int expand_string(char **, char **, size_t *, size_t);
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
+static int open_as_real_user(const char *, int, ...);
 static int config_trusted(struct stat *);
 
 static int read_base_dir_opt(json_val_t, void *);
@@ -171,6 +173,42 @@ get_uid(const char *name, uid_t *uid)
 err:
     free(buf);
     return err;
+}
+
+static int
+open_as_real_user(const char *path, int flags, ...)
+{
+    int ret;
+    uid_t prev_euid;
+
+    prev_euid = geteuid();
+
+    if (seteuid(getuid()) == -1) {
+        error(0, errno, "Error accessing %s", path);
+        return -1;
+    }
+
+    if (flags & O_CREAT) {
+        va_list ap;
+
+        va_start(ap, flags);
+        ret = open(path, flags, va_arg(ap, mode_t));
+        va_end(ap);
+    } else
+        ret = open(path, flags);
+    if (ret == -1) {
+        error(0, errno, "Error opening %s", path);
+        prev_euid = seteuid(prev_euid);
+        return -1;
+    }
+
+    if (seteuid(prev_euid) == -1) {
+        error(0, errno, "Error accessing %s", path);
+        close(ret);
+        return -1;
+    }
+
+    return ret;
 }
 
 static int
@@ -419,11 +457,9 @@ parse_json_config(const char *path, const struct json_parser *parser,
     int fd;
     struct stat s;
 
-    fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        error(0, errno, "Error opening %s", path);
+    fd = open_as_real_user(path, O_RDONLY);
+    if (fd == -1)
         return -1;
-    }
 
     if (fstat(fd, &s) == -1) {
         error(0, errno, "Error accessing %s", path);

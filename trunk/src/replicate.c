@@ -451,10 +451,6 @@ main(int argc, char **argv)
 
     setlinebuf(stdout);
 
-    ret = init_privs();
-    if (ret != 0)
-        error(EXIT_FAILURE, -ret, "Error setting process privileges");
-
     if (enable_debugging_features(0) != 0)
         return EXIT_FAILURE;
 
@@ -482,26 +478,32 @@ main(int argc, char **argv)
         fprintf(stderr, "UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
     }
 
+    ret = init_privs();
+    if (ret != 0) {
+        error(0, -ret, "Error setting process privileges");
+        goto end1;
+    }
+
     if (log_transfers)
         openlog(NULL, LOG_PID, LOG_USER);
 
     ret = mount_ns_unshare();
     if (ret != 0)
-        goto end;
+        goto end2;
 
     ret = set_signal_handlers();
     if (ret != 0)
-        goto end;
+        goto end2;
 
     ret = init_dbus(&ctx.busconn);
     if (ret != 0)
-        goto end;
+        goto end2;
 
     ret = do_transfers(&ctx);
 
     end_dbus(ctx.busconn);
 
-end:
+end2:
     if (log_transfers) {
         if (ret == 0)
             syslog(LOG_NOTICE, "Transfer process successful");
@@ -509,6 +511,7 @@ end:
             syslog(LOG_ERR, "Transfer process returned error status");
         closelog();
     }
+end1:
     free_transfers(ctx.transfers, ctx.num_transfers);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

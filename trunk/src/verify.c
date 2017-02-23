@@ -618,10 +618,6 @@ main(int argc, char **argv)
 
     setlinebuf(stdout);
 
-    ret = init_privs();
-    if (ret != 0)
-        error(EXIT_FAILURE, -ret, "Error setting process privileges");
-
     if (enable_debugging_features(0) != 0)
         return EXIT_FAILURE;
 
@@ -650,6 +646,12 @@ main(int argc, char **argv)
     free((void *)confpath);
     if (ret != 0)
         return EXIT_FAILURE;
+
+    ret = init_privs();
+    if (ret != 0) {
+        error(0, -ret, "Error setting process privileges");
+        goto end1;
+    }
 
     if ((ctx->base_dir != NULL) && (chdir(ctx->base_dir) == -1)) {
         error(0, -errno, "Error changing directory to %s", ctx->base_dir);
