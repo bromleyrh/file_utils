@@ -451,6 +451,9 @@ main(int argc, char **argv)
     int ret;
     struct replicate_ctx ctx;
 
+    if ((getuid() != 0) && (clearenv() != 0))
+        return EXIT_FAILURE;
+
     setlinebuf(stdout);
 
     if (enable_debugging_features(0) != 0)
