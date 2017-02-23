@@ -39,7 +39,7 @@ extern gid_t rgid;
 void debug_print(const char *fmt, ...);
 void log_print(int priority, const char *fmt, ...);
 
-int do_transfers(struct replicate_ctx *ctx);
+int do_transfers(struct replicate_ctx *ctx, int sessid);
 void print_transfers(FILE *, struct transfer *transfers, int num);
 void free_transfers(struct transfer *transfers, int num);
 

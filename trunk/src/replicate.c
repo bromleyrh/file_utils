@@ -14,10 +14,14 @@
 
 #include <strings_ext.h>
 
+#include <files/util.h>
+
+#include <assert.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <limits.h>
 #include <mcheck.h>
 #include <sched.h>
 #include <signal.h>
@@ -39,6 +43,7 @@
 #define MTRACE_FILE "mtrace.txt"
 
 #define CONFIG_PATH "\"$HOME/.replicate.conf\""
+#define VAR_PATH "/var/replicate"
 
 int debug = 0;
 int log_transfers = 0;
@@ -52,7 +57,7 @@ static int set_capabilities(void);
 static int init_privs(void);
 
 static void print_usage(const char *);
-static int parse_cmdline(int, char **, const char **);
+static int parse_cmdline(int, char **, const char **, int *);
 
 static int get_conf_path(const char *, const char **);
 
@@ -62,6 +67,13 @@ static int set_signal_handlers(void);
 
 static int init_dbus(DBusConnection **);
 static void end_dbus(DBusConnection *);
+
+static int get_sess_path(const char *, const char *, char *, size_t);
+
+static int sess_init(int, char *, size_t);
+static int sess_end(const char *);
+static int sess_is_complete(const char *, const char *);
+static int sess_record_complete(const char *, const char *);
 
 void
 debug_print(const char *fmt, ...)
@@ -166,19 +178,23 @@ print_usage(const char *progname)
 {
     printf("Usage: %s [options]\n"
            "\n"
-           "    -c PATH use specified configuration file\n"
-           "    -h      output help\n",
+           "    -c PATH    use specified configuration file\n"
+           "    -h         output help\n"
+           "    -s INTEGER record information in /var associated with the "
+           "given ID allowing\n"
+           "               automatic resumption of an interrupted replicate "
+           "process\n",
            progname);
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **confpath)
+parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
 {
     const char *cfpath = NULL;
     int ret;
 
     for (;;) {
-        int opt = getopt(argc, argv, "c:h");
+        int opt = getopt(argc, argv, "c:hs");
 
         if (opt == -1)
             break;
@@ -197,6 +213,9 @@ parse_cmdline(int argc, char **argv, const char **confpath)
             print_usage(argv[0]);
             ret = -2;
             goto exit;
+        case 's':
+            *sessid = atoi(optarg);
+            break;
         default:
             ret = -1;
             goto exit;
@@ -315,16 +334,96 @@ end_dbus(DBusConnection *busconn)
     dbus_connection_close(busconn);
 }
 
-int
-do_transfers(struct replicate_ctx *ctx)
+static int
+get_sess_path(const char *sesspath, const char *path, char *fullpath,
+              size_t len)
 {
+    return (snprintf(fullpath, len, "%s/%s", sesspath, path) >= (int)len)
+           ? -ENAMETOOLONG : 0;
+}
+
+static int
+sess_init(int sessid, char *sesspath, size_t len)
+{
+    assert(len > 0);
+
+    if (sessid == -1) {
+        *sesspath = '\0';
+        return 0;
+    }
+
+    if ((mkdir(VAR_PATH, S_IRWXU) == -1) && (errno != EEXIST))
+        return -errno;
+
+    if (snprintf(sesspath, len, VAR_PATH "/%d", sessid) >= (int)len)
+        return -ENAMETOOLONG;
+
+    return ((mkdir(sesspath, S_IRWXU) == -1) && (errno != EEXIST)) ? -errno : 0;
+}
+
+static int
+sess_end(const char *sesspath)
+{
+    int err;
+
+    if (*sesspath == '\0')
+        return 0;
+
+    err = dir_rem(sesspath, 0);
+    if (err)
+        return err;
+
+    return (rmdir(sesspath) == -1) ? -errno : 0;
+}
+
+static int
+sess_is_complete(const char *sesspath, const char *path)
+{
+    char fullpath[PATH_MAX];
+
+    if (*sesspath == '\0')
+        return 0;
+
+    if (get_sess_path(sesspath, path, fullpath, sizeof(fullpath)) != 0)
+        return 0;
+
+    return (access(fullpath, F_OK) == 0);
+}
+
+static int
+sess_record_complete(const char *sesspath, const char *path)
+{
+    char fullpath[PATH_MAX];
+    int err;
+
+    if (*sesspath == '\0')
+        return 0;
+
+    err = get_sess_path(sesspath, path, fullpath, sizeof(fullpath));
+    if (err)
+        return err;
+
+    return (mknod(fullpath, S_IFREG | S_IRUSR, 0) == -1) ? -errno : 0;
+}
+
+int
+do_transfers(struct replicate_ctx *ctx, int sessid)
+{
+    char sesspath[PATH_MAX];
     int err;
     int i;
     struct copy_args ca;
     struct transfer *transfer;
 
+    err = sess_init(sessid, sesspath, sizeof(sesspath));
+    if (err)
+        return err;
+
     for (i = 0; i < ctx->num_transfers; i++) {
         transfer = &ctx->transfers[i];
+
+        if (sess_is_complete(sesspath, transfer->srcpath))
+            continue;
 
         debug_print("Transfer %d:", i + 1);
         log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
@@ -392,7 +491,11 @@ do_transfers(struct replicate_ctx *ctx)
 
         log_print(LOG_INFO, "Finished transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
+
+        sess_record_complete(sesspath, transfer->srcpath);
     }
+
+    sess_end(sesspath);
 
     return 0;
 
@@ -449,6 +552,7 @@ main(int argc, char **argv)
 {
     const char *confpath = NULL;
     int ret;
+    int sessid;
     struct replicate_ctx ctx;
 
     if ((getuid() != 0) && (clearenv() != 0))
@@ -459,11 +563,12 @@ main(int argc, char **argv)
     if (enable_debugging_features(0) != 0)
         return EXIT_FAILURE;
 
+    sessid = -1;
     ctx.keep_cache = 0;
     ctx.uid = (uid_t)-1;
     ctx.gid = (gid_t)-1;
 
-    ret = parse_cmdline(argc, argv, &confpath);
+    ret = parse_cmdline(argc, argv, &confpath, &sessid);
     if (ret != 0)
         return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
 
@@ -504,7 +609,7 @@ main(int argc, char **argv)
     if (ret != 0)
         goto end2;
 
-    ret = do_transfers(&ctx);
+    ret = do_transfers(&ctx, sessid);
 
     end_dbus(ctx.busconn);
 
