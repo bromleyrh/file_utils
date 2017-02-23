@@ -655,6 +655,7 @@ main(int argc, char **argv)
 
     if ((ctx->base_dir != NULL) && (chdir(ctx->base_dir) == -1)) {
         error(0, errno, "Error changing directory to %s", ctx->base_dir);
+        ret = -errno;
         goto end1;
     }
 
