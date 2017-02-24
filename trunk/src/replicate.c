@@ -338,8 +338,18 @@ static int
 get_sess_path(const char *sesspath, const char *path, char *fullpath,
               size_t len)
 {
-    return (snprintf(fullpath, len, "%s/%s", sesspath, path) >= (int)len)
-           ? -ENAMETOOLONG : 0;
+    const char *newpath;
+    int ret;
+
+    newpath = strsub(path, "/", "_");
+    if (newpath == NULL)
+        return -ENOMEM;
+
+    ret = snprintf(fullpath, len, "%s/%s", sesspath, newpath);
+
+    free((void *)newpath);
+
+    return (ret >= (int)len) ? -ENAMETOOLONG : 0;
 }
 
 static int
