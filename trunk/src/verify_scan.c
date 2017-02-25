@@ -422,7 +422,7 @@ verif_err:
     return 1;
 
 err:
-    err = -((errno == 0) ? EIO : errno);
+    err = (errno == 0) ? EIO : errno;
     cancel_aio(&aiocb);
     return -err;
 }
