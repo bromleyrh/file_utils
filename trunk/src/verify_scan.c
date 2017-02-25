@@ -475,8 +475,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         return 0;
 
     if (snprintf(fullpath, sizeof(fullpath), "%s/%s", wctx->prefix, path)
-        >= (int)sizeof(fullpath))
+        >= (int)sizeof(fullpath)) {
+        error(0, 0, "Path name too long");
         return -EIO;
+    }
 
     if ((wctx->reg_excl != NULL) /* check if excluded */
         && (regexec(wctx->reg_excl, fullpath, 0, NULL, 0) == 0)) {
@@ -522,8 +524,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         p_record_in = NULL;
 
     res = set_direct_io(fd);
-    if (res != 0)
+    if (res != 0) {
+        error(0, -res, "Error reading %s", fullpath);
         return res;
+    }
 
     record.record.size = s->st_size;
     wctx->lastoff = 0;
@@ -559,7 +563,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     }
 
 end:
-    return -posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED);
+    res = posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED);
+    if (res != 0)
+        error(0, res, "Error writing %s", fullpath);
+    return -res;
 
 verif_err:
     error(0, 0, "Verification error: %s failed verification", fullpath);
@@ -579,8 +586,10 @@ verif_fn(void *arg)
     struct verif_walk_ctx wctx;
 
     bufsz = get_io_size(vargs->srcfd);
-    if (bufsz < 1)
-        return (bufsz == 0) ? EIO : -bufsz;
+    if (bufsz < 1) {
+        err = (bufsz == 0) ? EIO : -bufsz;
+        goto stat_err;
+    }
     wctx.bufsz = bufsz * 2;
 
     fullbufsize = get_huge_page_size();
@@ -594,8 +603,10 @@ verif_fn(void *arg)
             fullbufsize *= nhugep;
     }
 
-    if (fstatvfs(vargs->srcfd, &s) == -1)
-        return errno;
+    if (fstatvfs(vargs->srcfd, &s) == -1) {
+        err = errno;
+        goto stat_err;
+    }
     wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     wctx.bytesverified = 0;
 
@@ -603,7 +614,7 @@ verif_fn(void *arg)
                      MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
     if (wctx.buf1 == MAP_FAILED) {
         err = errno;
-        goto alloc_err;
+        goto alloc_err2;
     }
     wctx.buf2 = wctx.buf1 + wctx.bufsz / 2;
 
@@ -616,7 +627,7 @@ verif_fn(void *arg)
     err = avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
                        &verif_record_cmp, NULL);
     if (err)
-        goto end2;
+        goto alloc_err1;
 
     wctx.reg_excl = vargs->reg_excl;
     wctx.detect_hard_links = vargs->detect_hard_links;
@@ -631,14 +642,14 @@ verif_fn(void *arg)
         fexcepts = fedisableexcept(FE_ALL_EXCEPT);
         if (fexcepts == -1) {
             err = EIO;
-            goto end3;
+            goto end2;
         }
     }
 
     wctx.transfer_size = 512 * 1024;
     err = io_state_init(&wctx.io_state);
     if (err)
-        goto end4;
+        goto end3;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &wctx.starttm);
 
@@ -647,25 +658,30 @@ verif_fn(void *arg)
 
     io_state_free(wctx.io_state);
 
-end4:
+end3:
     if (debug)
         feenableexcept(fexcepts);
-end3:
-    avl_tree_free(wctx.output_data);
 end2:
+    avl_tree_free(wctx.output_data);
     EVP_MD_CTX_cleanup(&wctx.sumctx);
     EVP_MD_CTX_cleanup(&wctx.initsumctx);
 end1:
     munmap(wctx.buf1, fullbufsize);
     return err;
 
-alloc_err:
+alloc_err2:
     if ((err != ENOMEM) || (hugetlbfl == 0))
-        error(0, err, "Couldn't allocate memory");
-    else {
-        error(0, 0, "Couldn't allocate memory (check " NR_HUGEPAGES " is at "
-                    "least %d)", nhugep);
-    }
+        goto alloc_err1;
+    error(0, 0, "Couldn't allocate memory (check " NR_HUGEPAGES " is at least "
+          "%d)", nhugep);
+    return err;
+
+alloc_err1:
+    error(0, err, "Couldn't allocate memory");
+    return err;
+
+stat_err:
+    error(0, err, "Error getting filesystem stats");
     return err;
 }
 

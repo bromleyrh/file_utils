@@ -519,8 +519,11 @@ do_verifs(struct verify_ctx *ctx)
         if (verif->check_cmd != NULL) {
             err = check_filesystem(verif->devpath, verif->check_cmd,
                                    CHECK_CMD_SRC_SPECIFIER);
-            if (err)
+            if (err) {
+                error(0, -err, "Error checking filesystem on %s",
+                      verif->devpath);
                 goto err1;
+            }
         }
 
         va.srcfd = mount_filesystem(verif->devpath, verif->srcpath,
@@ -540,14 +543,19 @@ do_verifs(struct verify_ctx *ctx)
         va.uid = ctx->uid;
         va.gid = ctx->gid;
         err = do_verif(&va);
-        if (err)
+        if (err) {
+            error(0, -err, "Error verifying %s", verif->srcpath);
             goto err2;
+        }
 
         err = unmount_filesystem(verif->srcpath, va.srcfd);
-        if (err)
+        if (err) {
+            error(0, -err, "Error unmounting %s", verif->srcpath);
             goto err1;
+        }
 
         if ((dstf != stdout) && (fsync(fileno(dstf)) == -1)) {
+            error(0, errno, "Error writing output file %s", ctx->output_file);
             err = -errno;
             goto err1;
         }
@@ -570,7 +578,12 @@ do_verifs(struct verify_ctx *ctx)
         }
     }
 
-    return (dstf == stdout) ? 0 : ((fclose(dstf) == EOF) ? -errno : 0);
+    if ((dstf != stdout) && (fclose(dstf) == EOF)) {
+        error(0, -errno, "Error closing %s", ctx->output_file);
+        return -errno;
+    }
+
+    return 0;
 
 err2:
     unmount_filesystem(verif->srcpath, va.srcfd);
