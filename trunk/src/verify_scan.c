@@ -493,10 +493,16 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         record.ino = s->st_ino;
         res = avl_tree_search(wctx->output_data, &record, &record_res);
         if (res != 0) {
-            if (res < 0)
+            if (res < 0) {
+                TRACE(-res, "avl_tree_search()");
                 return res;
-            if (record_res.record.size != s->st_size)
+            }
+            if (record_res.record.size != s->st_size) {
+                TRACE(0, "record_res.record.size (%" PRIi64 ") "
+                         "!= s->st_size (%" PRIi64 ")",
+                      record_res.record.size, s->st_size);
                 return -EIO;
+            }
             res = output_record(wctx->dstf, record_res.record.size,
                                 record_res.record.initsum,
                                 record_res.record.sum, 20, wctx->prefix, path);
@@ -509,8 +515,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (wctx->input_data != NULL) {
         res = radix_tree_search(wctx->input_data, fullpath, &record_in);
         if (res != 1) {
-            if (res != 0)
+            if (res != 0) {
+                TRACE(-res, "radix_tree_search()");
                 return res;
+            }
             error(0, 0, "Verification error: %s added", fullpath);
             return -EIO;
         }
@@ -547,8 +555,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
     if (wctx->input_data != NULL) {
         res = radix_tree_delete(wctx->input_data, fullpath);
-        if (res != 0)
+        if (res != 0) {
+            TRACE(-res, "radix_tree_delete()");
             return res;
+        }
     }
 
     res = output_record(wctx->dstf, record.record.size, record.record.initsum,
@@ -558,8 +568,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
     if (mult_links) {
         res = avl_tree_insert(wctx->output_data, &record);
-        if (res != 0)
+        if (res != 0) {
+            TRACE(-res, "avl_tree_insert()");
             return res;
+        }
     }
 
 end:
@@ -620,6 +632,7 @@ verif_fn(void *arg)
 
     if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
         || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
+        TRACE(0, "EVP_DigestInit()");
         err = EIO;
         goto end1;
     }
@@ -641,6 +654,7 @@ verif_fn(void *arg)
            output */
         fexcepts = fedisableexcept(FE_ALL_EXCEPT);
         if (fexcepts == -1) {
+            TRACE(0, "fedisableexcept()");
             err = EIO;
             goto end2;
         }

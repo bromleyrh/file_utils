@@ -20,6 +20,7 @@
 
 extern int debug;
 extern int log_verifs;
+extern int tracing;
 
 extern uid_t ruid;
 extern gid_t rgid;
@@ -50,6 +51,11 @@ struct verif_record {
     unsigned char   sum[EVP_MAX_MD_SIZE];
 };
 
+#define TRACE(err, fmt, ...) \
+    trace(__FILE__, __FUNCTION__, __LINE__, err, fmt, ##__VA_ARGS__)
+
+void trace(const char *file, const char *func, int line, int err,
+           const char *fmt, ...);
 void debug_print(const char *fmt, ...);
 void log_print(int priority, const char *fmt, ...);
 

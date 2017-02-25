@@ -35,21 +35,25 @@ pkgcfg=pkg-config
 
 dbus_cflags=`eval $pkgcfg --cflags dbus-1`
 libjson_cflags=`eval $pkgcfg --cflags libjson`
+libunwind_cflags=`eval $pkgcfg --cflags libunwind 2>/dev/null`
 libutil_cflags=`eval $pkgcfg --cflags libutil`
 openssl_cflags=`eval $pkgcfg --cflags openssl`
 
 dbus_link_dep=`eval $pkgcfg --libs dbus-1`
 libjson_link_dep=`eval $pkgcfg --libs libjson`
+libunwind_link_dep=`eval $pkgcfg --libs libunwind 2>/dev/null`
 libutil_link_dep=`eval $pkgcfg --libs libutil`
 openssl_link_dep=`eval $pkgcfg --libs openssl`
 
 AC_SUBST([dbus_cflags])
 AC_SUBST([libjson_cflags])
+AC_SUBST([libunwind_cflags])
 AC_SUBST([libutil_cflags])
 AC_SUBST([openssl_cflags])
 
 AC_SUBST([dbus_link_dep])
 AC_SUBST([libjson_link_dep])
+AC_SUBST([libunwind_link_dep])
 AC_SUBST([libutil_link_dep])
 AC_SUBST([openssl_link_dep])
 
@@ -65,6 +69,14 @@ AC_ARG_ENABLE([debugging],
                esac],
               [debug=false])
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+
+enable_trace=false
+if test x$debug = xtrue; then
+    if test x$libunwind_link_dep != x; then
+        enable_trace=true
+    fi
+fi
+AM_CONDITIONAL([TRACE], [test $enable_trace = true])
 
 AC_ARG_WITH([pkgconfigdir],
             [  --with-pkgconfigdir=DIR install pkg-config data in DIR],

@@ -6,6 +6,10 @@
 #include "verify_conf.h"
 #include "verify_scan.h"
 
+#ifdef ENABLE_TRACE
+#include "backtrace.h"
+#endif
+
 #include <dbus/dbus.h>
 
 #include <libmount/libmount.h>
@@ -47,6 +51,7 @@
 
 int debug = 0;
 int log_verifs = 0;
+int tracing = 0;
 
 uid_t ruid;
 gid_t rgid;
@@ -78,6 +83,55 @@ static int print_input_data(FILE *, struct radix_tree *);
 
 static int init_dbus(DBusConnection **);
 static void end_dbus(DBusConnection *);
+
+void
+trace(const char *file, const char *func, int line, int err, const char *fmt,
+      ...)
+{
+    if (debug && tracing) {
+#ifdef ENABLE_TRACE
+        const char **bt;
+        int n;
+        static const char sep[] = "--------------------------------\n";
+#endif
+        char fmtbuf[1024];
+        int old_errno = errno;
+        va_list ap;
+
+#ifdef ENABLE_TRACE
+        fputs(sep, stderr);
+
+        bt = (const char **)get_backtrace(&n);
+        if (bt != NULL) {
+            int i;
+
+            for (i = n - 1; i > 2; i--)
+                fprintf(stderr, "%s()\n", bt[i]);
+            free_backtrace((char **)bt);
+        }
+
+#endif
+        if (err) {
+            char errbuf[128];
+
+            snprintf(fmtbuf, sizeof(fmtbuf), "%s(), %s:%d: %s (%s)\n", func,
+                     file, line, fmt, strerror_r(err, errbuf, sizeof(errbuf)));
+        } else {
+            snprintf(fmtbuf, sizeof(fmtbuf), "%s(), %s:%d: %s\n", func, file,
+                     line, fmt);
+        }
+
+        va_start(ap, fmt);
+        vfprintf(stderr, fmtbuf, ap);
+        va_end(ap);
+
+#ifdef ENABLE_TRACE
+        fputs(sep, stderr);
+
+#endif
+        errno = old_errno;
+    }
+}
 
 void
 debug_print(const char *fmt, ...)
@@ -158,7 +212,7 @@ parse_cmdline(int argc, char **argv, const char **confpath)
     int ret;
 
     for (;;) {
-        int opt = getopt(argc, argv, "c:h");
+        int opt = getopt(argc, argv, "c:dh");
 
         if (opt == -1)
             break;
@@ -172,6 +226,11 @@ parse_cmdline(int argc, char **argv, const char **confpath)
                 error(0, errno, "Couldn't allocate memory");
                 return -1;
             }
+            break;
+        case 'd':
+#ifdef ENABLE_TRACE
+            tracing = 1;
+#endif
             break;
         case 'h':
             print_usage(argv[0]);
@@ -568,8 +627,10 @@ do_verifs(struct verify_ctx *ctx)
         struct radix_tree_stats s;
 
         err = radix_tree_stats(ctx->input_data, &s);
-        if (err)
+        if (err) {
+            TRACE(-err, "radix_tree_stats()");
             goto err1;
+        }
         if (s.num_info_nodes != 0) {
             error(0, 0, "Verification error: Files removed:");
             print_input_data(stderr, ctx->input_data);
