@@ -134,7 +134,7 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
 }
 
 void
-debug_print(const char *fmt, ...)
+debug_print(int nl, const char *fmt, ...)
 {
     if (debug) {
         va_list ap;
@@ -142,7 +142,8 @@ debug_print(const char *fmt, ...)
         va_start(ap, fmt);
         vfprintf(stderr, fmt, ap);
         va_end(ap);
-        fputc('\n', stderr);
+        if (nl)
+            fputc('\n', stderr);
     }
 }
 
@@ -571,7 +572,7 @@ do_verifs(struct verify_ctx *ctx)
     for (i = 0; i < ctx->num_verifs; i++) {
         verif = &ctx->verifs[i];
 
-        debug_print("Verification %d:", i + 1);
+        DEBUG_PRINT("Verification %d:", i + 1);
         log_print(LOG_INFO, "Starting verifcation %d: %s", i + 1,
                   verif->srcpath);
 

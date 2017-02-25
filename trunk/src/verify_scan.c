@@ -309,7 +309,7 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     throughput = wctx->bytesverified
                  / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
                  / (1024 * 1024);
-    debug_print("\rProgress: %.6f%% (%.6f MiB/s)", pcnt, throughput);
+    DEBUG_PRINT_NO_NL("\rProgress: %.6f%% (%.6f MiB/s)", pcnt, throughput);
 
     broadcast_stat(wctx->busconn, pcnt, "/verify/signal/progress",
                    "verify.signal.Progress", "Progress");
@@ -737,7 +737,7 @@ do_verif(struct verif_args *verif_args)
         goto err2;
     }
 
-    debug_print("Performing verification");
+    DEBUG_PRINT("Performing verification");
 
     ret = -verif_fn(verif_args);
     if (ret != 0)

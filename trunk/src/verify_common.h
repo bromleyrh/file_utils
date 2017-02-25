@@ -54,9 +54,14 @@ struct verif_record {
 #define TRACE(err, fmt, ...) \
     trace(__FILE__, __FUNCTION__, __LINE__, err, fmt, ##__VA_ARGS__)
 
+#define DEBUG_PRINT(fmt, ...) \
+    debug_print(1, fmt, ##__VA_ARGS__)
+#define DEBUG_PRINT_NO_NL(fmt, ...) \
+    debug_print(0, fmt, ##__VA_ARGS__)
+
 void trace(const char *file, const char *func, int line, int err,
            const char *fmt, ...);
-void debug_print(const char *fmt, ...);
+void debug_print(int nl, const char *fmt, ...);
 void log_print(int priority, const char *fmt, ...);
 
 int do_verifs(struct verify_ctx *ctx);
