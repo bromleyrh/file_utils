@@ -39,6 +39,7 @@ struct verify_ctx {
     regex_t             *reg_excl;
     int                 detect_hard_links;
     const char          *input_file;
+    int                 allow_new;
     struct radix_tree   *input_data;
     const char          *output_file;
     uid_t               uid;

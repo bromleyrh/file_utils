@@ -19,6 +19,7 @@ struct verif_args {
     regex_t             *reg_excl;
     int                 detect_hard_links;
     struct radix_tree   *input_data;
+    int                 allow_new;
     DBusConnection      *busconn;
     const char          *prefix;
     uid_t               uid;

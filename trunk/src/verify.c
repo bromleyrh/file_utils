@@ -66,7 +66,7 @@ static int set_capabilities(void);
 static int init_privs(void);
 
 static void print_usage(const char *);
-static int parse_cmdline(int, char **, const char **);
+static int parse_cmdline(int, char **, const char **, int *);
 
 static int get_conf_path(const char *, const char **);
 
@@ -201,24 +201,30 @@ print_usage(const char *progname)
 {
     printf("Usage: %s [options]\n"
            "\n"
+           "    -a      if input file used, do not exit with error on "
+           "encountering files\n"
+           "            not listed in the input file\n"
            "    -c PATH use specified configuration file\n"
            "    -h      output help\n",
            progname);
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **confpath)
+parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new)
 {
     const char *cfpath = NULL;
     int ret;
 
     for (;;) {
-        int opt = getopt(argc, argv, "c:dh");
+        int opt = getopt(argc, argv, "ac:dh");
 
         if (opt == -1)
             break;
 
         switch (opt) {
+        case 'a':
+            *allow_new = 1;
+            break;
         case 'c':
             if (cfpath != NULL)
                 free((void *)cfpath);
@@ -597,6 +603,7 @@ do_verifs(struct verify_ctx *ctx)
         va.reg_excl = ctx->reg_excl;
         va.detect_hard_links = ctx->detect_hard_links;
         va.input_data = ctx->input_data;
+        va.allow_new = ctx->allow_new;
         va.busconn = ctx->busconn;
         va.dstf = dstf;
         va.prefix = verif->srcpath;
@@ -698,7 +705,7 @@ main(int argc, char **argv)
     if (enable_debugging_features(0) != 0)
         return EXIT_FAILURE;
 
-    ret = parse_cmdline(argc, argv, &confpath);
+    ret = parse_cmdline(argc, argv, &confpath, &pctx.ctx.allow_new);
     if (ret != 0)
         return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
 

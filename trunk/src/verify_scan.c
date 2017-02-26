@@ -69,6 +69,7 @@ struct verif_walk_ctx {
     int                 detect_hard_links;
     struct timespec     starttm;
     struct radix_tree   *input_data;
+    int                 allow_new;
     char                *buf1;
     char                *buf2;
     size_t              bufsz;
@@ -558,15 +559,18 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
                 TRACE(-res, "radix_tree_search()");
                 return res;
             }
-            error(0, 0, "Verification error: %s added", fullpath);
-            return -EIO;
+            if (!(wctx->allow_new)) {
+                error(0, 0, "Verification error: %s added", fullpath);
+                return -EIO;
+            }
+            p_record_in = NULL;
+        } else {
+            /* verify file size */
+            if (s->st_size != record_in.size)
+                goto verif_err;
+
+            p_record_in = &record_in;
         }
-
-        /* verify file size */
-        if (s->st_size != record_in.size)
-            goto verif_err;
-
-        p_record_in = &record_in;
     } else
         p_record_in = NULL;
 
@@ -592,7 +596,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (debug)
         fprintf(stderr, " (verified %s/%s)\n", wctx->prefix, path);
 
-    if (wctx->input_data != NULL) {
+    if (p_record_in != NULL) {
         res = radix_tree_delete(wctx->input_data, fullpath);
         if (res != 0) {
             TRACE(-res, "radix_tree_delete()");
@@ -682,6 +686,7 @@ verif_fn(void *arg)
     wctx.reg_excl = vargs->reg_excl;
     wctx.detect_hard_links = vargs->detect_hard_links;
     wctx.input_data = vargs->input_data;
+    wctx.allow_new = vargs->allow_new;
     wctx.busconn = vargs->busconn;
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
