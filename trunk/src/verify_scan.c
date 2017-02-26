@@ -93,6 +93,10 @@ static void cancel_aio(struct aiocb *);
 
 static int verif_record_cmp(const void *, const void *, void *);
 
+static int insert_ino(struct verif_record_output *, struct verif_walk_ctx *);
+static int look_up_ino(struct stat *, struct verif_record_output *,
+                       struct verif_walk_ctx *);
+
 static int broadcast_stat(DBusConnection *, double, const char *, const char *,
                           const char *);
 static int verif_chksums_cb(int, off_t, void *);
@@ -258,6 +262,44 @@ verif_record_cmp(const void *k1, const void *k2, void *ctx)
         return (record1->dev > record2->dev) - (record1->dev < record2->dev);
 
     return (record1->ino > record2->ino) - (record1->ino < record2->ino);
+}
+
+static int
+insert_ino(struct verif_record_output *record, struct verif_walk_ctx *wctx)
+{
+    int res;
+
+    res = avl_tree_insert(wctx->output_data, record);
+    if (res != 0)
+        TRACE(-res, "avl_tree_insert()");
+
+    return res;
+}
+
+static int
+look_up_ino(struct stat *s, struct verif_record_output *record,
+            struct verif_walk_ctx *wctx)
+{
+    int res;
+    struct verif_record_output tmp;
+
+    tmp.dev = s->st_dev;
+    tmp.ino = s->st_ino;
+    res = avl_tree_search(wctx->output_data, &tmp, record);
+    if (res != 0) {
+        if (res < 0) {
+            TRACE(-res, "avl_tree_search()");
+            return res;
+        }
+        if (record->record.size != s->st_size) {
+            TRACE(0, "record->record.size (%" PRIi64 ") != s->st_size (%"
+                     PRIi64 ")",
+                  record->record.size, s->st_size);
+            return -EIO;
+        }
+    }
+
+    return res;
 }
 
 static int
@@ -461,7 +503,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     int mult_links;
     int res;
     struct verif_record record_in, *p_record_in;
-    struct verif_record_output record, record_res;
+    struct verif_record_output record;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
     unsigned sumlen;
 
@@ -489,23 +531,13 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     /* if multiple hard links, check if already checksummed */
     mult_links = wctx->detect_hard_links && (s->st_nlink > 1);
     if (mult_links) {
-        record.dev = s->st_dev;
-        record.ino = s->st_ino;
-        res = avl_tree_search(wctx->output_data, &record, &record_res);
+        res = look_up_ino(s, &record, wctx);
         if (res != 0) {
-            if (res < 0) {
-                TRACE(-res, "avl_tree_search()");
+            if (res < 0)
                 return res;
-            }
-            if (record_res.record.size != s->st_size) {
-                TRACE(0, "record_res.record.size (%" PRIi64 ") "
-                         "!= s->st_size (%" PRIi64 ")",
-                      record_res.record.size, s->st_size);
-                return -EIO;
-            }
-            res = output_record(wctx->dstf, record_res.record.size,
-                                record_res.record.initsum,
-                                record_res.record.sum, 20, wctx->prefix, path);
+            res = output_record(wctx->dstf, record.record.size,
+                                record.record.initsum, record.record.sum, 20,
+                                wctx->prefix, path);
             if (res != 0)
                 return res;
             goto end;
@@ -567,11 +599,9 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         return res;
 
     if (mult_links) {
-        res = avl_tree_insert(wctx->output_data, &record);
-        if (res != 0) {
-            TRACE(-res, "avl_tree_insert()");
+        res = insert_ino(&record, wctx);
+        if (res != 0)
             return res;
-        }
     }
 
 end:
