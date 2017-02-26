@@ -14,6 +14,7 @@ Makefile.in
 .deps
 .dirstamp
 *.stamp
+stamp-h1
 
 .libs
 
