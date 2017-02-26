@@ -121,7 +121,7 @@ main(int argc, char **argv)
 
     static char conf_path[PATH_MAX] = "", template_path[PATH_MAX] = "";
 
-    static char *const cmd1[] = {"verify", "-c", conf_path, NULL};
+    static char *const cmd1[] = {"verify", "-a", "-c", conf_path, NULL};
     static char *const cmd2[] = {"osort", "-k3", NULL};
     static char *const cmd3[] = {"fastcat", template_path, "-", NULL};
 
