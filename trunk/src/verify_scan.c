@@ -2,6 +2,8 @@
  * verify_scan.c
  */
 
+#include "config.h"
+
 #include "verify_common.h"
 #include "verify_io.h"
 #include "verify_scan.h"
@@ -43,8 +45,9 @@
 #include <sys/statvfs.h>
 #include <sys/types.h>
 
-/* FIXME: test for presence of XFS headers during build process */
+#ifdef HAVE_XFS_XFS_H
 #include <xfs/xfs.h>
+#endif
 
 #define BUFSIZE (2 * 1024 * 1024)
 
@@ -163,6 +166,7 @@ print_chksum(FILE *f, unsigned char *sum, unsigned sumlen)
 static ssize_t
 get_io_size(int rootfd)
 {
+#ifdef HAVE_XFS_XFS_H
     struct stat s;
 
     if (1 || !platform_test_xfs_fd(rootfd))
@@ -170,6 +174,9 @@ get_io_size(int rootfd)
 
     /* FIXME: ensure XFS filesystems are mounted with "largeio" mount option */
     return (fstat(rootfd, &s) == 0) ? s.st_blksize : -errno;
+#else
+    return BUFSIZE;
+#endif
 }
 
 #define MEMINFO "/proc/meminfo"

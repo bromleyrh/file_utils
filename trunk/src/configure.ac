@@ -31,6 +31,11 @@ AC_PROG_RANLIB
 
 AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
+AC_CHECK_HEADERS([xfs/xfs.h], [], [], [
+#include <stdint.h>
+typedef int64_t off64_t;
+])
+
 pkgcfg=pkg-config
 
 dbus_cflags=`eval $pkgcfg --cflags dbus-1`
@@ -85,6 +90,7 @@ AC_ARG_WITH([pkgconfigdir],
 AC_SUBST([pkgconfigdir])
 
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_HEADERS([config.h])
 AC_OUTPUT
 
 dnl vi: set expandtab sw=4 ts=4:
