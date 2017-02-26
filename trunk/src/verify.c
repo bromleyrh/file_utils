@@ -575,6 +575,15 @@ do_verifs(struct verify_ctx *ctx)
         }
     }
 
+    va.reg_excl = ctx->reg_excl;
+    va.detect_hard_links = ctx->detect_hard_links;
+    va.input_data = ctx->input_data;
+    va.allow_new = ctx->allow_new;
+    va.busconn = ctx->busconn;
+    va.dstf = dstf;
+    va.uid = ctx->uid;
+    va.gid = ctx->gid;
+
     for (i = 0; i < ctx->num_verifs; i++) {
         verif = &ctx->verifs[i];
 
@@ -600,15 +609,7 @@ do_verifs(struct verify_ctx *ctx)
             goto err1;
         }
 
-        va.reg_excl = ctx->reg_excl;
-        va.detect_hard_links = ctx->detect_hard_links;
-        va.input_data = ctx->input_data;
-        va.allow_new = ctx->allow_new;
-        va.busconn = ctx->busconn;
-        va.dstf = dstf;
         va.prefix = verif->srcpath;
-        va.uid = ctx->uid;
-        va.gid = ctx->gid;
         err = do_verif(&va);
         if (err) {
             error(0, -err, "Error verifying %s", verif->srcpath);
