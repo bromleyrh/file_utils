@@ -167,8 +167,10 @@ copy_fn(void *arg)
     struct copy_ctx cctx;
     struct statvfs s;
 
-    if (fstatvfs(cargs->srcfd, &s) == -1)
+    if (fstatvfs(cargs->srcfd, &s) == -1) {
+        error(0, errno, "Error getting filesystem stats");
         return errno;
+    }
     cctx.busconn = cargs->busconn;
     cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     cctx.bytescopied = 0;

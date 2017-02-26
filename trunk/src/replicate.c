@@ -478,27 +478,40 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
 
         /* change ownership of destination root directory if needed */
         if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1)) {
+            error(0, errno, "Error changing ownership of %s",
+                  transfer->dstmntpath);
             err = -errno;
             goto err3;
         }
 
         err = do_copy(&ca);
-        if (err)
+        if (err) {
+            error(0, -err, "Error copying from %s to %s", transfer->srcpath,
+                  transfer->dstmntpath);
             goto err3;
+        }
 
         err = unmount_filesystem(transfer->dstmntpath, ca.dstfd);
-        if (err)
+        if (err) {
+            error(0, -err, "Error unmounting %s", transfer->dstmntpath);
             goto err2;
+        }
 
         if (transfer->setro) {
             err = blkdev_set_read_only(transfer->dstpath, 1, NULL);
-            if (err)
+            if (err) {
+                error(0, -err, "Error setting block device read-only flag for "
+                               "%s",
+                      transfer->dstpath);
                 goto err1;
+            }
         }
 
         err = unmount_filesystem(transfer->srcpath, ca.srcfd);
-        if (err)
+        if (err) {
+            error(0, -err, "Error unmounting %s", transfer->srcpath);
             return err;
+        }
 
         log_print(LOG_INFO, "Finished transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
