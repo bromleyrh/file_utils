@@ -6,6 +6,10 @@
 #include "replicate_conf.h"
 #include "replicate_trans.h"
 
+#ifdef ENABLE_TRACE
+#include "backtrace.h"
+#endif
+
 #include <dbus/dbus.h>
 
 #include <libmount/libmount.h>
@@ -47,6 +51,7 @@
 
 int debug = 0;
 int log_transfers = 0;
+int tracing = 0;
 
 uid_t ruid;
 gid_t rgid;
@@ -74,6 +79,55 @@ static int sess_init(int, char *, size_t);
 static int sess_end(const char *);
 static int sess_is_complete(const char *, const char *);
 static int sess_record_complete(const char *, const char *);
+
+void
+trace(const char *file, const char *func, int line, int err, const char *fmt,
+      ...)
+{
+    if (debug && tracing) {
+#ifdef ENABLE_TRACE
+        const char **bt;
+        int n;
+        static const char sep[] = "--------------------------------\n";
+#endif
+        char fmtbuf[1024];
+        int old_errno = errno;
+        va_list ap;
+
+#ifdef ENABLE_TRACE
+        fputs(sep, stderr);
+
+        bt = (const char **)get_backtrace(&n);
+        if (bt != NULL) {
+            int i;
+
+            for (i = n - 1; i > 2; i--)
+                fprintf(stderr, "%s()\n", bt[i]);
+            free_backtrace((char **)bt);
+        }
+
+#endif
+        if (err) {
+            char errbuf[128];
+
+            snprintf(fmtbuf, sizeof(fmtbuf), "%s(), %s:%d: %s (%s)\n", func,
+                     file, line, fmt, strerror_r(err, errbuf, sizeof(errbuf)));
+        } else {
+            snprintf(fmtbuf, sizeof(fmtbuf), "%s(), %s:%d: %s\n", func, file,
+                     line, fmt);
+        }
+
+        va_start(ap, fmt);
+        vfprintf(stderr, fmtbuf, ap);
+        va_end(ap);
+
+#ifdef ENABLE_TRACE
+        fputs(sep, stderr);
+
+#endif
+        errno = old_errno;
+    }
+}
 
 void
 debug_print(const char *fmt, ...)
@@ -194,7 +248,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
     int ret;
 
     for (;;) {
-        int opt = getopt(argc, argv, "c:hs");
+        int opt = getopt(argc, argv, "c:dhs");
 
         if (opt == -1)
             break;
@@ -208,6 +262,11 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
                 error(0, errno, "Couldn't allocate memory");
                 return -1;
             }
+            break;
+        case 'd':
+#ifdef ENABLE_TRACE
+            tracing = 1;
+#endif
             break;
         case 'h':
             print_usage(argv[0]);

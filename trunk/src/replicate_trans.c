@@ -187,8 +187,10 @@ copy_fn(void *arg)
         /* disable floating-point traps from calculations for debugging
            output */
         fexcepts = fedisableexcept(FE_ALL_EXCEPT);
-        if (fexcepts == -1)
+        if (fexcepts == -1) {
+            TRACE(0, "fedisableexcept()");
             return EIO;
+        }
     }
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &cctx.starttm);

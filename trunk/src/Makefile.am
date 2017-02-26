@@ -85,11 +85,13 @@ open_CFLAGS = $(AM_CFLAGS)
 open_pipes_SOURCES = open_pipes.c
 open_pipes_CFLAGS = $(AM_CFLAGS)
 
-replicate_SOURCES = replicate.c replicate_conf.c replicate_trans.c
+replicate_SOURCES = replicate.c replicate_conf.c replicate_trans.c \
+	$(trace_sources)
 replicate_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
-	-Ilibbackup/include @dbus_cflags@ @libjson_cflags@ @libutil_cflags@
+	-Ilibbackup/include @dbus_cflags@ @libjson_cflags@ @libutil_cflags@ \
+	$(trace_cflags)
 replicate_LDFLAGS = -lcap -lm -lmount $(backup_link) $(backup_link_dep) \
-	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
+	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ $(trace_link_dep)
 replicate_DEPENDENCIES = %reldir%/libbackup/libbackup.la
 
 sparse_scan_SOURCES = sparse_scan.c
