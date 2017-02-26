@@ -637,8 +637,8 @@ verif_fn(void *arg)
         goto end1;
     }
 
-    err = avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
-                       &verif_record_cmp, NULL);
+    err = -avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
+                        &verif_record_cmp, NULL);
     if (err)
         goto alloc_err1;
 
