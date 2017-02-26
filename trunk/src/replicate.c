@@ -429,6 +429,11 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
     if (err)
         return err;
 
+    ca.keep_cache = ctx->keep_cache;
+    ca.busconn = ctx->busconn;
+    ca.uid = ctx->uid;
+    ca.gid = ctx->gid;
+
     for (i = 0; i < ctx->num_transfers; i++) {
         transfer = &ctx->transfers[i];
 
@@ -477,10 +482,6 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             goto err3;
         }
 
-        ca.keep_cache = ctx->keep_cache;
-        ca.busconn = ctx->busconn;
-        ca.uid = ctx->uid;
-        ca.gid = ctx->gid;
         err = do_copy(&ca);
         if (err)
             goto err3;
