@@ -559,17 +559,16 @@ end_dbus(DBusConnection *busconn)
 int
 do_verifs(struct verify_ctx *ctx)
 {
-    FILE *dstf;
     int err;
     int i;
     struct verif *verif;
     struct verif_args va;
 
     if (strcmp("-", ctx->output_file) == 0)
-        dstf = stdout;
+        va.dstf = stdout;
     else {
-        dstf = fopen(ctx->output_file, "w");
-        if (dstf == NULL) {
+        va.dstf = fopen(ctx->output_file, "w");
+        if (va.dstf == NULL) {
             error(0, errno, "Error opening %s", ctx->output_file);
             return -errno;
         }
@@ -580,7 +579,6 @@ do_verifs(struct verify_ctx *ctx)
     va.input_data = ctx->input_data;
     va.allow_new = ctx->allow_new;
     va.busconn = ctx->busconn;
-    va.dstf = dstf;
     va.uid = ctx->uid;
     va.gid = ctx->gid;
 
@@ -622,7 +620,7 @@ do_verifs(struct verify_ctx *ctx)
             goto err1;
         }
 
-        if ((dstf != stdout) && (fsync(fileno(dstf)) == -1)) {
+        if ((va.dstf != stdout) && (fsync(fileno(va.dstf)) == -1)) {
             error(0, errno, "Error writing output file %s", ctx->output_file);
             err = -errno;
             goto err1;
@@ -648,7 +646,7 @@ do_verifs(struct verify_ctx *ctx)
         }
     }
 
-    if ((dstf != stdout) && (fclose(dstf) == EOF)) {
+    if ((va.dstf != stdout) && (fclose(va.dstf) == EOF)) {
         error(0, -errno, "Error closing %s", ctx->output_file);
         return -errno;
     }
@@ -658,8 +656,8 @@ do_verifs(struct verify_ctx *ctx)
 err2:
     unmount_filesystem(verif->srcpath, va.srcfd);
 err1:
-    if (dstf != stdout)
-        fclose(dstf);
+    if (va.dstf != stdout)
+        fclose(va.dstf);
     return err;
 }
 
