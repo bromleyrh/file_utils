@@ -16,6 +16,7 @@
 
 #include <backup.h>
 
+#include <diagnostics.h>
 #include <radix_tree.h>
 #include <strings_ext.h>
 
@@ -266,6 +267,17 @@ enable_debugging_features(int trace)
         .rlim_cur = RLIM_INFINITY,
         .rlim_max = RLIM_INFINITY
     };
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_flags = SA_SIGINFO;
+
+    sa.sa_sigaction = sigaction_segv_diag;
+    if (sigaction(SIGSEGV, &sa, NULL) == -1)
+        goto sig_err;
+    sa.sa_sigaction = sigaction_bus_diag;
+    if (sigaction(SIGBUS, &sa, NULL) == -1)
+        goto sig_err;
 
     if (setrlimit(RLIMIT_CORE, &rlim) == -1) {
         error(0, errno, "Couldn't set resource limit");
@@ -282,6 +294,10 @@ enable_debugging_features(int trace)
     }
 
     return 0;
+
+sig_err:
+    error(0, errno, "Error setting signal handler");
+    return -errno;
 }
 
 static int
