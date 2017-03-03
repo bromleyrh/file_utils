@@ -9,6 +9,7 @@ lib_LTLIBRARIES += %reldir%/libbackup.la
 %canon_reldir%_libbackup_la_SOURCES = %reldir%/blkdev.c %reldir%/mount.c \
 	%reldir%/util.c
 %canon_reldir%_libbackup_la_CFLAGS = $(AM_CFLAGS) -I%reldir%/include
-%canon_reldir%_libbackup_la_LDFLAGS = -lmount
+%canon_reldir%_libbackup_la_LDFLAGS = -lmount \
+	-version-info @lbu_vmaj@:@lbu_vmin@:0
 
 ## vi: set noexpandtab sw=4 ts=4:
