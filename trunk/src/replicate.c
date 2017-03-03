@@ -6,10 +6,6 @@
 #include "replicate_conf.h"
 #include "replicate_trans.h"
 
-#ifdef ENABLE_TRACE
-#include "backtrace.h"
-#endif
-
 #include <dbus/dbus.h>
 
 #include <libmount/libmount.h>

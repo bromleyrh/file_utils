@@ -11,9 +11,7 @@ AM_CFLAGS = -DNDEBUG -fvisibility=hidden -O2 -pipe -Wall -Wextra
 endif
 
 if TRACE
-trace_cflags = -DENABLE_TRACE @libunwind_cflags@
-trace_link_dep = @libunwind_link_dep@
-trace_sources = backtrace.c
+trace_cflags = -DENABLE_TRACE
 endif
 
 pkgconfigdir = @pkgconfigdir@
@@ -25,9 +23,9 @@ EXTRA_DIST = backtrace.c replicate.conf.sample replicate.spec \
 
 include %reldir%/scripts/Makefile.am
 
-noinst_HEADERS = backtrace.h replicate_common.h replicate_conf.h \
-	replicate_gram.h replicate_trans.h verify_common.h verify_conf.h \
-	verify_gram.h verify_io.h verify_scan.h
+noinst_HEADERS = replicate_common.h replicate_conf.h replicate_gram.h \
+	replicate_trans.h verify_common.h verify_conf.h verify_gram.h verify_io.h \
+	verify_scan.h
 
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM
@@ -85,27 +83,24 @@ open_CFLAGS = $(AM_CFLAGS)
 open_pipes_SOURCES = open_pipes.c
 open_pipes_CFLAGS = $(AM_CFLAGS)
 
-replicate_SOURCES = replicate.c replicate_conf.c replicate_trans.c \
-	$(trace_sources)
+replicate_SOURCES = replicate.c replicate_conf.c replicate_trans.c
 replicate_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Ilibbackup/include @dbus_cflags@ @libjson_cflags@ @libutil_cflags@ \
 	$(trace_cflags)
 replicate_LDFLAGS = -lcap -lm -lmount $(backup_link) $(backup_link_dep) \
-	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ $(trace_link_dep)
+	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
 replicate_DEPENDENCIES = %reldir%/libbackup/libbackup.la
 
 sparse_scan_SOURCES = sparse_scan.c
 sparse_scan_CFLAGS = $(AM_CFLAGS) @libutil_cflags@
 sparse_scan_LDFLAGS = @libutil_link_dep@
 
-verify_SOURCES = verify.c verify_conf.c verify_io.c verify_scan.c \
-	$(trace_sources)
+verify_SOURCES = verify.c verify_conf.c verify_io.c verify_scan.c
 verify_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Ilibbackup/include @dbus_cflags@ @libjson_cflags@ @libutil_cflags@ \
 	@openssl_cflags@ $(trace_cflags)
 verify_LDFLAGS = -lcap -lm -lmount -lrt $(backup_link) $(backup_link_dep) \
-	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ @openssl_link_dep@ \
-	$(trace_link_dep)
+	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ @openssl_link_dep@
 verify_DEPENDENCIES = %reldir%/libbackup/libbackup.la
 
 install-exec-hook:

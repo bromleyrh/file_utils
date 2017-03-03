@@ -6,10 +6,6 @@
 #include "verify_conf.h"
 #include "verify_scan.h"
 
-#ifdef ENABLE_TRACE
-#include "backtrace.h"
-#endif
-
 #include <dbus/dbus.h>
 
 #include <libmount/libmount.h>
