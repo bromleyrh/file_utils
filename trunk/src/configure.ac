@@ -84,18 +84,19 @@ AC_ARG_WITH([pkgconfigdir],
             [pkgconfigdir="$libdir/pkgconfig"])
 AC_SUBST([pkgconfigdir])
 
-vmin=`echo $PACKAGE_VERSION | cut -d '.' -f 2`
-vmaj=`echo $PACKAGE_VERSION | cut -d '.' -f 1`
+lbu_cur=0
+lbu_age=0
+lbu_rev=0
+AC_SUBST([lbu_cur])
+AC_SUBST([lbu_age])
+AC_SUBST([lbu_rev])
 
-lbu_vmin=$vmin
-lbu_vmaj=$vmaj
-AC_SUBST([lbu_vmin])
-AC_SUBST([lbu_vmaj])
-
-ldio_vmin=$vmin
-ldio_vmaj=$vmaj
-AC_SUBST([ldio_vmin])
-AC_SUBST([ldio_vmaj])
+ldio_cur=0
+ldio_age=0
+ldio_rev=0
+AC_SUBST([ldio_cur])
+AC_SUBST([ldio_age])
+AC_SUBST([ldio_rev])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_HEADERS([config.h])

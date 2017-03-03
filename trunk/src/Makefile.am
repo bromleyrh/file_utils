@@ -44,7 +44,7 @@ lib_LTLIBRARIES = libdirectio.la
 
 libdirectio_la_SOURCES = libdirectio.c
 libdirectio_la_CFLAGS = $(AM_CFLAGS)
-libdirectio_la_LDFLAGS = -lc -ldl -version-info @ldio_vmaj@:@ldio_vmin@:0
+libdirectio_la_LDFLAGS = -lc -ldl -version-info @ldio_cur@:@ldio_rev@:@ldio_age@
 
 include %reldir%/libbackup/Makefile.am
 
