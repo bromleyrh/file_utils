@@ -75,7 +75,7 @@ static int check_mode(struct set *, struct stat *);
 static int check_uid(struct set *, struct stat *);
 
 static int process_files_cb(int, int, const char *, const char *, struct stat *,
-                            void *);
+                            int, void *);
 
 static int process_files(const char **, struct radix_tree *);
 
@@ -198,7 +198,8 @@ add_to_gid_set(struct set **gid_set, const char *str)
     int err;
 
     if (*gid_set == NULL) {
-        err = set_new(gid_set, SET_FNS_AVL_TREE, sizeof(gid_t), &gid_cmp, NULL);
+        err = set_new(gid_set, SET_FNS_AVL_TREE, sizeof(gid_t), &gid_cmp, NULL,
+                      NULL);
         if (err)
             return err;
     }
@@ -234,7 +235,7 @@ add_to_mode_set(struct set **mode_set, const char *str)
 
     if (*mode_set == NULL) {
         err = set_new(mode_set, SET_FNS_AVL_TREE, sizeof(mode_t), &mode_cmp,
-                      NULL);
+                      NULL, NULL);
         if (err)
             return err;
     }
@@ -270,7 +271,7 @@ add_to_uid_set(struct set **uid_set, const char *str)
 
     if (*uid_set == NULL) {
         err = set_new(uid_set, SET_FNS_AVL_TREE, sizeof(mode_t), &uid_cmp,
-                      NULL);
+                      NULL, NULL);
         if (err)
             return err;
     }
@@ -547,7 +548,7 @@ check_uid(struct set *set, struct stat *s)
 
 static int
 process_files_cb(int fd, int dirfd, const char *name, const char *path,
-                 struct stat *s, void *ctx)
+                 struct stat *s, int flags, void *ctx)
 {
     char fullpath[PATH_MAX];
     int ret;
@@ -555,6 +556,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
     struct md_record record;
 
     (void)fd;
+    (void)flags;
 
     if (snprintf(fullpath, sizeof(fullpath), "%s/%s", pctx->rootdir, path)
         >= (int)sizeof(fullpath)) {

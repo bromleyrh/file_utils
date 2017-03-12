@@ -114,7 +114,7 @@ static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
                          unsigned, const char *, const char *);
 
 static int verif_walk_fn(int, int, const char *, const char *, struct stat *,
-                         void *);
+                         int, void *);
 
 static int verif_fn(void *);
 
@@ -505,7 +505,7 @@ err:
 
 static int
 verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
-              struct stat *s, void *ctx)
+              struct stat *s, int flags, void *ctx)
 {
     char fullpath[PATH_MAX];
     int mult_links;
@@ -517,6 +517,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
     (void)dirfd;
     (void)name;
+    (void)flags;
 
     if (quit)
         return -EINTR;

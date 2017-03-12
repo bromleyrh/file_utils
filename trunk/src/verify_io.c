@@ -152,7 +152,7 @@ io_stats_init(struct io_stats *stats, unsigned window_size)
         return err;
 
     err = set_new(&stats->ms_sorted, SET_FNS_AVL_TREE, sizeof(struct ms *),
-                  &ms_cmp, &ms_free);
+                  &ms_cmp, NULL, &ms_free);
     if (err) {
         queue_free(stats->ms_buf);
         return err;

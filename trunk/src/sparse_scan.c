@@ -51,7 +51,7 @@ static int scan_data(struct file_info *, const char *, size_t, off_t, int *);
 static int do_zero_block_scan(struct file_info *);
 
 static int block_scan_cb(int, int, const char *, const char *, struct stat *,
-                         void *);
+                         int, void *);
 
 static void int_handler(int);
 static int set_signal_handlers(void);
@@ -230,11 +230,12 @@ end:
 
 static int
 block_scan_cb(int fd, int dirfd, const char *name, const char *path,
-              struct stat *s, void *ctx)
+              struct stat *s, int flags, void *ctx)
 {
     int err;
     struct file_info fi;
 
+    (void)flags;
     (void)ctx;
 
     if (quit)
