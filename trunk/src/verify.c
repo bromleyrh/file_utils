@@ -53,7 +53,7 @@ int tracing = 0;
 uid_t ruid;
 gid_t rgid;
 
-static char from_hex(char);
+static signed char from_hex(char);
 
 static int scan_chksum(const char *, unsigned char *, unsigned);
 
@@ -156,7 +156,7 @@ log_print(int priority, const char *fmt, ...)
     }
 }
 
-static char
+static signed char
 from_hex(char hexchar)
 {
     if ((hexchar >= '0') && (hexchar <= '9'))
@@ -173,7 +173,7 @@ scan_chksum(const char *str, unsigned char *sum, unsigned sumlen)
     unsigned i;
 
     for (i = 0; i < sumlen; i++) {
-        char tmp1, tmp2;
+        signed char tmp1, tmp2;
 
         if (*str == '\0')
             return -EINVAL;
