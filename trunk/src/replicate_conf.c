@@ -8,6 +8,7 @@
 
 #include <json.h>
 
+#include <json/filters.h>
 #include <json/grammar.h>
 #include <json/grammar_parse.h>
 #include <json/native.h>
@@ -39,6 +40,7 @@ static int get_uid(const char *, uid_t *);
 
 static int open_as_real_user(const char *, int, ...);
 static int config_trusted(struct stat *);
+static size_t read_cb(char *, size_t, size_t, void *);
 
 static int format_cmd_filter(void *, void *, void *);
 
@@ -203,6 +205,19 @@ config_trusted(struct stat *s)
     }
 
     return 1;
+}
+
+static size_t
+read_cb(char *buf, size_t off, size_t len, void *ctx)
+{
+    FILE *f = (FILE *)ctx;
+    size_t ret;
+
+    (void)off;
+
+    ret = fread(buf, 1, len, f);
+
+    return ((ret == 0) && !feof(f)) ? (size_t)-1 : ret;
 }
 
 static int
@@ -427,9 +442,10 @@ static int
 parse_json_config(const char *path, const struct json_parser *parser,
                   json_val_t *config)
 {
-    char *conf;
+    FILE *f;
     int err;
     int fd;
+    struct json_read_cb_ctx ctx;
     struct stat s;
 
     fd = open_as_real_user(path, O_RDONLY);
@@ -444,18 +460,20 @@ parse_json_config(const char *path, const struct json_parser *parser,
     if (!config_trusted(&s))
         goto err;
 
-    conf = mmap(NULL, s.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-    if (conf == MAP_FAILED) {
+    f = fdopen(fd, "r");
+    if (f == NULL) {
         error(0, errno, "Error accessing %s", path);
         goto err;
     }
-    conf[s.st_size-1] = '\0';
 
-    close(fd);
+    json_read_cb_ctx_init(&ctx);
+    ctx.read_cb = &read_cb;
+    ctx.ctx = f;
 
-    err = json_grammar_validate(conf, NULL, NULL, parser, config);
+    err = json_grammar_validate(NULL, &json_read_cb_strip_comments, &ctx,
+                                parser, config);
 
-    munmap((void *)conf, s.st_size);
+    fclose(f);
 
     if (err) {
         error(0, -err, "Error parsing %s", path);
