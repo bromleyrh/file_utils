@@ -1,3 +1,7 @@
+#
+# verify.spec
+#
+
 <conf> = {
     <base_dir?>
     <creds?>
@@ -54,3 +58,5 @@
 <user> = "user" : <string>
 
 <group> = "group" : <string>
+
+# vi: set expandtab sw=4 ts=4:
