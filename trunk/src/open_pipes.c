@@ -50,7 +50,7 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
     int npipefds;
 
     if (argc < 2) {
-        error(0, 0, usage());
+        error(0, 0, "%s", usage());
         return -1;
     }
 
@@ -70,7 +70,7 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
     }
 
     if (i == argc - 1) {
-        error(0, 0, usage());
+        error(0, 0, "%s", usage());
         return -1;
     }
     *cmd = &argv[++i];
