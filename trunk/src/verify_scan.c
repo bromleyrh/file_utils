@@ -176,6 +176,8 @@ get_io_size(int rootfd)
     /* FIXME: ensure XFS filesystems are mounted with "largeio" mount option */
     return (fstat(rootfd, &s) == 0) ? s.st_blksize : -errno;
 #else
+    (void)rootfd;
+
     return BUFSIZE;
 #endif
 }
