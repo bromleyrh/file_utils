@@ -43,6 +43,7 @@ sub process_line {
     my ($line) = @_;
 
     my $escapec = "\\";
+    my $escaped = 0;
     my $in_quotes = 0;
     my $len = strlen($line);
     my $line_erased = 1;
@@ -57,9 +58,13 @@ sub process_line {
 
         my $c = char_at($line, $i);
 
-        if ($in_quotes) {
-            if ($c eq $quotc) {
+        if ($escaped) {
+            $escaped = $line_erased = 0;
+        } elsif ($in_quotes) {
+            if (($c eq $quotc) and (not $escaped)) {
                 $in_quotes = 0;
+            } elsif ($c eq $escapec) {
+                $escaped = 1;
             }
         } elsif ($c eq $escapec) {
             if ($i < $len - 1) {
