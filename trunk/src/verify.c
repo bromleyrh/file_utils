@@ -484,20 +484,15 @@ scan_input_file(const char *path, struct radix_tree **data)
         }
         res = sscanf(ln, "%s\t%s\t%s\t%s", buf1, buf2, buf3, buf4);
         if (res != 4) {
-            if ((res != EOF) || !ferror(f)) {
-                error(0, 0, "Line %d of %s invalid", linenum, path);
-                res = -EINVAL;
-                goto err2;
-            }
+            if ((res != EOF) || !ferror(f))
+                goto err3;
             res = -errno;
             goto err2;
         }
         record.size = strtoll(buf1, NULL, 10);
         if ((scan_chksum(buf2, record.initsum, 20) != 0)
-            || (scan_chksum(buf3, record.sum, 20) != 0)) {
-            res = -EINVAL;
-            goto err2;
-        }
+            || (scan_chksum(buf3, record.sum, 20) != 0))
+            goto err3;
         res = radix_tree_insert(ret, buf4, &record);
         if (res != 0)
             goto err2;
@@ -510,6 +505,9 @@ scan_input_file(const char *path, struct radix_tree **data)
     *data = ret;
     return 0;
 
+err3:
+    error(0, 0, "Line %d of %s invalid", linenum, path);
+    res = -EINVAL;
 err2:
     if (ln != NULL)
         free(ln);
@@ -765,8 +763,10 @@ main(int argc, char **argv)
 
     if (ctx->input_file != NULL) {
         ret = scan_input_file(ctx->input_file, &ctx->input_data);
-        if (ret != 0)
+        if (ret != 0) {
+            error(0, -ret, "Error reading %s", ctx->input_file);
             goto end1;
+        }
     }
 
     if (debug) {
