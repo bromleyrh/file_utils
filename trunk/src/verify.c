@@ -728,6 +728,7 @@ main(int argc, char **argv)
 
     ctx = &pctx.ctx;
     ctx->base_dir = NULL;
+    ctx->reg_excl = NULL;
     ctx->detect_hard_links = 1;
     ctx->input_file = NULL;
     ctx->input_data = NULL;
@@ -754,7 +755,6 @@ main(int argc, char **argv)
         goto end1;
     }
 
-    ctx->reg_excl = NULL;
     if (pctx.regex != NULL) {
         ret = get_regex(&reg_excl, pctx.regex);
         free((void *)(pctx.regex));
