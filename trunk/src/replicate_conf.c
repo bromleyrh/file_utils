@@ -387,7 +387,7 @@ read_transfers_opt(json_val_t opt, void *data)
         transfer->force_write = 1;
         transfer->setro = 0;
         err = json_oscanf(transfer, spec, (int)(sizeof(spec)/sizeof(spec[0])),
-                          val);
+                          0, val);
         if (err)
             goto err;
     }

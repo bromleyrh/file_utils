@@ -449,7 +449,7 @@ read_verifs_opt(json_val_t opt, void *data)
 
         ctx->verifs[i].check_cmd = NULL;
         err = json_oscanf(&ctx->verifs[i], spec,
-                          (int)(sizeof(spec)/sizeof(spec[0])), val);
+                          (int)(sizeof(spec)/sizeof(spec[0])), 0, val);
         if (err)
             goto err;
     }
