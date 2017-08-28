@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 tmpdir=/tmp/git_verify_archive
 
 if [ ! -d .git ] && [ ! -f .git ]; then
@@ -22,8 +24,8 @@ while true; do
 done
 archive=$1
 
-mkdir -p $tmpdir || exit 1
-tar -x -C $tmpdir -f "$archive" || exit 1
+mkdir -p $tmpdir
+tar -x -C $tmpdir -f "$archive"
 echo "Differences between archive and repository:"
 diff -r $tmpdir/* "./$path"
 rm -fr $tmpdir

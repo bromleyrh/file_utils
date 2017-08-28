@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 
+set -e
+
 skeldir=~/.gitskel
 
 rootdir=$(git rev-parse --show-toplevel)
 [[ $? != 0 ]] && exit 1
-pushd $rootdir > /dev/null || exit 1
+pushd $rootdir > /dev/null
 
-cp -irv $skeldir/* $skeldir/.[^.]* . || exit 1
+cp -irv $skeldir/* $skeldir/.[^.]* .
 
-popd > /dev/null || exit 1
+popd > /dev/null

@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
@@ -54,9 +56,9 @@ fi
 tagopts="$tagopts -m \"Version $version\""
 
 if [ $tagonly = 0 ]; then
-    echo "$version" > "$vfile" || exit 1
-    git add "$vfile" || exit 1
-    git commit --amend --no-edit || exit 1
+    echo "$version" > "$vfile"
+    git add "$vfile"
+    git commit --amend --no-edit
 fi
-eval git tag $tagopts v$version || exit 1
+eval git tag $tagopts v$version
 echo "Version $version"

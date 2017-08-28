@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 
+set -e
+
 rootdir=$(git rev-parse --show-toplevel)
 [[ $? != 0 ]] && exit 1
-pushd $rootdir > /dev/null || exit 1
+pushd $rootdir > /dev/null
 
-pushd / > /dev/null || exit 1
-find $rootdir -name '*.c' -o -name '*.h' > $rootdir/cscope.files || exit 1
-popd > /dev/null || exit 1
+pushd / > /dev/null
+find $rootdir -name '*.c' -o -name '*.h' > $rootdir/cscope.files
+popd > /dev/null
 
 ret=0
 if ! cscope -bq; then
     ret=1
 fi
 
-popd > /dev/null || exit 1
+popd > /dev/null
 
 exit $ret

@@ -6,6 +6,8 @@ do_exit()
     exit $1
 }
 
+set -e
+
 if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
@@ -57,7 +59,7 @@ if [ $sign = 1 ]; then
     commitarchopts="$commitarchopts -s"
     setversopts="-s"
     if [ $agent = 1 ]; then
-        gpg-agent --daemon --use-standard-socket || exit 1
+        gpg-agent --daemon --use-standard-socket
     fi
 fi
 
@@ -68,6 +70,8 @@ if [ $inc = 1 ]; then
     min=$(echo $version | cut -d . -f 2)
     version=$maj.$((min+1))
 fi
+
+set +e
 
 echo "$version" > "$vfile" || do_exit 1
 git add "$vfile" || do_exit 1

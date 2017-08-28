@@ -50,18 +50,20 @@ get_dirs()
 
 do_build()
 {
-    ./configure "$@" || return 1 # TODO: add option to set configure parameters
+    ./configure "$@" # TODO: add option to set configure parameters
 
-    make -j$ncpus check || return 1 # TODO: make building tests optional
+    make -j$ncpus check # TODO: make building tests optional
     if [[ $noroot = 0 ]]; then
         echo "Root privilege required to install"
-        sudo make install || return 1
+        sudo make install
     else
-        make install || return 1
+        make install
     fi
 
-    make distclean || return 1
+    make distclean
 }
+
+set -e
 
 get_cmds
 set_up_env
@@ -74,22 +76,22 @@ if [[ $1 = "-r" ]]; then
     shift
 fi
 
-get_ncpus || exit 1
-get_dirs || exit 1
+get_ncpus
+get_dirs
 
-mkdir -v $tmpdir || exit 1
-tar -x -f $distdir/*.xz -C $tmpdir -v || exit 1
+mkdir -v $tmpdir
+tar -x -f $distdir/*.xz -C $tmpdir -v
 
-cd $tmpdir/* || exit 1
+cd $tmpdir/*
 if [[ -n $cmdpre ]]; then
     echo "Running \"$cmdpre\""
     eval $cmdpre
 fi
-do_build "$@" || exit 1
+do_build "$@"
 if [[ -n $cmdpost ]]; then
     echo "Running \"$cmdpost\""
     eval $cmdpost
 fi
-cd - 1>/dev/null || exit 1
+cd - 1>/dev/null
 
 rm -frv $tmpdir

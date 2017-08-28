@@ -54,12 +54,15 @@ get_bundle_path()
     fi
 }
 
-parse_cmdline "$@" || exit 1
+set -e
 
-get_repo_name || exit 1
-get_branches || exit 1
-get_bundle_path || exit 1
+parse_cmdline "$@"
 
+get_repo_name
+get_branches
+get_bundle_path
+
+set +e
 ret=0
 for b in $branches; do
     bname="$reponame"

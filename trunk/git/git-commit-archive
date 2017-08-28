@@ -2,17 +2,17 @@
 
 do_make_dist()
 {
-    cd $1 || return 1
+    cd $1
 
-    autoreconf || return 1
-    ./configure || return 1
-    make dist-xz || return 1
-    mv *.xz "../$archive" || return 1
-    make distclean || return 1
-    git clean -fx || return 1
-    rm -frv autom4te.cache || return 1
+    autoreconf
+    ./configure
+    make dist-xz
+    mv *.xz "../$archive"
+    make distclean
+    git clean -fx
+    rm -frv autom4te.cache
 
-    cd .. || return 1
+    cd ..
 }
 
 restore_files()
@@ -20,6 +20,8 @@ restore_files()
     mv "$archive.save" "$archive" 2>/dev/null 1>&2
     mv "$archive.asc.save" "$archive.asc" 2>/dev/null 1>&2
 }
+
+set -e
 
 if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
@@ -60,18 +62,18 @@ trap restore_files EXIT
 mv "$archive" "$archive.save" 2>/dev/null 1>&2
 mv "$archive.asc" "$archive.asc.save" 2>/dev/null 1>&2
 
-git config tar.tar.xz.command "xz -9c" || exit 1
+git config tar.tar.xz.command "xz -9c"
 if [ $automake = 1 ]; then
-    do_make_dist "$@" || exit 1
+    do_make_dist "$@"
 else
-    git archive -o "$archive" HEAD "$@" || exit 1
+    git archive -o "$archive" HEAD "$@"
 fi
-git add "$archive" || exit 1
+git add "$archive"
 if [ $sign = 1 ]; then
-    gpg -a --detach-sign -o "$archive.asc" "$archive" || exit 1
-    git add "$archive.asc" || exit 1
+    gpg -a --detach-sign -o "$archive.asc" "$archive"
+    git add "$archive.asc"
 fi
-git commit $commitopts || exit 1
+git commit $commitopts
 
 trap '' EXIT
 rm "$archive.save" "$archive.asc.save"
