@@ -27,6 +27,6 @@ archive=$1
 mkdir -p $tmpdir
 tar -x -C $tmpdir -f "$archive"
 echo "Differences between archive and repository:"
-diff -r $tmpdir/* "./$path"
+set +e; diff -r $tmpdir/* "./$path"; set -e
 rm -fr $tmpdir
 gpg --verify "$archive.asc"

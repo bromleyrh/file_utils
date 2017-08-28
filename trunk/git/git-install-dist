@@ -63,8 +63,6 @@ do_build()
     make distclean
 }
 
-set -e
-
 get_cmds
 set_up_env
 opts=$(git config user.installDistOpts)
@@ -78,6 +76,8 @@ fi
 
 get_ncpus
 get_dirs
+
+set -e
 
 mkdir -v $tmpdir
 tar -x -f $distdir/*.xz -C $tmpdir -v
