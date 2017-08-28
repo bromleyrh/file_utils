@@ -8,6 +8,11 @@ pushd / > /dev/null || exit 1
 find $rootdir -name '*.c' -o -name '*.h' > $rootdir/cscope.files || exit 1
 popd > /dev/null || exit 1
 
-cscope -bq
+ret=0
+if ! cscope -bq; then
+    ret=1
+fi
 
 popd > /dev/null || exit 1
+
+exit $ret
