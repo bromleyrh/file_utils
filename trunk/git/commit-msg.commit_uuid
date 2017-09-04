@@ -1,0 +1,7 @@
+#!/bin/sh
+
+key="Commit UUID"
+
+if ! grep "$key:" $1; then
+	printf "\n$key: %s\n" $(uuidgen) >> $1
+fi
