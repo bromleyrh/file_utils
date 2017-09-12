@@ -3,5 +3,5 @@
 key="Commit UUID"
 
 if ! grep "$key:" $1; then
-	printf "\n$key: %s\n" $(uuidgen) >> $1
+	printf "\n$key: %s\n" $(uuidgen | tr [:upper:] [:lower:]) >> $1
 fi
