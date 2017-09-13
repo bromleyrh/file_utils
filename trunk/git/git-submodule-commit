@@ -4,7 +4,7 @@ get_submodules()
 {
     while IFS= read -r line; do
         if [[ $line = +* ]]; then
-            echo $line | cut -d '+' -f 2 | cut -d ' ' -f 2
+            echo $line | cut -d '+' -f 2- | cut -d ' ' -f 2
         fi
     done < <(git submodule status)
 }
