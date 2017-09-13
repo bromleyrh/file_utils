@@ -30,7 +30,11 @@ noinst_HEADERS = replicate_common.h replicate_conf.h replicate_gram.h \
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM
 
-BUILT_SOURCES = replicate_gram.h verify_gram.h
+gen_files = replicate_gram.h verify_gram.h
+
+BUILT_SOURCES = $(gen_files)
+
+CLEANFILES = $(gen_files)
 
 replicate_gram.h: replicate.spec
 	scripts/spec_to_h.pl replicate.spec $(replicate_gram_macro) > $@
