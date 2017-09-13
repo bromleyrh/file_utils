@@ -12,7 +12,7 @@
 
 #include <backup.h>
 
-#include <diagnostics.h>
+#include <forensics.h>
 #include <radix_tree.h>
 #include <strings_ext.h>
 
