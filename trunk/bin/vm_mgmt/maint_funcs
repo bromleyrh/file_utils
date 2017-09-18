@@ -1,0 +1,34 @@
+do_bup_disk_image()
+{
+	image=$1
+	bup=$image.bup
+
+	fastcp -b $image $bup
+	chmod -w $bup
+	rm -i $bup~
+}
+
+bup_disk_image()
+{
+	(set -e; do_bup_disk_image $1)
+}
+
+do_foreach_vm()
+{
+	for d in *; do
+		[ \( ! -d $d \) -o \( $d = "out_of_order" \) ] && continue
+		echo "Entering $d"
+		pushd $d >/dev/null
+		eval $@
+		popd >/dev/null
+	done
+}
+
+foreach_vm()
+{
+	(set -e; do_foreach_vm "$@")
+}
+
+alias bup_disk_images="foreach_vm bup_disk_image disk_image.img"
+
+# vi: set filetype=sh noexpandtab sw=4 ts=4:
