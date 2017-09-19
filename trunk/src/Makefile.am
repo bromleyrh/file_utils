@@ -18,7 +18,7 @@ pkgconfigdir = @pkgconfigdir@
 
 $(pkgconfig_DATA): config.status
 
-EXTRA_DIST = backtrace.c replicate.conf.sample replicate.spec \
+EXTRA_DIST = backtrace.c bootstrap replicate.conf.sample replicate.spec \
 	verify.conf.sample verify.spec
 
 include %reldir%/scripts/Makefile.am
