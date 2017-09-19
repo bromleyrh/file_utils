@@ -1,3 +1,4 @@
+/project_db_schema_gram.h
 /replicate_fs.h
 /replicate_gram.h
 /verify_gram.h
@@ -10,6 +11,7 @@
 /mkmanifest
 /open
 /open_pipes
+/project_db
 /replicate
 /simpledb
 /sparse_scan
