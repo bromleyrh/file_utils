@@ -129,6 +129,16 @@ AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
 )
 AC_SUBST([stack_protector])
 
+AX_CHECK_COMPILE_FLAG([-Werror -Wunused-local-typedefs],
+    [no_unused_local_typedefs="-Wno-unused-local-typedefs"],
+    [AX_CHECK_COMPILE_FLAG([-Werror -Wunused-local-typedef],
+        [no_unused_local_typedefs="-Wno-unused-local-typedef"],
+        [no_unused_local_typedefs=""]
+     )
+    ]
+)
+AC_SUBST([no_unused_local_typedefs])
+
 AX_CHECK_COMPILE_FLAG([-Werror -fstrict-aliasing],
     [strict_aliasing="-fstrict-aliasing"],
     [strict_aliasing=]
@@ -205,6 +215,10 @@ EOF
          [libmatroska_cppflags=$libmatroska_CFLAGS
           libmatroska_link_dep=$libmatroska_LIBS]
      )
+     PKG_CHECK_MODULES([libshell], [libshell],
+         [libshell_cppflags=$libshell_CFLAGS
+          libshell_link_dep=$libshell_LIBS]
+     )
      PKG_CHECK_MODULES([openssl], [openssl],
          [openssl_cppflags=$openssl_CFLAGS
           openssl_link_dep=$openssl_LIBS]
@@ -213,11 +227,13 @@ EOF
      AC_SUBST([dbus_cppflags])
      AC_SUBST([libjson_cppflags])
      AC_SUBST([libmatroska_cppflags])
+     AC_SUBST([libshell_cppflags])
      AC_SUBST([openssl_cppflags])
 
      AC_SUBST([dbus_link_dep])
      AC_SUBST([libjson_link_dep])
      AC_SUBST([libmatroska_link_dep])
+     AC_SUBST([libshell_link_dep])
      AC_SUBST([openssl_link_dep])
     ]
 )
