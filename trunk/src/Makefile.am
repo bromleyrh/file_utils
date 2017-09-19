@@ -6,18 +6,22 @@
 
 if LINUX
 
-EXTRA_DIST += src/replicate.conf.sample src/replicate.spec \
-	src/simpledb_obj.idl src/verify.conf.sample src/verify.spec
+EXTRA_DIST += src/project_db.spec src/project_db_schema.json \
+	src/replicate.conf.sample src/replicate.spec src/simpledb_obj.idl \
+	src/verify.conf.sample src/verify.spec
 
-noinst_HEADERS += src/common.h src/debug.h src/replicate_common.h \
-	src/replicate_conf.h src/replicate_gram.h src/replicate_trans.h src/util.h \
-	src/verify_common.h src/verify_conf.h src/verify_gram.h src/verify_io.h \
-	src/verify_plugin.h src/verify_scan.h
+noinst_HEADERS += src/common.h src/debug.h src/project_db_common.h \
+	src/replicate_common.h src/replicate_conf.h src/replicate_gram.h \
+	src/replicate_trans.h src/util.h src/verify_common.h src/verify_conf.h \
+	src/verify_gram.h src/verify_io.h src/verify_plugin.h src/verify_scan.h
 
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM
 
-gen_files = src/replicate_gram.h src/simpledb_obj.h src/verify_gram.h
+project_db_schema_gram_macro = SCHEMA_GRAM
+
+gen_files = src/project_db_schema_gram.h src/replicate_gram.h \
+	src/simpledb_obj.idl src/verify_gram.h
 
 BUILT_SOURCES += $(gen_files)
 
@@ -31,6 +35,10 @@ src/replicate_gram.h: src/replicate.spec
 
 src/verify_gram.h: src/verify.spec
 	scripts/spec_to_h.pl "$^" $(verify_gram_macro) >"$@"
+
+src/project_db_schema_gram.h: src/project_db.spec
+	scripts/spec_to_h.pl src/project_db.spec $(project_db_schema_gram_macro) \
+	>$@
 
 noinst_LIBRARIES += src/libfileutil.a
 
@@ -59,8 +67,8 @@ backup_link = -L$(abs_builddir)/src/libbackup/.libs -lbackup
 backup_link_dep = src/sys_dep/libsys.a @libutil_link_dep@
 
 bin_PROGRAMS += src/attr_idx src/cp_mem src/fastcat src/fastcp src/md_verify \
-	src/mkmanifest src/open src/open_pipes src/replicate src/simpledb \
-	src/sparse_scan src/tmpfile src/verify
+	src/mkmanifest src/open src/open_pipes src/project_db src/replicate \
+	src/simpledb src/sparse_scan src/tmpfile src/verify
 if HAVE_LIBXFS
 bin_PROGRAMS += src/xfsutil
 endif
@@ -110,6 +118,12 @@ src_open_pipes_SOURCES = src/open_pipes.c
 src_open_pipes_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_open_pipes_CFLAGS = $(AM_CFLAGS)
 src_open_pipes_LDADD = @libutil_link_dep@
+
+src_project_db_SOURCES = src/project_db.c
+src_project_db_CFLAGS = $(AM_CFLAGS) @no_unused_local_typedefs@ \
+	@libjson_cflags@ @libshell_cflags@ @libutil_cflags@
+src_project_db_LDADD = -lgdbm @libjson_link_dep@ @libshell_link_dep@ \
+	@libutil_link_dep@
 
 src_replicate_SOURCES = src/debug.c src/replicate.c src/replicate_conf.c \
 	src/replicate_trans.c src/util.c

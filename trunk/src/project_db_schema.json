@@ -1,0 +1,36 @@
+#
+# project_db_schema.json
+#
+
+{
+    "key":[
+        {
+            "type":"stringz",
+            "name":"name"
+        }
+    ],
+    "value":[
+        {
+            "type":"char",
+            "name":"documentation"
+        },
+        {
+            "type":"char",
+            "name":"kernel"
+        },
+        {
+            "type":"stringz",
+            "name":"lang"
+        },
+        {
+            "type":"char",
+            "name":"submodule"
+        },
+        {
+            "type":"stringz",
+            "name":"path"
+        }
+    ]
+}
+
+# vi: set expandtab sw=4 ts=4:
