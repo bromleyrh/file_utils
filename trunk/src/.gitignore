@@ -4,6 +4,8 @@
 /replicate_gram.h
 /verify_gram.h
 
+/project_db_schema_gram.h
+
 /attr_idx
 /cp_mem
 /fastcat
@@ -12,6 +14,7 @@
 /mkmanifest
 /open
 /open_pipes
+/project_db
 /replicate
 /simpledb
 /sparse_scan
