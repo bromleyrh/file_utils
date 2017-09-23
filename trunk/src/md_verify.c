@@ -4,6 +4,10 @@
 
 #define _GNU_SOURCE
 
+#define ASSERT_MACROS
+#include "common.h"
+#undef ASSERT_MACROS
+
 #include <radix_tree.h>
 
 #include <adt/set.h>
@@ -390,7 +394,7 @@ scan_input_file(const char *path, struct radix_tree **data)
         f = fopen(path, "r");
         if (f == NULL) {
             error(0, errno, "Error opening %s", path);
-            return -errno;
+            return MINUS_ERRNO;
         }
     }
 
@@ -407,7 +411,7 @@ scan_input_file(const char *path, struct radix_tree **data)
 
         if (getline(&ln, &n, f) == -1) {
             if (errno != 0) {
-                res = -errno;
+                res = MINUS_ERRNO;
                 goto err2;
             }
             break;
@@ -417,7 +421,7 @@ scan_input_file(const char *path, struct radix_tree **data)
         if (res != 1) {
             if ((res != EOF) || !ferror(f))
                 goto err3;
-            res = -errno;
+            res = MINUS_ERRNO;
             goto err2;
         }
         tmstr = scan_timestamp(ln + pathlen, "a:", &record.atim);

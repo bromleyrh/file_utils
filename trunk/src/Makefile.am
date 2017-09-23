@@ -23,7 +23,7 @@ EXTRA_DIST = backtrace.c bootstrap replicate.conf.sample replicate.spec \
 
 include %reldir%/scripts/Makefile.am
 
-noinst_HEADERS = replicate_common.h replicate_conf.h replicate_gram.h \
+noinst_HEADERS = common.h replicate_common.h replicate_conf.h replicate_gram.h \
 	replicate_trans.h verify_common.h verify_conf.h verify_gram.h verify_io.h \
 	verify_scan.h
 

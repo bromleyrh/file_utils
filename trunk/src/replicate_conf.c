@@ -175,6 +175,7 @@ open_as_real_user(const char *path, int flags, ...)
     if (ret == -1) {
         error(0, errno, "Error opening %s", path);
         prev_euid = seteuid(prev_euid);
+        (void)prev_euid;
         return -1;
     }
 
