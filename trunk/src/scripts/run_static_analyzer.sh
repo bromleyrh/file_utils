@@ -1,0 +1,43 @@
+#!/bin/sh
+
+dummy_file=scan_build
+
+configure_opts="--enable-debugging"
+
+do_configure()
+{
+	if [ $cache_file != /dev/null ]; then
+		rm -fv $cache_file
+	fi
+	
+	scan-build ./configure $configure_opts
+	touch $dummy_file
+}
+
+set -e
+
+# import Autoconf cache file path variable
+cache_file=/dev/null
+for f in /usr/share/config.site /usr/local/share/config.site; do
+	if [ -r $f ]; then
+		. $f
+	fi
+done
+
+if [ ! -f configure ]; then
+	echo "\"configure\" script not found (must run from root build directory)" \
+		1>&2
+	exit 1
+fi
+
+if [ ! -f Makefile ]; then
+	do_configure
+elif [ ! -f $dummy_file ]; then
+	echo "Project not configured for static analysis" 1>&2
+	make distclean
+	do_configure
+fi
+
+scan-build make
+
+# vi: set noexpandtab sw=4 ts=4:
