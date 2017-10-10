@@ -1,0 +1,4 @@
+TODO
+
+- Implement pre-applypatch hook for use with commit-uuid commit-msg hook that
+  generates a new UUID rather than using the UUID included in the patch
