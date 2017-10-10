@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 
+get_excluded_submodules()
+{
+    for i in $(git config user.submoduleskip); do
+        excluded_submodules[$i]=1
+    done
+}
+
 get_submodules()
 {
     while IFS= read -r line; do
         if [[ $line = +* ]]; then
-            echo $line | cut -d '+' -f 2- | cut -d ' ' -f 2
+            submodule=$(echo $line | cut -d '+' -f 2- | cut -d ' ' -f 2)
+            [[ ${excluded_submodules[$submodule]} != 1 ]] && echo $submodule
         fi
     done < <(git submodule status)
 }
@@ -21,6 +29,10 @@ get_commit_message()
 }
 
 set -e
+
+declare -A excluded_submodules
+
+get_excluded_submodules
 
 submodules=$(get_submodules)
 [[ $? != 0 ]] && exit 1
