@@ -52,6 +52,8 @@ struct attr_key {
 
 #define INDEX_FILE ".index"
 
+#define MAX_ENTRIES (1024 * 1024)
+
 static int parse_cmdline(int, char **, struct opts *);
 
 static int index_open(const char *, struct index_ctx *);
@@ -117,7 +119,7 @@ index_open(const char *index_file, struct index_ctx *ictx)
     void *hctx, *nctx;
 
     if (ictx->read) {
-        ret = btree_mmap_init_ctx(index_file, &hctx, &nctx, 0);
+        ret = btree_mmap_init_ctx(index_file, MAX_ENTRIES, &hctx, &nctx, 0);
         if (ret != 0) {
             error(0, -ret, "Error reading index");
             return ret;
@@ -130,8 +132,8 @@ index_open(const char *index_file, struct index_ctx *ictx)
             goto err;
         }
     } else {
-        ret = btree_mmap_init_ctx(index_file, &hctx, &nctx, BTREE_MMAP_CREATE,
-                                  S_IRUSR | S_IWUSR);
+        ret = btree_mmap_init_ctx(index_file, MAX_ENTRIES, &hctx, &nctx,
+                                  BTREE_MMAP_CREATE, S_IRUSR | S_IWUSR);
         if (ret != 0) {
             error(0, -ret, "Error creating index");
             return ret;
