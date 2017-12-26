@@ -28,6 +28,11 @@ stamp-h1
 *.la
 *.lo
 
+*.gcda
+*.gcno
+/file_utils-0.1-coverage
+/file_utils-0.1-coverage.info
+
 /attr_idx
 /cp_mem
 /fastcat

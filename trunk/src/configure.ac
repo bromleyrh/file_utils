@@ -31,6 +31,8 @@ AC_PROG_RANLIB
 
 AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
+AX_CODE_COVERAGE
+
 AC_CHECK_HEADERS([xfs/xfs.h], [], [], [
 #include <stdint.h>
 typedef int64_t off64_t;
