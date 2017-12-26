@@ -1,11 +1,14 @@
 /aclocal.m4
 /autom4te.cache
+/conf??????
+/confdefs.h
 /config.h
 /config.h.in
 /config.h.in~
 /config.log
 /config.status
 /configure
+/conftest.err
 /libtool
 /scan_build
 
