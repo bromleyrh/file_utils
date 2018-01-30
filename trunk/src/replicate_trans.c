@@ -43,7 +43,8 @@ static int getsgids(gid_t **);
 static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
 static int broadcast_progress(DBusConnection *, double);
-static int copy_cb(int, int, const char *, const char *, struct stat *, void *);
+static int copy_cb(int, int, const char *, const char *, struct stat *, int,
+                   void *);
 
 static int copy_fn(void *);
 
@@ -112,7 +113,7 @@ err1:
 
 static int
 copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
-        void *ctx)
+        int flags, void *ctx)
 {
     double pcnt;
     struct dir_copy_ctx *dcpctx = (struct dir_copy_ctx *)ctx;
@@ -122,6 +123,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
     (void)name;
     (void)path;
     (void)s;
+    (void)flags;
 
     if (dcpctx->off >= 0) {
         struct copy_ctx *cctx = (struct copy_ctx *)(dcpctx->ctx);
