@@ -20,7 +20,7 @@ Ensure the following dependencies are satisfied:
 * Development version required
 + From Glacier project
 
-Run the following commands to build and install the library:
+Run the following commands to build and install the utilities:
 
 ./bootstrap
 ./configure
@@ -31,7 +31,7 @@ sudo make install
 Uninstallation
 --------------
 
-Run the following commands to uninstall the library:
+Run the following commands to uninstall the utilities:
 
 (if "make distclean" run) ./bootstrap
 (if "make distclean" run) ./configure
