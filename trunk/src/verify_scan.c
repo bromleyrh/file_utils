@@ -597,7 +597,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         return res;
     }
     if (debug)
-        fprintf(stderr, " (verified %s/%s)\n", wctx->prefix, path);
+        fprintf(stderr, " (read %s/%s)\n", wctx->prefix, path);
 
     if (p_record_in != NULL) {
         res = radix_tree_delete(wctx->input_data, fullpath);
