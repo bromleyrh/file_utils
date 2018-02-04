@@ -338,7 +338,7 @@ io_state_update(struct io_state *state, size_t len, double tp)
                                        - state->probe_step);
         }
     }
-    fprintf(stderr, " (transfer size %7zd)", state->transfer_size);
+    fprintf(stderr, " (transfer size %7zd bytes)", state->transfer_size);
 
     state->last_throughput = throughput;
 
