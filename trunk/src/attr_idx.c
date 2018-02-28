@@ -389,7 +389,7 @@ apply_from_index(const char *index_file, const char **names)
         }
 
         if (fstat(fd, &s) == -1) {
-            error(0, errno, "Error getting stats of %s", names[i]);
+            error(0, errno, "Error getting status of %s", names[i]);
             goto err2;
         }
         mode = s.st_mode & 07777;

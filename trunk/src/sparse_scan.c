@@ -320,7 +320,7 @@ main(int argc, char **argv)
     }
 
     if (fstat(fd, &s) == -1) {
-        error(0, errno, "Error getting stats of %s", path);
+        error(0, errno, "Error getting status of %s", path);
         goto err2;
     }
 

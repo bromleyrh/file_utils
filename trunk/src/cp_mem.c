@@ -186,7 +186,7 @@ get_dest_info(const char *pathname)
     return 0;
 
 err:
-    error(0, errno, "Couldn't stat destination");
+    error(0, errno, "Couldn't get status of destination file");
     return -1;
 }
 
@@ -405,7 +405,7 @@ copy_mode(int fd1, int fd2)
     struct stat srcsb;
 
     if (fstat(fd1, &srcsb) == -1) {
-        error(0, errno, "Couldn't stat source file");
+        error(0, errno, "Couldn't get status of source file");
         return -1;
     }
     if (fchmod(fd2, srcsb.st_mode) == -1) {
