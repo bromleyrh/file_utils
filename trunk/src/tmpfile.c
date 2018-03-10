@@ -6,6 +6,8 @@
 
 #define _GNU_SOURCE
 
+#include <files/acc_ctl.h>
+
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -122,7 +124,7 @@ open_file(char *path)
         return -EISDIR;
 
     path[dnlen] = '\0';
-    ret = open(path, O_TMPFILE | O_WRONLY, S_IRUSR | S_IWUSR);
+    ret = open(path, O_TMPFILE | O_WRONLY, ACC_MODE_DEFAULT);
     path[dnlen] = '/';
 
     return (ret == -1) ? -errno : ret;

@@ -7,6 +7,8 @@
 #include "btree.h"
 #include "btree_mmap.h"
 
+#include "files/acc_ctl.h"
+
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -133,7 +135,7 @@ index_open(const char *index_file, struct index_ctx *ictx)
         }
     } else {
         ret = btree_mmap_init_ctx(index_file, MAX_ENTRIES, &hctx, &nctx,
-                                  BTREE_MMAP_CREATE, S_IRUSR | S_IWUSR);
+                                  BTREE_MMAP_CREATE, ACC_MODE_DEFAULT);
         if (ret != 0) {
             error(0, -ret, "Error creating index");
             return ret;

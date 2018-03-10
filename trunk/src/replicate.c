@@ -15,6 +15,7 @@
 #include <forensics.h>
 #include <strings_ext.h>
 
+#include <files/acc_ctl.h>
 #include <files/util.h>
 
 #include <assert.h>
@@ -433,13 +434,14 @@ sess_init(int sessid, char *sesspath, size_t len)
         return 0;
     }
 
-    if ((mkdir(VAR_PATH, S_IRWXU) == -1) && (errno != EEXIST))
+    if ((mkdir(VAR_PATH, ACC_MODE_ACCESS_PERMS) == -1) && (errno != EEXIST))
         return -errno;
 
     if (snprintf(sesspath, len, VAR_PATH "/%d", sessid) >= (int)len)
         return -ENAMETOOLONG;
 
-    return ((mkdir(sesspath, S_IRWXU) == -1) && (errno != EEXIST)) ? -errno : 0;
+    return ((mkdir(sesspath, ACC_MODE_ACCESS_PERMS) == -1) && (errno != EEXIST))
+           ? -errno : 0;
 }
 
 static int
@@ -484,7 +486,8 @@ sess_record_complete(const char *sesspath, const char *path)
     if (err)
         return err;
 
-    return (mknod(fullpath, S_IFREG | S_IRUSR, 0) == -1) ? -errno : 0;
+    return (mknod(fullpath, S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 0) == -1)
+           ? -errno : 0;
 }
 
 int

@@ -6,6 +6,8 @@
 
 #define _FILE_OFFSET_BITS 64
 
+#include <files/acc_ctl.h>
+
 #include <strings_ext.h>
 
 #include <assert.h>
@@ -465,10 +467,10 @@ copy(int n)
     }
 
     if (hugetlbfs)
-        fd2 = open(dstfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+        fd2 = open(dstfile, O_CREAT | O_RDWR, ACC_MODE_DEFAULT);
     else {
         fd2 = open(dirname(strdupa(dstfile)), O_RDWR | O_TMPFILE,
-                   S_IRUSR | S_IWUSR);
+                   ACC_MODE_DEFAULT);
     }
     if (fd2 == -1) {
         error(0, errno, "Couldn't open %s", dstfile);
