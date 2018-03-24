@@ -33,6 +33,12 @@ AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
 AX_CODE_COVERAGE
 
+AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
+    [stack_protector="-fstack-protector-all"],
+    [stack_protector=""]
+)
+AC_SUBST([stack_protector])
+
 AC_CHECK_HEADERS([xfs/xfs.h], [], [], [
 #include <stdint.h>
 typedef int64_t off64_t;
