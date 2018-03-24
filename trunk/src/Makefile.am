@@ -5,9 +5,9 @@
 ## Process this file with automake to produce Makefile.in
 
 if DEBUG
-AM_CFLAGS = @stack_protector@ -ggdb3 -O0 -pipe -Wall -Wextra
+AM_CFLAGS = @stack_protector@ -ftrapv -ggdb3 -O0 -pipe -Wall -Wextra
 else
-AM_CFLAGS = -DNDEBUG -fvisibility=hidden -O2 -pipe -Wall -Wextra
+AM_CFLAGS = -DNDEBUG -ftrapv -fvisibility=hidden -O2 -pipe -Wall -Wextra
 endif
 
 if TRACE
