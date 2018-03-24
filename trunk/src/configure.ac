@@ -33,6 +33,13 @@ AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
 AX_CODE_COVERAGE
 
+fsanitizer="-fsanitize=address -fsanitize=undefined"
+AX_CHECK_COMPILE_FLAG([-fsanitize=address],
+    [sanitizer="$fsanitizer"],
+    [sanitizer=""]
+)
+AC_SUBST([sanitizer])
+
 AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
     [stack_protector="-fstack-protector-all"],
     [stack_protector=""]
