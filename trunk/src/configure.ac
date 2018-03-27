@@ -33,11 +33,17 @@ AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
 AX_CODE_COVERAGE
 
+AC_CHECK_LIB([asan], [__interceptor_malloc], [asan_libs="-lasan"])
+AC_CHECK_LIB([ubsan], [__ubsan_handle_add_overflow], [ubsan_libs="-lubsan"])
+
 fsanitizer="-fsanitize=address -fsanitize=undefined"
 AX_CHECK_COMPILE_FLAG([-fsanitize=address],
     [sanitizer="$fsanitizer"],
     [sanitizer=""]
 )
+if test "x$asan_libs" = x || test "x$ubsan_libs" = x; then
+    sanitizer=""
+fi
 AC_SUBST([sanitizer])
 
 AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
