@@ -4,10 +4,14 @@
 
 ## Process this file with automake to produce Makefile.in
 
-if DEBUG
+if SANITIZERS
 AM_CFLAGS = @sanitizer@ @stack_protector@ -ftrapv -ggdb3 -O0 -pipe -Wall -Wextra
 else
+if DEBUG
+AM_CFLAGS = @stack_protector@ -ftrapv -ggdb3 -O0 -pipe -Wall -Wextra
+else
 AM_CFLAGS = -DNDEBUG -ftrapv -fvisibility=hidden -O2 -pipe -Wall -Wextra
+endif
 endif
 
 if TRACE

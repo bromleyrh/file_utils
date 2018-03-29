@@ -33,17 +33,48 @@ AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
 AX_CODE_COVERAGE
 
-AC_CHECK_LIB([asan], [__interceptor_malloc], [asan_libs="-lasan"])
-AC_CHECK_LIB([ubsan], [__ubsan_handle_add_overflow], [ubsan_libs="-lubsan"])
+AC_ARG_ENABLE([sanitizers],
+              [  --enable-sanitizers     enable GCC sanitizers],
+              [case "$enableval" in
+                   yes)
+                       sanitizers=true;;
+                   no)
+                       sanitizers=false;;
+                   *)
+                       AC_MSG_ERROR([invalid "--enable-sanitizers" argument]);;
+               esac],
+              [sanitizers=false])
 
-fsanitizer="-fsanitize=address -fsanitize=undefined"
-AX_CHECK_COMPILE_FLAG([-fsanitize=address],
-    [sanitizer="$fsanitizer"],
-    [sanitizer=""]
-)
-if test "x$asan_libs" = x || test "x$ubsan_libs" = x; then
-    sanitizer=""
+AC_ARG_ENABLE([debugging],
+              [  --enable-debugging      enable debugging],
+              [case "$enableval" in
+                   yes)
+                       debug=true;;
+                   no)
+                       debug=false;;
+                   *)
+                       AC_MSG_ERROR([invalid "--enable-debugging" argument]);;
+               esac],
+              [debug=false])
+if test "x$sanitizers" = xtrue; then
+    debug=true
 fi
+AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+
+if test "x$sanitizers" = xtrue; then
+    AC_CHECK_LIB([asan], [__interceptor_malloc], [asan_libs="-lasan"])
+    AC_CHECK_LIB([ubsan], [__ubsan_handle_add_overflow], [ubsan_libs="-lubsan"])
+
+    fsanitizer="-fsanitize=address -fsanitize=undefined"
+    AX_CHECK_COMPILE_FLAG([-fsanitize=address],
+        [sanitizer="$fsanitizer"],
+        [sanitizer=""]
+    )
+    if test "x$asan_libs" = x || test "x$ubsan_libs" = x; then
+        sanitizer=""
+    fi
+fi
+AM_CONDITIONAL([SANITIZERS], [test x$sanitizers = xtrue])
 AC_SUBST([sanitizer])
 
 AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
@@ -78,19 +109,6 @@ AC_SUBST([dbus_link_dep])
 AC_SUBST([libjson_link_dep])
 AC_SUBST([libutil_link_dep])
 AC_SUBST([openssl_link_dep])
-
-AC_ARG_ENABLE([debugging],
-              [  --enable-debugging      enable debugging],
-              [case "$enableval" in
-                   yes)
-                       debug=true;;
-                   no)
-                       debug=false;;
-                   *)
-                       AC_MSG_ERROR([invalid "--enable-debugging" argument]);;
-               esac],
-              [debug=false])
-AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
 
 if test x$debug = xtrue; then
     enable_trace=true
