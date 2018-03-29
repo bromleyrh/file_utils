@@ -66,6 +66,7 @@ if test "x$sanitizers" = xtrue; then
     AC_CHECK_LIB([ubsan], [__ubsan_handle_add_overflow], [ubsan_libs="-lubsan"])
 
     fsanitizer="-fsanitize=address -fsanitize=undefined"
+    fsanitizer="$fsanitizer -fsanitize-undefined-trap-on-error"
     AX_CHECK_COMPILE_FLAG([-fsanitize=address],
         [sanitizer="$fsanitizer"],
         [sanitizer=""]
