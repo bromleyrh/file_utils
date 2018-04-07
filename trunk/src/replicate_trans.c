@@ -197,7 +197,7 @@ copy_fn(void *arg)
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &cctx.starttm);
 
-    ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
+    ret = -dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
     if (debug) {
         feenableexcept(fexcepts);
         fputc('\n', stderr);
