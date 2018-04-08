@@ -179,7 +179,8 @@ copy_fn(void *arg)
     cctx.lastino = 0;
     cctx.lastpath = NULL;
 
-    fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_TMPFILE;
+    fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_SYNC
+         | DIR_COPY_TMPFILE;
     if (!(cargs->keep_cache))
         fl |= DIR_COPY_DISCARD_CACHE;
 
