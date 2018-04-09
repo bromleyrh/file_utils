@@ -680,7 +680,7 @@ print_verifs(FILE *f, struct verif *verifs, int num)
         struct verif *verif = &verifs[i];
 
         fprintf(f,
-                "Verifcation %d:\n"
+                "Verification %d:\n"
                 "\tDevice path: %s\n"
                 "\tSource directory path: %s\n",
                 i + 1,
