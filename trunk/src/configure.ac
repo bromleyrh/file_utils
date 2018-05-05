@@ -84,10 +84,12 @@ AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
 )
 AC_SUBST([stack_protector])
 
-AC_CHECK_HEADERS([xfs/xfs.h], [], [], [
+libxfs=false
+AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [], [
 #include <stdint.h>
 typedef int64_t off64_t;
 ])
+AM_CONDITIONAL([HAVE_LIBXFS], [test x$libxfs = xtrue])
 
 AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
 

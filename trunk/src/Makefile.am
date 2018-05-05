@@ -62,7 +62,10 @@ backup_link = -L$(abs_builddir)/libbackup/.libs -lbackup
 backup_link_dep = @libutil_link_dep@
 
 bin_PROGRAMS = attr_idx cp_mem fastcat fastcp md_verify mkmanifest open \
-	open_pipes replicate sparse_scan tmpfile verify xfsutil
+	open_pipes replicate sparse_scan tmpfile verify
+if HAVE_LIBXFS
+bin_PROGRAMS += xfsutil
+endif
 
 bin_cflags = $(CODE_COVERAGE_CFLAGS)
 bin_libs = $(CODE_COVERAGE_LIBS)
