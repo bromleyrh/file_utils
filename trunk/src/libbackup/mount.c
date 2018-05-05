@@ -9,6 +9,7 @@
 
 #include <libmount/libmount.h>
 
+#include <avl_tree.h>
 #include <strings_ext.h>
 
 #include <errno.h>
@@ -23,22 +24,91 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+static int do_fs_cmp(struct libmnt_fs *, struct libmnt_fs *);
+#ifdef HAVE_MNT_TABLE_UNIQ_FS
 static int mnt_cmp(struct libmnt_table *, struct libmnt_fs *,
                    struct libmnt_fs *);
+#endif
+static int fs_cmp(const void *, const void *, void *);
+
+static int uniq_fs(struct libmnt_table *, struct libmnt_iter *);
 static int keep_mnt(const char *);
 
 static int
-mnt_cmp(struct libmnt_table *tbl, struct libmnt_fs *fs1, struct libmnt_fs *fs2)
+do_fs_cmp(struct libmnt_fs *fs1, struct libmnt_fs *fs2)
 {
     const char *target1, *target2;
-
-    (void)tbl;
 
     if (((target1 = mnt_fs_get_target(fs1)) == NULL)
         || ((target2 = mnt_fs_get_target(fs2)) == NULL))
         return -1;
 
     return strcmp(target1, target2);
+}
+
+#ifdef HAVE_MNT_TABLE_UNIQ_FS
+static int
+mnt_cmp(struct libmnt_table *tbl, struct libmnt_fs *fs1, struct libmnt_fs *fs2)
+{
+    (void)tbl;
+
+    return do_fs_cmp(fs1, fs2);
+}
+
+#endif
+static int
+fs_cmp(const void *k1, const void *k2, void *ctx)
+{
+    struct libmnt_fs *fs1 = (struct libmnt_fs *)k1;
+    struct libmnt_fs *fs2 = (struct libmnt_fs *)k2;
+
+    (void)ctx;
+
+    return do_fs_cmp(fs1, fs2);
+}
+
+static int
+uniq_fs(struct libmnt_table *tbl, struct libmnt_iter *itr)
+{
+    int ret;
+    struct avl_tree *fs_set;
+
+    ret = avl_tree_new(&fs_set, sizeof(struct libmnt_fs *), &fs_cmp, 0, NULL,
+                       NULL, NULL);
+    if (ret != 0)
+        return ret;
+
+    mnt_reset_iter(itr, -1);
+
+    for (;;) {
+        struct libmnt_fs *fs;
+
+        ret = mnt_table_next_fs(tbl, itr, &fs);
+        if (ret != 0) {
+            if (ret == 1)
+                break;
+            goto err;
+        }
+        ret = avl_tree_insert(fs_set, &fs);
+        if (ret != 0) {
+            if (ret == -EADDRINUSE) {
+                ret = mnt_table_remove_fs(tbl, fs);
+                if (ret != 0)
+                    goto err;
+            } else
+                goto err;
+        }
+    }
+
+    mnt_reset_iter(itr, -1);
+
+    avl_tree_free(fs_set);
+
+    return 0;
+
+err:
+    avl_tree_free(fs_set);
+    return -EIO;
 }
 
 #define MNT(target) {target, sizeof(target) - 1}
@@ -110,7 +180,11 @@ mount_ns_unshare()
     if (mnt_table_parse_mtab(tbl, NULL) != 0)
         goto err;
 
+#ifdef HAVE_MNT_TABLE_UNIQ_FS
     if (mnt_table_uniq_fs(tbl, 0, &mnt_cmp) != 0)
+#else
+    if (uniq_fs(tbl, itr) != 0)
+#endif
         goto err;
 
     if ((mnt_table_first_fs(tbl, &fs) != 0)

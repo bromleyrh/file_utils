@@ -91,6 +91,8 @@ typedef int64_t off64_t;
 ])
 AM_CONDITIONAL([HAVE_LIBXFS], [test x$libxfs = xtrue])
 
+AC_CHECK_FUNCS([mnt_table_uniq_fs])
+
 AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
 
 pkgcfg=pkg-config
