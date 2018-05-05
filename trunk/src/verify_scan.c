@@ -89,7 +89,9 @@ static int check_creds(uid_t, gid_t, uid_t, gid_t);
 static int print_chksum(FILE *, unsigned char *, unsigned);
 
 static ssize_t get_io_size(int);
+#ifdef MAP_HUGETLB
 static int64_t get_huge_page_size(void);
+#endif
 
 static int set_direct_io(int);
 
@@ -182,6 +184,8 @@ get_io_size(int rootfd)
 #endif
 }
 
+#ifdef MAP_HUGETLB
+
 #define MEMINFO "/proc/meminfo"
 #define HUGE_PAGE_SIZE_KEY "Hugepagesize:"
 
@@ -230,6 +234,8 @@ end:
 
 #undef MEMINFO
 #undef HUGE_PAGE_SIZE_KEY
+
+#endif
 
 static int
 set_direct_io(int fd)
@@ -648,6 +654,7 @@ verif_fn(void *arg)
     }
     wctx.bufsz = bufsz * 2;
 
+#ifdef MAP_HUGETLB
     fullbufsize = get_huge_page_size();
     if (fullbufsize <= 0) {
         hugetlbfl = 0;
@@ -658,6 +665,10 @@ verif_fn(void *arg)
         if ((size_t)fullbufsize < wctx.bufsz)
             fullbufsize *= nhugep;
     }
+#else
+    hugetlbfl = 0;
+    fullbufsize = wctx.bufsz;
+#endif
 
     if (fstatvfs(vargs->srcfd, &s) == -1) {
         err = errno;
