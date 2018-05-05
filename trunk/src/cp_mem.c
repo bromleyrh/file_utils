@@ -78,7 +78,9 @@ static int do_write(struct dest *, const void *, size_t);
 
 static int do_copy(int, int, int);
 static int copy_mode(int, int);
+#ifdef O_TMPFILE
 static int do_link(int, const char *);
+#endif
 
 static int copy(int);
 
@@ -418,6 +420,7 @@ copy_mode(int fd1, int fd2)
     return 0;
 }
 
+#ifdef O_TMPFILE
 static int
 do_link(int fd, const char *name)
 {
@@ -439,6 +442,7 @@ do_link(int fd, const char *name)
     return 0;
 }
 
+#endif
 static int
 copy(int n)
 {
@@ -466,12 +470,16 @@ copy(int n)
         }
     }
 
+#ifdef O_TMPFILE
     if (hugetlbfs)
         fd2 = open(dstfile, O_CREAT | O_RDWR, ACC_MODE_DEFAULT);
     else {
         fd2 = open(dirname(strdupa(dstfile)), O_RDWR | O_TMPFILE,
                    ACC_MODE_DEFAULT);
     }
+#else
+    fd2 = open(dstfile, O_CREAT | O_RDWR, ACC_MODE_DEFAULT);
+#endif
     if (fd2 == -1) {
         error(0, errno, "Couldn't open %s", dstfile);
         goto err1;
@@ -483,8 +491,10 @@ copy(int n)
         goto err2;
 
     close(fd1);
+#ifdef O_TMPFILE
     if (!hugetlbfs)
         do_link(fd2, dstfile);
+#endif
     if (close(fd2) == -1) {
         error(0, errno, "Couldn't close %s", dstfile);
         return -1;
