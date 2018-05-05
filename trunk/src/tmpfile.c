@@ -21,8 +21,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#ifdef O_TMPFILE
 static size_t dirname_len(const char *);
 
+#endif
 static int parse_cmdline(int, char **, char *, int *);
 
 static int get_stdout(int [2], int *);
@@ -38,6 +40,7 @@ static int copy_file(int, int, int [2], int);
 
 static int link_file(int, const char *);
 
+#ifdef O_TMPFILE
 static size_t
 dirname_len(const char *path)
 {
@@ -46,6 +49,7 @@ dirname_len(const char *path)
     return (last_slash == NULL) ? 0 : last_slash - path;
 }
 
+#endif
 static int
 parse_cmdline(int argc, char **argv, char *file, int *write_to_stdout)
 {
@@ -116,6 +120,7 @@ close_stdout_pipe(int pipefd[2])
 static int
 open_file(char *path)
 {
+#ifdef O_TMPFILE
     int ret;
     size_t dnlen;
 
@@ -128,6 +133,11 @@ open_file(char *path)
     path[dnlen] = '/';
 
     return (ret == -1) ? -errno : ret;
+#else
+    (void)path;
+
+    return -ENOTSUP;
+#endif
 }
 
 #define MAX_LEN 4096
