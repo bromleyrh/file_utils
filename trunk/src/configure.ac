@@ -89,6 +89,8 @@ AC_CHECK_HEADERS([xfs/xfs.h], [], [], [
 typedef int64_t off64_t;
 ])
 
+AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
+
 pkgcfg=pkg-config
 
 dbus_cflags=`eval $pkgcfg --cflags dbus-1`

@@ -6,6 +6,8 @@
 
 #define _FILE_OFFSET_BITS 64
 
+#include "config.h"
+
 #include <files/acc_ctl.h>
 
 #include <strings_ext.h>
@@ -46,6 +48,10 @@ struct dest {
     int         hugetlbfs;
 };
 
+#if !defined(HAVE___FSWORD_T)
+typedef unsigned __fsword_t;
+
+#endif
 static const char **srcs;
 static const char *dst;
 static int dstdir;
@@ -151,7 +157,7 @@ is_on_fs_of_type(const char *pathname, __fsword_t fstype)
             return -1;
     }
 
-    return buf.f_type == fstype;
+    return (__fsword_t)(buf.f_type) == fstype;
 }
 
 static int
