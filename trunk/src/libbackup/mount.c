@@ -4,6 +4,8 @@
 
 #define _GNU_SOURCE
 
+#include "config.h"
+
 #include "backup.h"
 #include "util.h"
 
@@ -298,7 +300,11 @@ unmount_filesystem(const char *path, int rootfd)
     if (rootfd >= 0) {
         /* explicitly synchronize filesystem for greater assurance of data
            integrity if filesystem is writable */
+#ifdef HAVE_SYNCFS
         syncfs(rootfd);
+#else
+        sync();
+#endif
         close(rootfd);
     }
 
