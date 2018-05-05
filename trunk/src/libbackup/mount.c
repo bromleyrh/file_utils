@@ -187,10 +187,6 @@ mount_ns_unshare()
 #endif
         goto err;
 
-    if ((mnt_table_first_fs(tbl, &fs) != 0)
-        || (mnt_table_set_iter(tbl, itr, fs) != 0))
-        goto err;
-
     for (;;) {
         const char *target;
 
