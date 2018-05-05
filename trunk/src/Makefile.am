@@ -4,6 +4,8 @@
 
 ## Process this file with automake to produce Makefile.in
 
+ACLOCAL_AMFLAGS = -I m4
+
 if SANITIZERS
 AM_CFLAGS = @sanitizer@ @stack_protector@ -ftrapv -ggdb3 -O0 -pipe -Wall -Wextra
 else
