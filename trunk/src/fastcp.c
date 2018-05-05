@@ -87,7 +87,7 @@ do_backup(int dirfd, const char *name)
 int
 main(int argc, char **argv)
 {
-    char *dstbn, tmp;
+    char *dstbn, tmp = '\0';
     const char *dstdn;
     const char *dst, *src;
     int back_up = 0;
