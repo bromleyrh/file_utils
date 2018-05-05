@@ -25,7 +25,7 @@ $(pkgconfig_DATA): config.status
 EXTRA_DIST = backtrace.c bootstrap replicate.conf.sample replicate.spec \
 	verify.conf.sample verify.spec
 
-include %reldir%/scripts/Makefile.am
+include scripts/Makefile.am
 
 noinst_HEADERS = common.h replicate_common.h replicate_conf.h replicate_gram.h \
 	replicate_trans.h verify_common.h verify_conf.h verify_gram.h verify_io.h \
@@ -54,7 +54,7 @@ libdirectio_la_SOURCES = libdirectio.c
 libdirectio_la_CFLAGS = $(AM_CFLAGS)
 libdirectio_la_LDFLAGS = -lc -ldl -version-info @ldio_cur@:@ldio_rev@:@ldio_age@
 
-include %reldir%/libbackup/Makefile.am
+include libbackup/Makefile.am
 
 backup_link = -L$(abs_builddir)/libbackup/.libs -lbackup
 backup_link_dep = @libutil_link_dep@
@@ -109,7 +109,7 @@ replicate_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 replicate_LIBS = $(bin_libs)
 replicate_LDFLAGS = -lcap -lm -lmount $(backup_link) $(backup_link_dep) \
 	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
-replicate_DEPENDENCIES = %reldir%/libbackup/libbackup.la
+replicate_DEPENDENCIES = libbackup/libbackup.la
 
 sparse_scan_SOURCES = sparse_scan.c
 sparse_scan_CFLAGS = $(AM_CFLAGS) $(bin_cflags) @libutil_cflags@
@@ -123,7 +123,7 @@ verify_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 verify_LIBS = $(bin_libs)
 verify_LDFLAGS = -lcap -lm -lmount -lrt $(backup_link) $(backup_link_dep) \
 	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ @openssl_link_dep@
-verify_DEPENDENCIES = %reldir%/libbackup/libbackup.la
+verify_DEPENDENCIES = libbackup/libbackup.la
 
 @CODE_COVERAGE_RULES@
 
