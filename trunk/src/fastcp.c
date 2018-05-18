@@ -22,6 +22,7 @@
 #include <sys/types.h>
 
 static void print_usage(const char *);
+static void print_version(void);
 static int parse_cmdline(int, char **, const char **, const char **, int *);
 
 static int do_backup(int, const char *);
@@ -36,21 +37,32 @@ print_usage(const char *progname)
            progname);
 }
 
+static void
+print_version()
+{
+#include <myutil/version.h>
+    puts("libutil version " LIBUTIL_VERSION);
+}
+
 static int
 parse_cmdline(int argc, char **argv, const char **src, const char **dst,
               int *back_up)
 {
     static const struct option longopts[] = {
         {"help", 0, NULL, 'h'},
+        {"version", 0, NULL, '.'},
         {NULL, 0, NULL, 0}
     };
 
-    GET_LONG_OPTIONS(argc, argv, "bh", longopts) {
+    GET_LONG_OPTIONS(argc, argv, "bh.", longopts) {
     case 'b':
         *back_up = 1;
         break;
     case 'h':
         print_usage(argv[0]);
+        return -2;
+    case '.':
+        print_version();
         return -2;
     default:
         return -1;

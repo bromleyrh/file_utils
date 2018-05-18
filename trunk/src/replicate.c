@@ -62,6 +62,7 @@ static int set_capabilities(void);
 static int init_privs(void);
 
 static void print_usage(const char *);
+static void print_version(void);
 static int parse_cmdline(int, char **, const char **, int *);
 
 static int get_conf_path(const char *, const char **);
@@ -256,6 +257,15 @@ print_usage(const char *progname)
            progname);
 }
 
+static void
+print_version()
+{
+#include <myutil/version.h>
+#include <json/version.h>
+    puts("libutil version " LIBUTIL_VERSION);
+    puts("libjson version " LIBJSON_VERSION);
+}
+
 static int
 parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
 {
@@ -264,10 +274,11 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
 
     static const struct option longopts[] = {
         {"help", 0, NULL, 'h'},
+        {"version", 0, NULL, '.'},
         {NULL, 0, NULL, 0}
     };
 
-    GET_LONG_OPTIONS(argc, argv, "c:dhs", longopts) {
+    GET_LONG_OPTIONS(argc, argv, "c:dhs.", longopts) {
     case 'c':
         if (cfpath != NULL)
             free((void *)cfpath);
@@ -284,11 +295,13 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
         break;
     case 'h':
         print_usage(argv[0]);
-        ret = -2;
-        goto exit;
+        goto exit_success;
     case 's':
         *sessid = atoi(optarg);
         break;
+    case '.':
+        print_version();
+        goto exit_success;
     default:
         ret = -1;
         goto exit;
@@ -298,6 +311,8 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
         *confpath = cfpath;
     return 0;
 
+exit_success:
+    ret = -2;
 exit:
     if (cfpath != NULL)
         free((void *)cfpath);

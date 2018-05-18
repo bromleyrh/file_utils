@@ -69,15 +69,23 @@ print_usage(const char *progname)
            progname);
 }
 
+static void
+print_version()
+{
+#include <myutil/version.h>
+    puts("libutil version " LIBUTIL_VERSION);
+}
+
 static int
 parse_cmdline(int argc, char **argv, const char **path)
 {
     static const struct option longopts[] = {
         {"help", 0, NULL, 'h'},
+        {"version", 0, NULL, '.'},
         {NULL, 0, NULL, 0}
     };
 
-    GET_LONG_OPTIONS(argc, argv, "Hhp", longopts) {
+    GET_LONG_OPTIONS(argc, argv, "Hhp.", longopts) {
     case 'H':
         create_holes = 1;
         break;
@@ -87,6 +95,9 @@ parse_cmdline(int argc, char **argv, const char **path)
     case 'p':
         preserve_times = 1;
         break;
+    case '.':
+        print_version();
+        return -2;
     default:
         return -1;
     } END_GET_LONG_OPTIONS;

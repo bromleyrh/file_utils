@@ -25,6 +25,7 @@
 #define TEMPLATE_PATH "\"$HOME/.manifest_temp\""
 
 static void print_usage(const char *);
+static void print_version(void);
 static int parse_cmdline(int, char **, char *, char *);
 
 static int get_path(const char *, char *);
@@ -42,15 +43,23 @@ print_usage(const char *progname)
            progname);
 }
 
+static void
+print_version()
+{
+#include <myutil/version.h>
+    puts("libutil version " LIBUTIL_VERSION);
+}
+
 static int
 parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
 {
     static const struct option longopts[] = {
         {"help", 0, NULL, 'h'},
+        {"version", 0, NULL, '.'},
         {NULL, 0, NULL, 0}
     };
 
-    GET_LONG_OPTIONS(argc, argv, "c:ht:", longopts) {
+    GET_LONG_OPTIONS(argc, argv, "c:ht:.", longopts) {
     case 'c':
         if (strlcpy(conf_path, optarg, PATH_MAX) >= PATH_MAX)
             goto path_err;
@@ -62,6 +71,9 @@ parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
         if (strlcpy(template_path, optarg, PATH_MAX) >= PATH_MAX)
             goto path_err;
         break;
+    case '.':
+        print_version();
+        return -2;
     default:
         return -1;
     } END_GET_LONG_OPTIONS;

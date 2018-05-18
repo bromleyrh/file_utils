@@ -52,6 +52,7 @@ static struct set *mode_set;
 static struct set *uid_set;
 
 static void print_usage(const char *);
+static void print_version(void);
 static int parse_cmdline(int, char **, const char **, const char ***);
 
 static int set_time_variables(void);
@@ -103,6 +104,13 @@ print_usage(const char *progname)
            progname);
 }
 
+static void
+print_version()
+{
+#include <myutil/version.h>
+    puts("libutil version " LIBUTIL_VERSION);
+}
+
 static int
 parse_cmdline(int argc, char **argv, const char **manifest_path,
               const char ***paths)
@@ -111,10 +119,11 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
 
     static const struct option longopts[] = {
         {"help", 0, NULL, 'h'},
+        {"version", 0, NULL, '.'},
         {NULL, 0, NULL, 0}
     };
 
-    GET_LONG_OPTIONS(argc, argv, "acg:hm:u:v", longopts) {
+    GET_LONG_OPTIONS(argc, argv, "acg:hm:u:v.", longopts) {
     case 'a':
         ignore_additions = 1;
         break;
@@ -140,6 +149,9 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
     case 'v':
         verbose = 1;
         break;
+    case '.':
+        print_version();
+        return -2;
     default:
         return -1;
     } END_GET_LONG_OPTIONS;
