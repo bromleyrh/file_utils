@@ -6,6 +6,7 @@
 
 #define _GNU_SOURCE
 
+#include <option_parsing.h>
 #include <strings_ext.h>
 
 #include <files/util.h>
@@ -70,26 +71,19 @@ print_usage(const char *progname)
 static int
 parse_cmdline(int argc, char **argv, const char **path)
 {
-    for (;;) {
-        int opt = getopt(argc, argv, "Hhp");
-
-        if (opt == -1)
-            break;
-
-        switch (opt) {
-        case 'H':
-            create_holes = 1;
-            break;
-        case 'h':
-            print_usage(argv[0]);
-            return -2;
-        case 'p':
-            preserve_times = 1;
-            break;
-        default:
-            return -1;
-        }
-    }
+    GET_OPTIONS(argc, argv, "Hhp") {
+    case 'H':
+        create_holes = 1;
+        break;
+    case 'h':
+        print_usage(argv[0]);
+        return -2;
+    case 'p':
+        preserve_times = 1;
+        break;
+    default:
+        return -1;
+    } END_GET_OPTIONS;
 
     if (optind == argc) {
         error(0, 0, "Must specify file");

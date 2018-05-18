@@ -8,6 +8,7 @@
 #include "common.h"
 #undef ASSERT_MACROS
 
+#include <option_parsing.h>
 #include <radix_tree.h>
 
 #include <adt/set.h>
@@ -107,42 +108,35 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
 {
     int ret = -1;
 
-    for (;;) {
-        int opt = getopt(argc, argv, "acg:hm:u:v");
-
-        if (opt == -1)
-            break;
-
-        switch (opt) {
-        case 'a':
-            ignore_additions = 1;
-            break;
-        case 'c':
-            correct_timestamps = 1;
-            break;
-        case 'g':
-            if (add_to_gid_set(&gid_set, optarg) != 0)
-                goto quit;
-            break;
-        case 'h':
-            print_usage(argv[0]);
-            ret = -2;
+    GET_OPTIONS(argc, argv, "acg:hm:u:v") {
+    case 'a':
+        ignore_additions = 1;
+        break;
+    case 'c':
+        correct_timestamps = 1;
+        break;
+    case 'g':
+        if (add_to_gid_set(&gid_set, optarg) != 0)
             goto quit;
-        case 'm':
-            if (add_to_mode_set(&mode_set, optarg) != 0)
-                goto quit;
-            break;
-        case 'u':
-            if (add_to_uid_set(&uid_set, optarg) != 0)
-                goto quit;
-            break;
-        case 'v':
-            verbose = 1;
-            break;
-        default:
-            return -1;
-        }
-    }
+        break;
+    case 'h':
+        print_usage(argv[0]);
+        ret = -2;
+        goto quit;
+    case 'm':
+        if (add_to_mode_set(&mode_set, optarg) != 0)
+            goto quit;
+        break;
+    case 'u':
+        if (add_to_uid_set(&uid_set, optarg) != 0)
+            goto quit;
+        break;
+    case 'v':
+        verbose = 1;
+        break;
+    default:
+        return -1;
+    } END_GET_OPTIONS;
 
     if (optind > argc - 2) {
         error(0, 0, "Must specify manifest path and directory path");

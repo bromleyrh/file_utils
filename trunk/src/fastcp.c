@@ -2,6 +2,8 @@
  * fastcp.c
  */
 
+#include <option_parsing.h>
+
 #include <files/util.h>
 
 #include <errno.h>
@@ -35,23 +37,16 @@ static int
 parse_cmdline(int argc, char **argv, const char **src, const char **dst,
               int *back_up)
 {
-    for (;;) {
-        int opt = getopt(argc, argv, "bh");
-
-        if (opt == -1)
-            break;
-
-        switch (opt) {
-        case 'b':
-            *back_up = 1;
-            break;
-        case 'h':
-            print_usage(argv[0]);
-            return -2;
-        default:
-            return -1;
-        }
-    }
+    GET_OPTIONS(argc, argv, "bh") {
+    case 'b':
+        *back_up = 1;
+        break;
+    case 'h':
+        print_usage(argv[0]);
+        return -2;
+    default:
+        return -1;
+    } END_GET_OPTIONS;
 
     if (optind > argc - 2) {
         error(0, 0, "Must specify source and destination paths");

@@ -6,6 +6,7 @@
 
 #include "btree.h"
 #include "btree_mmap.h"
+#include "option_parsing.h"
 
 #include "files/acc_ctl.h"
 
@@ -82,25 +83,18 @@ parse_cmdline(int argc, char **argv, struct opts *opts)
         ['l'] = LIST
     };
 
-    for (;;) {
-        int opt = getopt(argc, argv, "i:o:");
-
-        if (opt == -1)
-            break;
-
-        switch (opt) {
-        case 'i':
-            opts->index_file = strdup(optarg);
-            break;
-        case 'o':
-            if (optarg[1] != '\0')
-                return -1;
-            opts->op = opmap[(int)*optarg];
-            break;
-        default:
+    GET_OPTIONS(argc, argv, "i:o:") {
+    case 'i':
+        opts->index_file = strdup(optarg);
+        break;
+    case 'o':
+        if (optarg[1] != '\0')
             return -1;
-        }
-    }
+        opts->op = opmap[(int)*optarg];
+        break;
+    default:
+        return -1;
+    } END_GET_OPTIONS;
 
     if (opts->op == APPLY) {
         if (optind >= argc) {

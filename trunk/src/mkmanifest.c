@@ -2,6 +2,7 @@
  * mkmanifest.c
  */
 
+#include <option_parsing.h>
 #include <proc_ext.h>
 #include <strings_ext.h>
 
@@ -41,28 +42,21 @@ print_usage(const char *progname)
 static int
 parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
 {
-    for (;;) {
-        int opt = getopt(argc, argv, "c:ht:");
-
-        if (opt == -1)
-            break;
-
-        switch (opt) {
-        case 'c':
-            if (strlcpy(conf_path, optarg, PATH_MAX) >= PATH_MAX)
-                goto path_err;
-            break;
-        case 'h':
-            print_usage(argv[0]);
-            return -2;
-        case 't':
-            if (strlcpy(template_path, optarg, PATH_MAX) >= PATH_MAX)
-                goto path_err;
-            break;
-        default:
-            return -1;
-        }
-    }
+    GET_OPTIONS(argc, argv, "c:ht:") {
+    case 'c':
+        if (strlcpy(conf_path, optarg, PATH_MAX) >= PATH_MAX)
+            goto path_err;
+        break;
+    case 'h':
+        print_usage(argv[0]);
+        return -2;
+    case 't':
+        if (strlcpy(template_path, optarg, PATH_MAX) >= PATH_MAX)
+            goto path_err;
+        break;
+    default:
+        return -1;
+    } END_GET_OPTIONS;
 
     return 0;
 

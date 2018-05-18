@@ -13,6 +13,7 @@
 #include <backup.h>
 
 #include <forensics.h>
+#include <option_parsing.h>
 #include <radix_tree.h>
 #include <strings_ext.h>
 
@@ -212,39 +213,32 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new)
     const char *cfpath = NULL;
     int ret;
 
-    for (;;) {
-        int opt = getopt(argc, argv, "ac:dh");
-
-        if (opt == -1)
-            break;
-
-        switch (opt) {
-        case 'a':
-            *allow_new = 1;
-            break;
-        case 'c':
-            if (cfpath != NULL)
-                free((void *)cfpath);
-            cfpath = strdup(optarg);
-            if (cfpath == NULL) {
-                error(0, errno, "Couldn't allocate memory");
-                return -1;
-            }
-            break;
-        case 'd':
-#ifdef ENABLE_TRACE
-            tracing = 1;
-#endif
-            break;
-        case 'h':
-            print_usage(argv[0]);
-            ret = -2;
-            goto exit;
-        default:
-            ret = -1;
-            goto exit;
+    GET_OPTIONS(argc, argv, "ac:dh") {
+    case 'a':
+        *allow_new = 1;
+        break;
+    case 'c':
+        if (cfpath != NULL)
+            free((void *)cfpath);
+        cfpath = strdup(optarg);
+        if (cfpath == NULL) {
+            error(0, errno, "Couldn't allocate memory");
+            return -1;
         }
-    }
+        break;
+    case 'd':
+#ifdef ENABLE_TRACE
+        tracing = 1;
+#endif
+        break;
+    case 'h':
+        print_usage(argv[0]);
+        ret = -2;
+        goto exit;
+    default:
+        ret = -1;
+        goto exit;
+    } END_GET_OPTIONS;
 
     if (cfpath != NULL)
         *confpath = cfpath;

@@ -10,6 +10,7 @@
 
 #include <files/acc_ctl.h>
 
+#include <option_parsing.h>
 #include <strings_ext.h>
 
 #include <assert.h>
@@ -114,25 +115,17 @@ static int
 parse_cmdline(int argc, char **argv)
 {
     int numopts;
-    int opt;
 
-    for (;;) {
-        opt = getopt(argc, argv, "tv");
-
-        if (opt == -1)
-            break;
-
-        switch (opt) {
-        case 't':
-            hugetlbfs = 1;
-            break;
-        case 'v':
-            verbose = 1;
-            break;
-        default:
-            return -1;
-        }
-    }
+    GET_OPTIONS(argc, argv, "tv") {
+    case 't':
+        hugetlbfs = 1;
+        break;
+    case 'v':
+        verbose = 1;
+        break;
+    default:
+        return -1;
+    } END_GET_OPTIONS;
     numopts = optind - 1;
 
     if (argc - numopts < 3) {
