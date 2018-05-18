@@ -19,7 +19,7 @@ get_submodules()
 
 get_commit_message()
 {
-    printf "Committed to submodules\n\nCommit IDs:\n"
+    printf "Commit to submodules\n\nCommit IDs:\n"
 
     for m in $1; do
         cd $m
