@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -108,7 +109,12 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
 {
     int ret = -1;
 
-    GET_OPTIONS(argc, argv, "acg:hm:u:v") {
+    static const struct option longopts[] = {
+        {"help", 0, NULL, 'h'},
+        {NULL, 0, NULL, 0}
+    };
+
+    GET_LONG_OPTIONS(argc, argv, "acg:hm:u:v", longopts) {
     case 'a':
         ignore_additions = 1;
         break;
@@ -136,7 +142,7 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
         break;
     default:
         return -1;
-    } END_GET_OPTIONS;
+    } END_GET_LONG_OPTIONS;
 
     if (optind > argc - 2) {
         error(0, 0, "Must specify manifest path and directory path");

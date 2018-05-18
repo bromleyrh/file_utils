@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdint.h>
@@ -71,7 +72,12 @@ print_usage(const char *progname)
 static int
 parse_cmdline(int argc, char **argv, const char **path)
 {
-    GET_OPTIONS(argc, argv, "Hhp") {
+    static const struct option longopts[] = {
+        {"help", 0, NULL, 'h'},
+        {NULL, 0, NULL, 0}
+    };
+
+    GET_LONG_OPTIONS(argc, argv, "Hhp", longopts) {
     case 'H':
         create_holes = 1;
         break;
@@ -83,7 +89,7 @@ parse_cmdline(int argc, char **argv, const char **path)
         break;
     default:
         return -1;
-    } END_GET_OPTIONS;
+    } END_GET_LONG_OPTIONS;
 
     if (optind == argc) {
         error(0, 0, "Must specify file");

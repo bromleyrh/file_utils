@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <grp.h>
 #include <limits.h>
 #include <mcheck.h>
@@ -261,7 +262,12 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
     const char *cfpath = NULL;
     int ret;
 
-    GET_OPTIONS(argc, argv, "c:dhs") {
+    static const struct option longopts[] = {
+        {"help", 0, NULL, 'h'},
+        {NULL, 0, NULL, 0}
+    };
+
+    GET_LONG_OPTIONS(argc, argv, "c:dhs", longopts) {
     case 'c':
         if (cfpath != NULL)
             free((void *)cfpath);
@@ -286,7 +292,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
     default:
         ret = -1;
         goto exit;
-    } END_GET_OPTIONS;
+    } END_GET_LONG_OPTIONS;
 
     if (cfpath != NULL)
         *confpath = cfpath;

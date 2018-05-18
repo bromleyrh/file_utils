@@ -2,6 +2,8 @@
  * fastcp.c
  */
 
+#define _GNU_SOURCE
+
 #include <option_parsing.h>
 
 #include <files/util.h>
@@ -9,6 +11,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +40,12 @@ static int
 parse_cmdline(int argc, char **argv, const char **src, const char **dst,
               int *back_up)
 {
-    GET_OPTIONS(argc, argv, "bh") {
+    static const struct option longopts[] = {
+        {"help", 0, NULL, 'h'},
+        {NULL, 0, NULL, 0}
+    };
+
+    GET_LONG_OPTIONS(argc, argv, "bh", longopts) {
     case 'b':
         *back_up = 1;
         break;
@@ -46,7 +54,7 @@ parse_cmdline(int argc, char **argv, const char **src, const char **dst,
         return -2;
     default:
         return -1;
-    } END_GET_OPTIONS;
+    } END_GET_LONG_OPTIONS;
 
     if (optind > argc - 2) {
         error(0, 0, "Must specify source and destination paths");

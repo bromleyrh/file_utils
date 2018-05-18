@@ -2,12 +2,15 @@
  * mkmanifest.c
  */
 
+#define _GNU_SOURCE
+
 #include <option_parsing.h>
 #include <proc_ext.h>
 #include <strings_ext.h>
 
 #include <errno.h>
 #include <error.h>
+#include <getopt.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -42,7 +45,12 @@ print_usage(const char *progname)
 static int
 parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
 {
-    GET_OPTIONS(argc, argv, "c:ht:") {
+    static const struct option longopts[] = {
+        {"help", 0, NULL, 'h'},
+        {NULL, 0, NULL, 0}
+    };
+
+    GET_LONG_OPTIONS(argc, argv, "c:ht:", longopts) {
     case 'c':
         if (strlcpy(conf_path, optarg, PATH_MAX) >= PATH_MAX)
             goto path_err;
@@ -56,7 +64,7 @@ parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
         break;
     default:
         return -1;
-    } END_GET_OPTIONS;
+    } END_GET_LONG_OPTIONS;
 
     return 0;
 
