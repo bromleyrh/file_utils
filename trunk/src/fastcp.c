@@ -156,7 +156,7 @@ main(int argc, char **argv)
     close(dstdirfd);
 
     if (((ret = file_copy_fd(fd1, fd2, 0)) != 0)
-        || ((ret = file_copy_attrs_fd(fd1, fd2)) != 0)) {
+        || ((ret = file_copy_attrs_fd(fd1, fd2, 0)) != 0)) {
         error(0, -ret, "Error copying file");
         goto err2;
     }
