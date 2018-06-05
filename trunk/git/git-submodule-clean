@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+eval exec git submodule foreach \'"git clean $@"\'
