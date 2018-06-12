@@ -48,6 +48,24 @@ get_dirs()
     tmpdir=/tmp/tmp
 }
 
+apply_patches()
+{
+    local reponame=$(basename $2)
+    local patchdir=$2/../patches/$reponame
+
+    cd $1
+
+    if [[ -d $patchdir ]]; then
+        for i in $patchdir/*; do
+            echo "Applying patch $i to $1"
+            patch -p 2 < $i
+        done
+        autoreconf -fv
+    fi
+
+    cd - 1>/dev/null
+}
+
 do_build()
 {
     ./configure "$@" # TODO: add option to set configure parameters
@@ -81,6 +99,8 @@ set -e
 
 mkdir -v $tmpdir
 tar -x -f $distdir/*.xz -C $tmpdir -v
+
+apply_patches $tmpdir/* $(pwd)
 
 cd $tmpdir/*
 if [[ -n $cmdpre ]]; then
