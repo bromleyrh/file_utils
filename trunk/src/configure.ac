@@ -148,4 +148,17 @@ AC_CONFIG_FILES([Makefile])
 AC_CONFIG_HEADERS([config.h])
 AC_OUTPUT
 
+cat <<- EOF
+
+$PACKAGE_NAME configuration
+
+               Compiler: $CC
+
+              Debugging: $debug
+         GCC sanitizers: $sanitizers
+
+    Installation prefix: $prefix
+
+EOF
+
 dnl vi: set expandtab sw=4 ts=4:
