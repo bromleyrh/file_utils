@@ -31,4 +31,4 @@ foreach_vm()
 
 alias bup_disk_images="foreach_vm bup_disk_image disk_image.img"
 
-# vi: set filetype=sh noexpandtab sw=4 ts=4:
+# vi: set ft=sh noexpandtab sw=4 ts=4:
