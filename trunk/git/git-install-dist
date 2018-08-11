@@ -79,6 +79,8 @@ do_build()
     fi
 
     make distclean
+
+    sync
 }
 
 get_cmds
