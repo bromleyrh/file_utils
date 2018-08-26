@@ -15,12 +15,12 @@ AM_INIT_AUTOMAKE([1.15 foreign no-define subdir-objects])
 AM_SILENT_RULES([yes])
 LT_INIT([disable-static])
 
-case $target_os in
-    *linux*)
-        platform=linux;;
-    *)
-        AC_MSG_ERROR([unsupported platform], [1]);;
-esac
+AS_CASE(
+    [$target_os],
+        [*linux*],
+            [platform=linux],
+        [AC_MSG_ERROR([unsupported platform], [1])]
+)
 
 CFLAGS=""
 
@@ -35,46 +35,54 @@ AX_CODE_COVERAGE
 
 AC_ARG_ENABLE([sanitizers],
               [  --enable-sanitizers     enable GCC sanitizers],
-              [case "$enableval" in
-                   yes)
-                       sanitizers=true;;
-                   no)
-                       sanitizers=false;;
-                   *)
-                       AC_MSG_ERROR([invalid "--enable-sanitizers" argument]);;
-               esac],
+              [AS_CASE(
+                  ["$enableval"],
+                      [yes],
+                          [sanitizers=true],
+                      [no],
+                          [sanitizers=false],
+                      [AC_MSG_ERROR([invalid "--enable-sanitizers" argument])]
+               )
+              ],
               [sanitizers=false])
 
 AC_ARG_ENABLE([debugging],
               [  --enable-debugging      enable debugging],
-              [case "$enableval" in
-                   yes)
-                       debug=true;;
-                   no)
-                       debug=false;;
-                   *)
-                       AC_MSG_ERROR([invalid "--enable-debugging" argument]);;
-               esac],
+              [AS_CASE(
+                  ["$enableval"],
+                      [yes],
+                          [debug=true],
+                      [no],
+                          [debug=false],
+                      [AC_MSG_ERROR([invalid "--enable-debugging" argument])]
+               )
+              ],
               [debug=false])
-if test "x$sanitizers" = xtrue; then
-    debug=true
-fi
+AS_IF(
+    [test "x$sanitizers" = xtrue],
+    [debug=true]
+)
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
 
-if test "x$sanitizers" = xtrue; then
-    AC_CHECK_LIB([asan], [__interceptor_malloc], [asan_libs="-lasan"])
-    AC_CHECK_LIB([ubsan], [__ubsan_handle_add_overflow], [ubsan_libs="-lubsan"])
+AS_IF(
+    [test "x$sanitizers" = xtrue],
+    [AC_CHECK_LIB([asan], [__interceptor_malloc], [asan_libs="-lasan"])
+     AC_CHECK_LIB([ubsan], [__ubsan_handle_add_overflow],
+                  [ubsan_libs="-lubsan"]
+     )
 
-    fsanitizer="-fsanitize=address -fsanitize=undefined"
-    fsanitizer="$fsanitizer -fsanitize-undefined-trap-on-error"
-    AX_CHECK_COMPILE_FLAG([-fsanitize=address],
-        [sanitizer="$fsanitizer"],
-        [sanitizer=""]
-    )
-    if test "x$asan_libs" = x || test "x$ubsan_libs" = x; then
-        sanitizer=""
-    fi
-fi
+     fsanitizer="-fsanitize=address -fsanitize=undefined"
+     fsanitizer="$fsanitizer -fsanitize-undefined-trap-on-error"
+     AX_CHECK_COMPILE_FLAG([-fsanitize=address],
+         [sanitizer="$fsanitizer"],
+         [sanitizer=""]
+     )
+     AS_IF(
+         [test "x$asan_libs" = x || test "x$ubsan_libs" = x],
+         [sanitizer=""]
+     )
+    ]
+)
 AM_CONDITIONAL([SANITIZERS], [test x$sanitizers = xtrue])
 AC_SUBST([sanitizer])
 
@@ -117,11 +125,11 @@ AC_SUBST([libjson_link_dep])
 AC_SUBST([libutil_link_dep])
 AC_SUBST([openssl_link_dep])
 
-if test x$debug = xtrue; then
-    enable_trace=true
-else
-    enable_trace=false
-fi
+AS_IF(
+    [test x$debug = xtrue],
+    [enable_trace=true],
+    [enable_trace=false]
+)
 AM_CONDITIONAL([TRACE], [test $enable_trace = true])
 
 AC_ARG_WITH([pkgconfigdir],
