@@ -141,6 +141,10 @@ install-exec-hook:
 	@if ldc=`which ldconfig 2>/dev/null` && test -x ${ldc}; then \
 		echo "Regenerating runtime linker cache"; \
 		ldconfig || true; \
-	fi
+	fi; \
+	echo; \
+	echo "Note: The path \"$(pkgconfigdir)\" must be added to"; \
+	echo "PKG_CONFIG_PATH in order to build dependent modules"; \
+	echo
 
 ## vi: set noexpandtab sw=4 ts=4:
