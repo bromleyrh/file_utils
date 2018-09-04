@@ -103,17 +103,22 @@ AC_CHECK_FUNCS([mnt_table_uniq_fs syncfs])
 
 AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
 
-pkgcfg=pkg-config
-
-dbus_cflags=`eval $pkgcfg --cflags dbus-1`
-libjson_cflags=`eval $pkgcfg --cflags libjson`
-libutil_cflags=`eval $pkgcfg --cflags libutil`
-openssl_cflags=`eval $pkgcfg --cflags openssl`
-
-dbus_link_dep=`eval $pkgcfg --libs dbus-1`
-libjson_link_dep=`eval $pkgcfg --libs libjson`
-libutil_link_dep=`eval $pkgcfg --libs libutil`
-openssl_link_dep=`eval $pkgcfg --libs openssl`
+PKG_CHECK_MODULES([dbus], [dbus-1],
+    [dbus_cflags=$dbus_CFLAGS
+     dbus_link_dep=$dbus_LIBS]
+)
+PKG_CHECK_MODULES([libjson], [libjson],
+    [libjson_cflags=$libjson_CFLAGS
+     libjson_link_dep=$libjson_LIBS]
+)
+PKG_CHECK_MODULES([libutil], [libutil],
+    [libutil_cflags=$libutil_CFLAGS
+     libutil_link_dep=$libutil_LIBS]
+)
+PKG_CHECK_MODULES([openssl], [openssl],
+    [openssl_cflags=$openssl_CFLAGS
+     openssl_link_dep=$openssl_LIBS]
+)
 
 AC_SUBST([dbus_cflags])
 AC_SUBST([libjson_cflags])
