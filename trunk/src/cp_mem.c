@@ -230,7 +230,7 @@ dest_init(int fd, int on_hugetlbfs, struct dest *dst)
     dst->buf.buf = NULL;
 
     if (ioctl(dst->fd, FIGETBSZ, &dst->blksize) == -1) {
-        error(0, errno, "Couldn't get destination filesystem block size");
+        error(0, errno, "Couldn't get destination file system block size");
         return -1;
     }
 

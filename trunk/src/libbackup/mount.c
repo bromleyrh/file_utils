@@ -328,7 +328,7 @@ check_filesystem(const char *path, const char *cmd, const char *src_specifier)
     const char *fullcmd;
     int err;
 
-    debug_print("Checking filesystem on %s", path);
+    debug_print("Checking file system on %s", path);
 
     fullcmd = strsub(cmd, src_specifier, path);
     if (fullcmd == NULL)

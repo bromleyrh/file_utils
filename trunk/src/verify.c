@@ -618,7 +618,7 @@ do_verifs(struct verify_ctx *ctx)
             err = check_filesystem(verif->devpath, verif->check_cmd,
                                    CHECK_CMD_SRC_SPECIFIER);
             if (err) {
-                error(0, -err, "Error checking filesystem on %s",
+                error(0, -err, "Error checking file system on %s",
                       verif->devpath);
                 goto err1;
             }

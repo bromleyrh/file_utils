@@ -97,7 +97,7 @@ main(int argc, char **argv)
         error(EXIT_FAILURE, errno, "Error opening %s", file);
 
     if (!platform_test_xfs_fd(fd)) {
-        error(0, 0, "%s does not reside on an XFS filesystem", file);
+        error(0, 0, "%s does not reside on an XFS file system", file);
         close(fd);
         return EXIT_FAILURE;
     }
