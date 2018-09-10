@@ -175,7 +175,7 @@ get_io_size(int rootfd)
     if (1 || !platform_test_xfs_fd(rootfd))
         return BUFSIZE;
 
-    /* FIXME: ensure XFS filesystems are mounted with "largeio" mount option */
+    /* FIXME: ensure XFS file systems are mounted with "largeio" mount option */
     return (fstat(rootfd, &s) == 0) ? s.st_blksize : -errno;
 #else
     (void)rootfd;
@@ -246,7 +246,7 @@ set_direct_io(int fd)
     return ((fl != -1)
             && ((fcntl(fd, F_SETFL, fl | O_DIRECT) != -1) || (errno == EINVAL)))
            ? 0 : -errno; /* EINVAL from fcntl(F_SETFL, fl | O_DIRECT) means
-                            O_DIRECT not supported by filesystem */
+                            O_DIRECT not supported by file system */
 }
 
 static void
