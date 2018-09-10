@@ -615,8 +615,8 @@ do_verifs(struct verify_ctx *ctx)
                   verif->srcpath);
 
         if (verif->check_cmd != NULL) {
-            err = check_filesystem(verif->devpath, verif->check_cmd,
-                                   CHECK_CMD_SRC_SPECIFIER);
+            err = check_file_system(verif->devpath, verif->check_cmd,
+                                    CHECK_CMD_SRC_SPECIFIER);
             if (err) {
                 error(0, -err, "Error checking file system on %s",
                       verif->devpath);
@@ -624,8 +624,8 @@ do_verifs(struct verify_ctx *ctx)
             }
         }
 
-        va.srcfd = mount_filesystem(verif->devpath, verif->srcpath,
-                                    MNT_FS_READ);
+        va.srcfd = mount_file_system(verif->devpath, verif->srcpath,
+                                     MNT_FS_READ);
         if (va.srcfd < 0) {
             error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
             err = va.srcfd;
@@ -639,7 +639,7 @@ do_verifs(struct verify_ctx *ctx)
             goto err2;
         }
 
-        err = unmount_filesystem(verif->srcpath, va.srcfd);
+        err = unmount_file_system(verif->srcpath, va.srcfd);
         if (err) {
             error(0, -err, "Error unmounting %s", verif->srcpath);
             goto err1;
@@ -679,7 +679,7 @@ do_verifs(struct verify_ctx *ctx)
     return 0;
 
 err2:
-    unmount_filesystem(verif->srcpath, va.srcfd);
+    unmount_file_system(verif->srcpath, va.srcfd);
 err1:
     if (va.dstf != stdout)
         fclose(va.dstf);

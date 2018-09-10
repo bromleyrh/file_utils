@@ -27,11 +27,11 @@ LIBBACKUP_EXPORTED int blkdev_format(const char *path, const char *cmd,
 
 LIBBACKUP_EXPORTED int mount_ns_unshare(void);
 
-LIBBACKUP_EXPORTED int mount_filesystem(const char *devpath,
-                                        const char *mntpath, int flags);
-LIBBACKUP_EXPORTED int unmount_filesystem(const char *path, int rootfd);
-LIBBACKUP_EXPORTED int check_filesystem(const char *path, const char *cmd,
-                                        const char *src_specifier);
+LIBBACKUP_EXPORTED int mount_file_system(const char *devpath,
+                                         const char *mntpath, int flags);
+LIBBACKUP_EXPORTED int unmount_file_system(const char *path, int rootfd);
+LIBBACKUP_EXPORTED int check_file_system(const char *path, const char *cmd,
+                                         const char *src_specifier);
 
 #ifdef __cplusplus
 }

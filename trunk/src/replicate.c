@@ -533,7 +533,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
 
-        ca.srcfd = mount_filesystem(NULL, transfer->srcpath, MNT_FS_READ);
+        ca.srcfd = mount_file_system(NULL, transfer->srcpath, MNT_FS_READ);
         if (ca.srcfd < 0) {
             error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
             return ca.srcfd;
@@ -556,9 +556,9 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             goto err2;
         }
 
-        ca.dstfd = mount_filesystem(transfer->dstpath, transfer->dstmntpath,
-                                    transfer->force_write
-                                    ? MNT_FS_FORCE_WRITE : MNT_FS_WRITE);
+        ca.dstfd = mount_file_system(transfer->dstpath, transfer->dstmntpath,
+                                     transfer->force_write
+                                     ? MNT_FS_FORCE_WRITE : MNT_FS_WRITE);
         if (ca.dstfd < 0) {
             error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
             err = ca.dstfd;
@@ -580,7 +580,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             goto err3;
         }
 
-        err = unmount_filesystem(transfer->dstmntpath, ca.dstfd);
+        err = unmount_file_system(transfer->dstmntpath, ca.dstfd);
         if (err) {
             error(0, -err, "Error unmounting %s", transfer->dstmntpath);
             goto err2;
@@ -596,7 +596,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             }
         }
 
-        err = unmount_filesystem(transfer->srcpath, ca.srcfd);
+        err = unmount_file_system(transfer->srcpath, ca.srcfd);
         if (err) {
             error(0, -err, "Error unmounting %s", transfer->srcpath);
             return err;
@@ -613,12 +613,12 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
     return 0;
 
 err3:
-    unmount_filesystem(transfer->dstmntpath, ca.dstfd);
+    unmount_file_system(transfer->dstmntpath, ca.dstfd);
 err2:
     if (transfer->setro)
         blkdev_set_read_only(transfer->dstpath, 1, NULL);
 err1:
-    unmount_filesystem(transfer->srcpath, ca.srcfd);
+    unmount_file_system(transfer->srcpath, ca.srcfd);
     return err;
 }
 

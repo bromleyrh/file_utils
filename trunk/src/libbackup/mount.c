@@ -233,7 +233,7 @@ err:
 }
 
 int
-mount_filesystem(const char *devpath, const char *mntpath, int flags)
+mount_file_system(const char *devpath, const char *mntpath, int flags)
 {
     int mflags;
     int ret;
@@ -271,7 +271,7 @@ mount_filesystem(const char *devpath, const char *mntpath, int flags)
     ret = open(mntpath, O_DIRECTORY | O_RDONLY);
     if (ret == -1) {
         ret = -errno;
-        unmount_filesystem(mntpath, -1);
+        unmount_file_system(mntpath, -1);
         goto err2;
     }
 
@@ -287,7 +287,7 @@ err1:
 }
 
 int
-unmount_filesystem(const char *path, int rootfd)
+unmount_file_system(const char *path, int rootfd)
 {
     int ret;
     struct libmnt_context *mntctx;
@@ -323,7 +323,7 @@ unmount_filesystem(const char *path, int rootfd)
 }
 
 int
-check_filesystem(const char *path, const char *cmd, const char *src_specifier)
+check_file_system(const char *path, const char *cmd, const char *src_specifier)
 {
     const char *fullcmd;
     int err;
