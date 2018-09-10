@@ -99,7 +99,15 @@ typedef int64_t off64_t;
 ])
 AM_CONDITIONAL([HAVE_LIBXFS], [test x$libxfs = xtrue])
 
-AC_CHECK_FUNCS([mnt_table_uniq_fs syncfs])
+AC_CHECK_FUNCS([syncfs])
+
+AC_CHECK_LIB([mount], [mnt_table_uniq_fs],
+    [AC_DEFINE(
+        [HAVE_MNT_TABLE_UNIQ_FS], [1],
+        [Define if you have the 'mnt_table_uniq_fs' function.]
+     )
+    ]
+)
 
 AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
 
