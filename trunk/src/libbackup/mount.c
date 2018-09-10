@@ -27,13 +27,15 @@
 #include <sys/types.h>
 
 static int do_fs_cmp(struct libmnt_fs *, struct libmnt_fs *);
+
 #ifdef HAVE_MNT_TABLE_UNIQ_FS
 static int mnt_cmp(struct libmnt_table *, struct libmnt_fs *,
                    struct libmnt_fs *);
-#endif
+#else
 static int fs_cmp(const void *, const void *, void *);
-
 static int uniq_fs(struct libmnt_table *, struct libmnt_iter *);
+#endif
+
 static int keep_mnt(const char *);
 
 static int
@@ -56,8 +58,7 @@ mnt_cmp(struct libmnt_table *tbl, struct libmnt_fs *fs1, struct libmnt_fs *fs2)
 
     return do_fs_cmp(fs1, fs2);
 }
-
-#endif
+#else
 static int
 fs_cmp(const void *k1, const void *k2, void *ctx)
 {
@@ -112,6 +113,7 @@ err:
     avl_tree_free(fs_set);
     return -EIO;
 }
+#endif
 
 #define MNT(target) {target, sizeof(target) - 1}
 
