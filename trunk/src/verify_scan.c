@@ -751,7 +751,7 @@ alloc_err1:
     return err;
 
 stat_err:
-    error(0, err, "Error getting filesystem stats");
+    error(0, err, "Error getting filesystem statistics");
     return err;
 }
 

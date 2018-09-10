@@ -170,7 +170,7 @@ copy_fn(void *arg)
     struct statvfs s;
 
     if (fstatvfs(cargs->srcfd, &s) == -1) {
-        error(0, errno, "Error getting filesystem stats");
+        error(0, errno, "Error getting filesystem statistics");
         return errno;
     }
     cctx.busconn = cargs->busconn;
