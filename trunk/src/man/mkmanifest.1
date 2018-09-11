@@ -1,0 +1,28 @@
+.\" mkmanifest.1
+.TH MKMANIFEST 1 2018-09-10 ""
+.SH NAME
+mkmanifest \- generate file systems manifest
+.SH SYNOPSIS
+.B mkmanifest
+[\fIOPTION\fR]...
+.SH DESCRIPTION
+Generate a file systems manifest file, containing a header and one record for
+each file in a set of file systems consisting of a size in bytes, a SHA-1
+checksum of the first 512 bytes of the file, a SHA-1 checksum of the entire
+file, and a relative pathname. The set of file systems for which a manifest is
+generated is defined by a configuration file, whose format is described in
+\fBverify.conf\fR(5). By default, ~/.verify.conf is read as the configuration
+file.
+.TP
+\fB\-c\fR \fIPATH\fR
+use specified verify.conf configuration file
+.TP
+\fB\-h\fR
+output help
+.TP
+\fB\-t\fR \fIPATH\fR
+use specified manifest template file
+.SH EXIT STATUS
+0 on success, nonzero on error
+.SH SEE ALSO
+.BR verify.conf (5)

@@ -159,7 +159,7 @@ AC_SUBST([ldio_cur], [0])
 AC_SUBST([ldio_age], [0])
 AC_SUBST([ldio_rev], [0])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile man/Makefile])
 AC_CONFIG_HEADERS([config.h])
 AC_OUTPUT
 

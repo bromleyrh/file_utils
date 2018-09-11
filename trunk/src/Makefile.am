@@ -6,6 +6,8 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
+SUBDIRS = man
+
 fortify_source_defines = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 
 if SANITIZERS
