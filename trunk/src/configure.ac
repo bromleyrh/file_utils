@@ -92,8 +92,7 @@ AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
 )
 AC_SUBST([stack_protector])
 
-libxfs=false
-AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [], [
+AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [libxfs=false], [
 #include <stdint.h>
 typedef int64_t off64_t;
 ])
@@ -151,19 +150,13 @@ AC_ARG_WITH([pkgconfigdir],
             [pkgconfigdir="$libdir/pkgconfig"])
 AC_SUBST([pkgconfigdir])
 
-lbu_cur=0
-lbu_age=0
-lbu_rev=0
-AC_SUBST([lbu_cur])
-AC_SUBST([lbu_age])
-AC_SUBST([lbu_rev])
+AC_SUBST([lbu_cur], [0])
+AC_SUBST([lbu_age], [0])
+AC_SUBST([lbu_rev], [0])
 
-ldio_cur=0
-ldio_age=0
-ldio_rev=0
-AC_SUBST([ldio_cur])
-AC_SUBST([ldio_age])
-AC_SUBST([ldio_rev])
+AC_SUBST([ldio_cur], [0])
+AC_SUBST([ldio_age], [0])
+AC_SUBST([ldio_rev], [0])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_HEADERS([config.h])
