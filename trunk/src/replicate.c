@@ -278,7 +278,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
         {NULL, 0, NULL, 0}
     };
 
-    GET_LONG_OPTIONS(argc, argv, "c:dhs.", longopts) {
+    GET_LONG_OPTIONS(argc, argv, "c:dhs:.", longopts) {
     case 'c':
         if (cfpath != NULL)
             free((void *)cfpath);
