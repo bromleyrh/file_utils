@@ -18,6 +18,8 @@ install:
 		for i in $(helpers); \
 			do install -g wheel -o root -m 0755 $$i $(bindir); \
 		done; \
+		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpost; \
+		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpre; \
 		ln -fs git-make-bundle $(bindir)/git-make-bundles; \
 		ln -fs git-submodule-repeat $(bindir)/git-submodule-clean; \
 		ln -fs git-submodule-repeat $(bindir)/git-submodule-fetch; \
@@ -25,6 +27,8 @@ install:
 		for i in $(helpers); \
 			do install -D -g root -o root -m 0755 $$i $(bindir)/$$i; \
 		done; \
+		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpost; \
+		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpre; \
 		ln -fs git-make-bundle $(bindir)/git-make-bundles; \
 		ln -fs git-submodule-repeat $(bindir)/git-submodule-clean; \
 		ln -fs git-submodule-repeat $(bindir)/git-submodule-fetch; \

@@ -88,6 +88,15 @@ set_up_env
 opts=$(git config user.installDistOpts)
 [[ $? == 0 ]] && set -- $opts $@
 
+cmd=$(echo $0 | cut -d '-' -f 4)
+if [[ $cmd = "cmdpre" ]] || [[ $cmd = "cmdpost" ]]; then
+    eval command="\$$cmd"
+    [[ -z $command ]] && exit 0
+    echo "Running \"$command\""
+    eval $command
+    exit $?
+fi
+
 noroot=0
 if [[ $1 = "-r" ]]; then
     noroot=1
