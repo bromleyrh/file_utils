@@ -4,6 +4,8 @@
 # spec_to_h.pl
 #
 
+# FIXME: Length of output C string constants should be limited to 509 characters
+
 use strict;
 use warnings;
 
