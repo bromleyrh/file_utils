@@ -5,9 +5,9 @@
 prefix=/usr/local
 bindir=$(prefix)/bin
 
-helpers=git-ck git-commit-archive git-cscope git-get-bundles git-install-dist \
-git-make-bundle git-prepare git-set-version git-skel git-submodule-commit \
-git-submodule-repeat git-sync git-verify
+helpers=git-branches git-ck git-commit-archive git-cscope git-get-bundles \
+git-install-dist git-make-bundle git-prepare git-set-version git-skel \
+git-submodule-commit git-submodule-repeat git-verify
 
 .PHONY: install clean
 
@@ -18,6 +18,7 @@ install:
 		for i in $(helpers); \
 			do install -g wheel -o root -m 0755 $$i $(bindir); \
 		done; \
+		ln -fs git-branches $(bindir)/git-sync; \
 		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpost; \
 		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpre; \
 		ln -fs git-make-bundle $(bindir)/git-make-bundles; \
@@ -27,6 +28,7 @@ install:
 		for i in $(helpers); \
 			do install -D -g root -o root -m 0755 $$i $(bindir)/$$i; \
 		done; \
+		ln -fs git-branches $(bindir)/git-sync; \
 		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpost; \
 		ln -fs git-install-dist $(bindir)/git-install-dist-cmdpre; \
 		ln -fs git-make-bundle $(bindir)/git-make-bundles; \
