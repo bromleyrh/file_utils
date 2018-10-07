@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+get_remotes()
+{
+    local tmp
+
+    tmp=$(git remote)
+    if [[ $? != 0 ]]; then
+        return 1
+    fi
+
+    for rmt in $tmp; do
+        remotes+="$rmt "
+        remote_set[$rmt]=1
+    done < <(echo "$tmp")
+}
+
+set -e
+
+declare -A remote_set
+get_remotes
+
+set +e
+
+remotes_excl=$(git config user.remotesExcl)
+for rmt in $remotes_excl; do
+    remote_set[$rmt]=
+done
+
+first=1
+for rmt in $remotes; do
+    if [[ ${remote_set[$rmt]} = 1 ]]; then
+        if [[ $first = 1 ]]; then
+            first=0
+        else
+            echo -n " "
+        fi
+        echo -n "$rmt"
+    fi
+done
