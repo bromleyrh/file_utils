@@ -41,7 +41,7 @@ get_ncpus()
 
 get_dirs()
 {
-    local rootdir=$(git rev-parse --show-toplevel)
+    rootdir=$(git rev-parse --show-toplevel)
     [[ $? != 0 ]] && return 1
 
     distdir=$rootdir/dist
@@ -81,6 +81,15 @@ do_build()
     make distclean
 
     sync
+
+    local reponame=$(basename $rootdir)
+    local logmsg="Installed $reponame"
+    if [[ -z $@ ]]; then
+        logmsg="$logmsg with default configuration"
+    else
+        logmsg="$logmsg with configuration \"$@\""
+    fi
+    logger "$logmsg"
 }
 
 get_cmds
