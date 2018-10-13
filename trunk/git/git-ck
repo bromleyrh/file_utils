@@ -31,4 +31,7 @@ for c in $commands; do
     echo "\`- $?"
 done
 
+reponame=$(git rev-parse --show-toplevel)
+logger "Ran check commands for repository $reponame"
+
 exit $ret
