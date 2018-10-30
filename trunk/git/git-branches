@@ -48,14 +48,8 @@ for b in $branches_excl; do
 done
 branch_set["master"]=
 
-first=1
 for b in $branches; do
     if [[ ${branch_set[$b]} = 1 ]]; then
-        if [[ $first = 1 ]]; then
-            first=0
-        else
-            echo -n " "
-        fi
-        echo -n "$b"
+        echo "$b"
     fi
 done

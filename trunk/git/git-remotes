@@ -27,14 +27,8 @@ for rmt in $remotes_excl; do
     remote_set[$rmt]=
 done
 
-first=1
 for rmt in $remotes; do
     if [[ ${remote_set[$rmt]} = 1 ]]; then
-        if [[ $first = 1 ]]; then
-            first=0
-        else
-            echo -n " "
-        fi
-        echo -n "$rmt"
+        echo "$rmt"
     fi
 done
