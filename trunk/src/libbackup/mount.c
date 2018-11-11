@@ -306,7 +306,8 @@ unmount_file_system(const char *path, int rootfd)
 
     if (rootfd >= 0) {
         /* explicitly synchronize file system for greater assurance of data
-           integrity if file system is writable */
+           integrity if file system is writable (however, this should be
+           unnecessary) */
 #ifdef HAVE_SYNCFS
         syncfs(rootfd);
 #else
