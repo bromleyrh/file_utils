@@ -102,8 +102,10 @@ get_gid(const char *name, gid_t *gid)
         err = getgrnam_r(name, &grp, buf, bufsize, &res);
         if (!err)
             break;
-        if (err != ERANGE)
+        if (err != ERANGE) {
+            error(0, err, "Error looking up group information for %s", name);
             goto err;
+        }
 
         bufsize *= 2;
         tmp = do_realloc(buf, bufsize);
@@ -151,8 +153,10 @@ get_uid(const char *name, uid_t *uid)
         err = getpwnam_r(name, &pwd, buf, bufsize, &res);
         if (!err)
             break;
-        if (err != ERANGE)
+        if (err != ERANGE) {
+            error(0, err, "Error looking up user information for %s", name);
             goto err;
+        }
 
         bufsize *= 2;
         tmp = do_realloc(buf, bufsize);
