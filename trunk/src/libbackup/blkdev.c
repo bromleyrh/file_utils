@@ -23,23 +23,25 @@
 int
 blkdev_set_read_only(const char *path, int read_only, int *prev_read_only)
 {
+    int err;
     int fd;
     int prev;
 
     fd = open(path, O_RDONLY);
     if (fd == -1) {
+        err = -errno;
         error(0, errno, "Error opening %s", path);
-        goto err1;
+        return err;
     }
 
     if (ioctl(fd, BLKROGET, &prev) == -1) {
         error(0, errno, "Error setting %s read-only", path);
-        goto err2;
+        goto err;
     }
 
     if ((prev != read_only) && (ioctl(fd, BLKROSET, &read_only) == -1)) {
         error(0, errno, "Error setting %s read-only", path);
-        goto err2;
+        goto err;
     }
 
     close(fd);
@@ -48,10 +50,10 @@ blkdev_set_read_only(const char *path, int read_only, int *prev_read_only)
         *prev_read_only = prev;
     return 0;
 
-err2:
+err:
+    err = -errno;
     close(fd);
-err1:
-    return -errno;
+    return err;
 }
 
 int

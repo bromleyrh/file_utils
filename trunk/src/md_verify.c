@@ -405,8 +405,9 @@ scan_input_file(const char *path, struct radix_tree **data)
     else {
         f = fopen(path, "r");
         if (f == NULL) {
+            res = MINUS_ERRNO;
             error(0, errno, "Error opening %s", path);
-            return MINUS_ERRNO;
+            return res;
         }
     }
 

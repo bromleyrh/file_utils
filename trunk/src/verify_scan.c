@@ -209,8 +209,9 @@ get_huge_page_size()
 
     f = fopen(MEMINFO, "r");
     if (f == NULL) {
+        ret = -errno;
         error(0, errno, "Error opening " MEMINFO);
-        return -errno;
+        return ret;
     }
 
     for (;;) {
@@ -776,9 +777,10 @@ do_verif(struct verif_args *verif_args)
         return -nsgids;
     }
     if (setgroups(0, NULL) == -1) {
+        ret = errno;
         error(0, errno, "Error setting groups");
         free(sgids);
-        return errno;
+        return ret;
     }
 
     egid = getegid();

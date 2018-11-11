@@ -160,8 +160,9 @@ mount_ns_unshare()
 
     /* requires CAP_SYS_ADMIN */
     if (unshare(CLONE_NEWNS) == -1) {
+        ret = -errno;
         error(0, errno, "Error unsharing namespace");
-        return -errno;
+        return ret;
     }
 
     tbl = mnt_new_table();

@@ -274,10 +274,12 @@ exit:
 static int
 enable_debugging_features(int trace)
 {
+    const char *errmsg = NULL;
     const struct rlimit rlim = {
         .rlim_cur = RLIM_INFINITY,
         .rlim_max = RLIM_INFINITY
     };
+    int err;
     struct sigaction sa;
 
     memset(&sa, 0, sizeof(sa));
@@ -291,15 +293,15 @@ enable_debugging_features(int trace)
         goto sig_err;
 
     if (setrlimit(RLIMIT_CORE, &rlim) == -1) {
-        error(0, errno, "Couldn't set resource limit");
-        return -errno;
+        errmsg = "Couldn't set resource limit";
+        goto err;
     }
 
     if (trace) {
         if ((setenv("MALLOC_CHECK_", "7", 1) == -1)
             || (setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1)) {
-            error(0, errno, "Couldn't set environment variable");
-            return -errno;
+            errmsg = "Couldn't set environment variable";
+            goto err;
         }
         mtrace();
     }
@@ -307,14 +309,18 @@ enable_debugging_features(int trace)
     return 0;
 
 sig_err:
-    error(0, errno, "Error setting signal handler");
-    return -errno;
+    errmsg = "Error setting signal handler";
+err:
+    err = -errno;
+    error(0, err, "%s", errmsg);
+    return err;
 }
 
 static int
 set_capabilities()
 {
     cap_t caps;
+    int err;
 
     static const cap_value_t capvals[] = {
         CAP_CHOWN, /* fchown("/etc/mtab") performed by libmount */
@@ -340,8 +346,9 @@ set_capabilities()
     return 0;
 
 err:
+    err = -errno;
     cap_free(caps);
-    return -errno;
+    return err;
 }
 
 static int
@@ -362,6 +369,7 @@ static int
 get_conf_path(const char *pathspec, const char **path)
 {
     const char *ret;
+    int err = -EIO;
     wordexp_t words;
 
     if (wordexp(pathspec, &words, WRDE_NOCMD | WRDE_UNDEF) != 0)
@@ -371,11 +379,12 @@ get_conf_path(const char *pathspec, const char **path)
         goto err2;
 
     ret = strdup(words.we_wordv[0]);
+    if (ret == NULL) {
+        err = -errno;
+        goto err2;
+    }
 
     wordfree(&words);
-
-    if (ret == NULL)
-        return -errno;
 
     *path = ret;
     return 0;
@@ -383,7 +392,7 @@ get_conf_path(const char *pathspec, const char **path)
 err2:
     wordfree(&words);
 err1:
-    return -EIO;
+    return err;
 }
 
 #define ERRBUF_INIT_SIZE 128
@@ -477,8 +486,9 @@ scan_input_file(const char *path, struct radix_tree **data)
 
     f = fopen(path, "r");
     if (f == NULL) {
+        res = -errno;
         error(0, errno, "Error opening %s", path);
-        return -errno;
+        return res;
     }
 
     res = radix_tree_new(&ret, sizeof(struct verif_record));
@@ -594,8 +604,9 @@ do_verifs(struct verify_ctx *ctx)
     else {
         va.dstf = fopen(ctx->output_file, "w");
         if (va.dstf == NULL) {
+            err = -errno;
             error(0, errno, "Error opening %s", ctx->output_file);
-            return -errno;
+            return err;
         }
     }
 
@@ -627,8 +638,8 @@ do_verifs(struct verify_ctx *ctx)
         va.srcfd = mount_file_system(verif->devpath, verif->srcpath,
                                      MNT_FS_READ);
         if (va.srcfd < 0) {
-            error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
             err = va.srcfd;
+            error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
             goto err1;
         }
 
@@ -646,8 +657,8 @@ do_verifs(struct verify_ctx *ctx)
         }
 
         if ((va.dstf != stdout) && (fsync(fileno(va.dstf)) == -1)) {
-            error(0, errno, "Error writing output file %s", ctx->output_file);
             err = -errno;
+            error(0, errno, "Error writing output file %s", ctx->output_file);
             goto err1;
         }
 
@@ -664,16 +675,17 @@ do_verifs(struct verify_ctx *ctx)
             goto err1;
         }
         if (s.num_info_nodes != 0) {
+            err = -EIO;
             error(0, 0, "Verification error: Files removed:");
             print_input_data(stderr, ctx->input_data);
-            err = -EIO;
             goto err1;
         }
     }
 
     if ((va.dstf != stdout) && (fclose(va.dstf) == EOF)) {
+        err = -errno;
         error(0, -errno, "Error closing %s", ctx->output_file);
-        return -errno;
+        return err;
     }
 
     return 0;
@@ -763,8 +775,8 @@ main(int argc, char **argv)
     }
 
     if ((ctx->base_dir != NULL) && (chdir(ctx->base_dir) == -1)) {
-        error(0, errno, "Error changing directory to %s", ctx->base_dir);
         ret = -errno;
+        error(0, errno, "Error changing directory to %s", ctx->base_dir);
         goto end1;
     }
 

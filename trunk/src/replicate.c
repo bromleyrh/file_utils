@@ -158,10 +158,12 @@ log_print(int priority, const char *fmt, ...)
 static int
 enable_debugging_features(int trace)
 {
+    const char *errmsg = NULL;
     const struct rlimit rlim = {
         .rlim_cur = RLIM_INFINITY,
         .rlim_max = RLIM_INFINITY
     };
+    int err;
     struct sigaction sa;
 
     memset(&sa, 0, sizeof(sa));
@@ -175,15 +177,15 @@ enable_debugging_features(int trace)
         goto sig_err;
 
     if (setrlimit(RLIMIT_CORE, &rlim) == -1) {
-        error(0, errno, "Couldn't set resource limit");
-        return -errno;
+        errmsg = "Couldn't set resource limit";
+        goto err;
     }
 
     if (trace) {
         if ((setenv("MALLOC_CHECK_", "7", 1) == -1)
             || (setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1)) {
-            error(0, errno, "Couldn't set environment variable");
-            return -errno;
+            errmsg = "Couldn't set environment variable";
+            goto err;
         }
         mtrace();
     }
@@ -191,14 +193,18 @@ enable_debugging_features(int trace)
     return 0;
 
 sig_err:
-    error(0, errno, "Error setting signal handler");
-    return -errno;
+    errmsg = "Error setting signal handler";
+err:
+    err = -errno;
+    error(0, errno, "%s", errmsg);
+    return err;
 }
 
 static int
 set_capabilities()
 {
     cap_t caps;
+    int err;
 
     static const cap_value_t capvals[] = {
         CAP_CHOWN,
@@ -225,8 +231,9 @@ set_capabilities()
     return 0;
 
 err:
+    err = -errno;
     cap_free(caps);
-    return -errno;
+    return err;
 }
 
 static int
@@ -323,6 +330,7 @@ static int
 get_conf_path(const char *pathspec, const char **path)
 {
     const char *ret;
+    int err = -EIO;
     wordexp_t words;
 
     if (wordexp(pathspec, &words, WRDE_NOCMD | WRDE_UNDEF) != 0)
@@ -332,11 +340,12 @@ get_conf_path(const char *pathspec, const char **path)
         goto err2;
 
     ret = strdup(words.we_wordv[0]);
+    if (ret == NULL) {
+        err = -errno;
+        goto err2;
+    }
 
     wordfree(&words);
-
-    if (ret == NULL)
-        return -errno;
 
     *path = ret;
     return 0;
@@ -344,7 +353,7 @@ get_conf_path(const char *pathspec, const char **path)
 err2:
     wordfree(&words);
 err1:
-    return -EIO;
+    return err;
 }
 
 static void
@@ -560,16 +569,16 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
                                      transfer->force_write
                                      ? MNT_FS_FORCE_WRITE : MNT_FS_WRITE);
         if (ca.dstfd < 0) {
-            error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
             err = ca.dstfd;
+            error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
             goto err2;
         }
 
         /* change ownership of destination root directory if needed */
         if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1)) {
+            err = -errno;
             error(0, errno, "Error changing ownership of %s",
                   transfer->dstmntpath);
-            err = -errno;
             goto err3;
         }
 

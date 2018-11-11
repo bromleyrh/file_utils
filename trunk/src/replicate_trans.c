@@ -53,6 +53,7 @@ static int
 getsgids(gid_t **sgids)
 {
     gid_t *ret;
+    int err;
     int nsgids, tmp;
 
     nsgids = getgroups(0, NULL);
@@ -65,8 +66,9 @@ getsgids(gid_t **sgids)
 
     tmp = getgroups(nsgids, ret);
     if (tmp != nsgids) {
+        err = (tmp == -1) ? -errno : -EIO;
         free(ret);
-        return (tmp == -1) ? -errno : -EIO;
+        return err;
     }
 
     *sgids = ret;
@@ -171,8 +173,9 @@ copy_fn(void *arg)
     struct statvfs s;
 
     if (fstatvfs(cargs->srcfd, &s) == -1) {
+        ret = errno;
         error(0, errno, "Error getting file system statistics");
-        return errno;
+        return ret;
     }
     cctx.busconn = cargs->busconn;
     cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
@@ -232,9 +235,10 @@ do_copy(struct copy_args *copy_args)
         return -nsgids;
     }
     if (setgroups(0, NULL) == -1) {
+        ret = errno;
         error(0, errno, "Error setting groups");
         free(sgids);
-        return errno;
+        return ret;
     }
 
     egid = getegid();
