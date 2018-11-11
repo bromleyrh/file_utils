@@ -4,6 +4,7 @@
 
 #include "config.h"
 
+#include "util.h"
 #include "verify_common.h"
 #include "verify_io.h"
 #include "verify_scan.h"
@@ -130,7 +131,7 @@ getsgids(gid_t **sgids)
     if (nsgids == -1)
         return -errno;
 
-    ret = malloc(nsgids * sizeof(*ret));
+    ret = do_malloc(nsgids * sizeof(*ret));
     if (ret == NULL)
         return -errno;
 

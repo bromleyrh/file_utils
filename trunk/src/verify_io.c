@@ -2,6 +2,7 @@
  * verify_io.c
  */
 
+#include "util.h"
 #include "verify_io.h"
 
 #include <time_ext.h>
@@ -86,7 +87,7 @@ sorted_stats_add(struct io_stats *stats, double ms)
     int ret;
     struct ms *m;
 
-    m = malloc(sizeof(*m));
+    m = do_malloc(sizeof(*m));
     if (m == NULL)
         return -errno;
     m->ms = ms;
@@ -235,7 +236,7 @@ io_state_init(struct io_state **state)
     int err;
     struct io_state *ret;
 
-    ret = malloc(sizeof(*ret));
+    ret = do_malloc(sizeof(*ret));
     if (ret == NULL)
         return -errno;
 

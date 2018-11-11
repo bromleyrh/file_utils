@@ -2,6 +2,7 @@
  * verify_conf.c
  */
 
+#include "util.h"
 #include "verify_common.h"
 #include "verify_conf.h"
 #include "verify_gram.h"
@@ -68,7 +69,7 @@ expand_string(char **str, char **dst, size_t *len, size_t minadd)
         size_t newlen;
 
         newlen = MAX(*len + minadd, *len * 2);
-        tmp = realloc((void *)*str, newlen + 1);
+        tmp = do_realloc((void *)*str, newlen + 1);
         if (tmp == NULL)
             return -errno;
         *str = tmp;
@@ -91,7 +92,7 @@ get_gid(const char *name, gid_t *gid)
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
-    buf = malloc(bufsize);
+    buf = do_malloc(bufsize);
     if (buf == NULL)
         return -errno;
 
@@ -105,7 +106,7 @@ get_gid(const char *name, gid_t *gid)
             goto err;
 
         bufsize *= 2;
-        tmp = realloc(buf, bufsize);
+        tmp = do_realloc(buf, bufsize);
         if (tmp == NULL) {
             err = -errno;
             goto err;
@@ -140,7 +141,7 @@ get_uid(const char *name, uid_t *uid)
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
-    buf = malloc(bufsize);
+    buf = do_malloc(bufsize);
     if (buf == NULL)
         return -errno;
 
@@ -154,7 +155,7 @@ get_uid(const char *name, uid_t *uid)
             goto err;
 
         bufsize *= 2;
-        tmp = realloc(buf, bufsize);
+        tmp = do_realloc(buf, bufsize);
         if (tmp == NULL) {
             err = -errno;
             goto err;
@@ -435,7 +436,7 @@ read_verifs_opt(json_val_t opt, void *data)
 
     ctx->num_verifs = json_val_array_get_num_elem(opt);
 
-    ctx->verifs = calloc(ctx->num_verifs, sizeof(*(ctx->verifs)));
+    ctx->verifs = do_calloc(ctx->num_verifs, sizeof(*(ctx->verifs)));
     if (ctx->verifs == NULL)
         return -errno;
 

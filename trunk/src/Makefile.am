@@ -35,8 +35,8 @@ EXTRA_DIST = backtrace.c bootstrap replicate.conf.sample replicate.spec \
 include scripts/Makefile.am
 
 noinst_HEADERS = common.h replicate_common.h replicate_conf.h replicate_gram.h \
-	replicate_trans.h verify_common.h verify_conf.h verify_gram.h verify_io.h \
-	verify_scan.h
+	replicate_trans.h util.h verify_common.h verify_conf.h verify_gram.h \
+	verify_io.h verify_scan.h
 
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM
@@ -54,6 +54,11 @@ verify_gram.h: verify.spec
 	scripts/spec_to_h.pl verify.spec $(verify_gram_macro) > $@
 
 include_HEADERS =
+
+noinst_LIBRARIES = libfileutil.a
+
+libfileutil_a_SOURCES = util.c
+libfileutil_a_CFLAGS = $(AM_CFLAGS) $(CODE_COVERAGE_CFLAGS)
 
 lib_LTLIBRARIES = libdirectio.la
 
@@ -117,9 +122,10 @@ replicate_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Ilibbackup/include $(bin_cflags) @dbus_cflags@ @libjson_cflags@ \
 	@libutil_cflags@ $(trace_cflags)
 replicate_LIBS = $(bin_libs)
+replicate_LDADD = libfileutil.a
 replicate_LDFLAGS = -lcap -lm -lmount $(backup_link) $(backup_link_dep) \
 	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
-replicate_DEPENDENCIES = libbackup/libbackup.la
+replicate_DEPENDENCIES = libfileutil.a libbackup/libbackup.la
 
 sparse_scan_SOURCES = sparse_scan.c
 sparse_scan_CFLAGS = $(AM_CFLAGS) $(bin_cflags) @libutil_cflags@
@@ -131,9 +137,10 @@ verify_CFLAGS = $(AM_CFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Ilibbackup/include $(bin_cflags) @dbus_cflags@ @libjson_cflags@ \
 	@libutil_cflags@ @openssl_cflags@ $(trace_cflags)
 verify_LIBS = $(bin_libs)
+verify_LDADD = libfileutil.a
 verify_LDFLAGS = -lcap -lm -lmount -lrt $(backup_link) $(backup_link_dep) \
 	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ @openssl_link_dep@
-verify_DEPENDENCIES = libbackup/libbackup.la
+verify_DEPENDENCIES = libfileutil.a libbackup/libbackup.la
 
 @CODE_COVERAGE_RULES@
 

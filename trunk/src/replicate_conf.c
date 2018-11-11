@@ -5,6 +5,7 @@
 #include "replicate_common.h"
 #include "replicate_conf.h"
 #include "replicate_gram.h"
+#include "util.h"
 
 #include <json.h>
 
@@ -65,7 +66,7 @@ get_gid(const char *name, gid_t *gid)
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
-    buf = malloc(bufsize);
+    buf = do_malloc(bufsize);
     if (buf == NULL)
         return -errno;
 
@@ -79,7 +80,7 @@ get_gid(const char *name, gid_t *gid)
             goto err;
 
         bufsize *= 2;
-        tmp = realloc(buf, bufsize);
+        tmp = do_realloc(buf, bufsize);
         if (tmp == NULL) {
             err = -errno;
             goto err;
@@ -114,7 +115,7 @@ get_uid(const char *name, uid_t *uid)
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
-    buf = malloc(bufsize);
+    buf = do_malloc(bufsize);
     if (buf == NULL)
         return -errno;
 
@@ -128,7 +129,7 @@ get_uid(const char *name, uid_t *uid)
             goto err;
 
         bufsize *= 2;
-        tmp = realloc(buf, bufsize);
+        tmp = do_realloc(buf, bufsize);
         if (tmp == NULL) {
             err = -errno;
             goto err;
@@ -371,7 +372,7 @@ read_transfers_opt(json_val_t opt, void *data)
 
     ctx->num_transfers = json_val_array_get_num_elem(opt);
 
-    ctx->transfers = calloc(ctx->num_transfers, sizeof(*(ctx->transfers)));
+    ctx->transfers = do_calloc(ctx->num_transfers, sizeof(*(ctx->transfers)));
     if (ctx->transfers == NULL)
         return -errno;
 

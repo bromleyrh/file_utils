@@ -4,6 +4,7 @@
 
 #include "replicate_common.h"
 #include "replicate_trans.h"
+#include "util.h"
 
 #include <dbus/dbus.h>
 
@@ -58,7 +59,7 @@ getsgids(gid_t **sgids)
     if (nsgids == -1)
         return -errno;
 
-    ret = malloc(nsgids * sizeof(*ret));
+    ret = do_malloc(nsgids * sizeof(*ret));
     if (ret == NULL)
         return -errno;
 
