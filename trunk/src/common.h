@@ -13,7 +13,7 @@
 static __thread int asserttmp;
 
 #define ERRNO (asserttmp = errno, assert(asserttmp > 0), asserttmp)
-#define MINUS_ERRNO (asserttmp = errno, assert(asserttmp < 0), asserttmp)
+#define MINUS_ERRNO (asserttmp = -errno, assert(asserttmp < 0), asserttmp)
 #endif
 
 #endif
