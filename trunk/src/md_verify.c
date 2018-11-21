@@ -713,8 +713,16 @@ main(int argc, char **argv)
 
     if (ret == 0)
         status = EXIT_SUCCESS;
-    else
+    else {
         error(0, -ret, "Error processing files");
+        if (ret == -EIO) {
+            fprintf(stderr,
+                    "\nHints:\n"
+                    "- Program must be run from correct working directory\n"
+                    "- More specific error messages written to standard "
+                    "output\n");
+        }
+    }
 
 end:
     if (gid_set != NULL)
