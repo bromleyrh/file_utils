@@ -53,7 +53,6 @@ static int
 getsgids(gid_t **sgids)
 {
     gid_t *ret;
-    int err;
     int nsgids, tmp;
 
     nsgids = getgroups(0, NULL);
@@ -66,9 +65,9 @@ getsgids(gid_t **sgids)
 
     tmp = getgroups(nsgids, ret);
     if (tmp != nsgids) {
-        err = (tmp == -1) ? -errno : -EIO;
+        tmp = (tmp == -1) ? -errno : -EIO;
         free(ret);
-        return err;
+        return tmp;
     }
 
     *sgids = ret;
