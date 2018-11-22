@@ -72,7 +72,6 @@ static void int_handler(int);
 static int set_signal_handlers(void);
 
 static int init_dbus(DBusConnection **);
-static void end_dbus(DBusConnection *);
 
 static int get_sess_path(const char *, const char *, char *, size_t);
 
@@ -398,36 +397,24 @@ init_dbus(DBusConnection **busconn)
 
     ret = dbus_bus_get(DBUS_BUS_SESSION, &buserr);
     if (dbus_error_is_set(&buserr))
-        goto err1;
+        goto err2;
     if (ret == NULL)
-        goto err3;
+        goto err1;
 
     res = dbus_bus_request_name(ret, "replicate.replicate", 0, &buserr);
     if (dbus_error_is_set(&buserr))
         goto err2;
     if (res != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER)
-        goto err4;
+        goto err1;
 
     *busconn = ret;
     return 0;
 
-err4:
-    dbus_connection_close(ret);
-err3:
-    return -EIO;
-
 err2:
-    dbus_connection_close(ret);
-err1:
     error(0, 0, "Error connecting to session bus: %s", buserr.message);
     dbus_error_free(&buserr);
+err1:
     return -EIO;
-}
-
-static void
-end_dbus(DBusConnection *busconn)
-{
-    dbus_connection_close(busconn);
 }
 
 static int
@@ -732,8 +719,6 @@ main(int argc, char **argv)
         goto end2;
 
     ret = do_transfers(&ctx, sessid);
-
-    end_dbus(ctx.busconn);
 
 end2:
     if (log_transfers) {
