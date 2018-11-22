@@ -137,8 +137,9 @@ getsgids(gid_t **sgids)
 
     tmp = getgroups(nsgids, ret);
     if (tmp != nsgids) {
+        tmp = (tmp == -1) ? -errno : -EIO;
         free(ret);
-        return (tmp == -1) ? -errno : -EIO;
+        return tmp;
     }
 
     *sgids = ret;
