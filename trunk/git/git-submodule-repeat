@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
 set -e
-cmd=$(echo $0 | cut -d '-' -f 3)
+cmd=$(echo $0 | cut -d '-' -f 3-)
 
 eval exec git submodule foreach \'"git $cmd $@"\'

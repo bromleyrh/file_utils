@@ -23,7 +23,7 @@ get_branches
 
 set +e
 
-cmd=$(echo $0 | cut -d '-' -f 2)
+cmd=$(echo $0 | cut -d '-' -f 2-)
 if [[ $cmd = "sync" ]]; then
     ret=0
     for b in $branches; do
