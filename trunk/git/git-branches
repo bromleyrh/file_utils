@@ -12,13 +12,12 @@ get_branches()
     while IFS= read -r line; do
         b="${line##??}"
         branches+="$b "
-        branch_set[$b]=1
     done < <(echo "$tmp")
 }
 
 set -e
 
-declare -A branch_set
+declare -A branch_excl_set
 get_branches
 
 set +e
@@ -44,12 +43,12 @@ fi
 
 branches_excl=$(git config user.branchesExcl)
 for b in $branches_excl; do
-    branch_set[$b]=
+    branch_excl_set[$b]=1
 done
-branch_set["master"]=
+branch_excl_set["master"]=1
 
 for b in $branches; do
-    if [[ ${branch_set[$b]} = 1 ]]; then
+    if [[ ${branch_excl_set[$b]} != 1 ]]; then
         echo "$b"
     fi
 done
