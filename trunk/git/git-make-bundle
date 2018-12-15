@@ -63,11 +63,22 @@ get_branches
 get_bundle_path
 
 set +e
+
+declare -A branch_excl_set
+
+branches_excl=$(git config user.branchesExcl)
+for b in $branches_excl; do
+    branch_excl_set[$b]=1
+done
+branch_excl_set["master"]=1
+
 ret=0
 for b in $branches; do
-    bname="$reponame"
-    [[ $b != "master" ]] && bname+=".$b"
-    git bundle create $bundle_path/$bname.bundle $commit..$b || ret=1
+    if [[ ${branch_excl_set[$b]} != 1 ]]; then
+        bname="$reponame"
+        [[ $b != "master" ]] && bname+=".$b"
+        git bundle create $bundle_path/$bname.bundle $commit..$b || ret=1
+    fi
 done
 
 exit $ret
