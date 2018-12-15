@@ -5,9 +5,9 @@
 prefix=/usr/local
 bindir=$(prefix)/bin
 
-helpers=git-branches git-ck git-commit-archive git-cscope git-get-bundles \
-git-install-dist git-make-bundle git-prepare git-remotes git-set-version \
-git-skel git-submodule-commit git-submodule-repeat git-verify
+helpers=git-branches git-ck git-clean-bundles git-commit-archive git-cscope \
+git-get-bundles git-install-dist git-make-bundle git-prepare git-remotes \
+git-set-version git-skel git-submodule-commit git-submodule-repeat git-verify
 
 .PHONY: install clean
 
