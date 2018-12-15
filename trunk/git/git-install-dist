@@ -92,6 +92,25 @@ do_build()
     logger "$logmsg"
 }
 
+run_install_cmd()
+{
+    cmd=$(git config user.installDistCmd${1})
+
+    echo "Running \"$cmd\""
+    eval $cmd
+
+    exit $?
+}
+
+case $1 in
+    "--pre")
+        run_install_cmd pre
+        ;;
+    "--post")
+        run_install_cmd post
+        ;;
+esac
+
 get_cmds
 set_up_env
 opts=$(git config user.installDistOpts)
