@@ -15,20 +15,13 @@ get_branches()
     done < <(echo "$tmp")
 }
 
-set -e
-
-declare -A branch_excl_set
-get_branches
-
-set +e
-
-cmd=$(echo $0 | cut -d '-' -f 2-)
-if [[ $cmd = "sync" ]]; then
+do_sync()
+{
     ret=0
     for b in $branches; do
-        if [[ $b != "master" ]]; then
-            cmd="git checkout $b && git reset --hard origin/$b"
-            echo "Running \"$cmd\""
+        if [[ $b != "master" ]] && [[ ${branch_excl_set[$b]} != 1 ]]; then
+            cmd="git checkout $b && git reset --hard $1"
+            eval echo \"Running \\\"$cmd\\\"\"
             read -p "Continue? (y/n) " resp
             if [[ $resp = "y" ]]; then
                 eval $cmd || ret=1
@@ -39,13 +32,48 @@ if [[ $cmd = "sync" ]]; then
     git checkout master
 
     exit $ret
+}
+
+sync_with_origin()
+{
+    do_sync "origin/\$b"
+}
+
+sync_with_bundles()
+{
+    do_sync "bundle_\$b/\$b"
+}
+
+set -e
+
+get_branches
+
+set +e
+
+cmd=$(echo $0 | cut -d '-' -f 2-)
+if [[ $cmd = "sync" ]]; then
+    if [[ $1 = "--bundles" ]]; then
+        sync_bundles=1
+    else
+        sync_origin=1
+    fi
 fi
 
-branches_excl=$(git config user.branchesExcl)
-for b in $branches_excl; do
-    branch_excl_set[$b]=1
-done
-branch_excl_set["master"]=1
+if [[ $sync_origin = 0 ]] || [[ $sync_bundles = 1 ]]; then
+    declare -A branch_excl_set
+
+    branches_excl=$(git config user.branchesExcl)
+    for b in $branches_excl; do
+        branch_excl_set[$b]=1
+    done
+    branch_excl_set["master"]=1
+fi
+
+if [[ $sync_origin = 1 ]]; then
+    sync_with_origin
+elif [[ $sync_bundles = 1 ]]; then
+    sync_with_bundles
+fi
 
 for b in $branches; do
     if [[ ${branch_excl_set[$b]} != 1 ]]; then
