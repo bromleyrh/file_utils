@@ -1,0 +1,42 @@
+#!/bin/sh
+
+set -e
+
+if [ ! -d .git ] && [ ! -f .git ]; then
+    echo "Current directory is not root of a Git repository" 1>&2
+    exit 1
+fi
+reponame=$(basename $(pwd))
+
+distdir=dist
+trunkdir=trunk
+
+opts="$@"
+temp=$(getopt ad:imst: "$@")
+[ $? != 0 ] && exit 1
+eval set -- "$temp"
+while true; do
+    case "$1" in
+        -d)
+            distdir=$2
+            shift 2;;
+        -t)
+            trunkdir=$2
+            shift 2;;
+        --)
+            shift
+            break;;
+        *)
+            shift;;
+    esac
+done
+
+vfile=$trunkdir/.version
+
+echo "0.0" > "$vfile"
+
+mkdir "$distdir"
+touch "${distdir}/${reponame}.tar.xz"
+touch "${distdir}/${reponame}.tar.xz.asc"
+
+git prepare "$opts"
