@@ -1,4 +1,6 @@
 TODO
 
+- Implement transactions for all Git helper scripts using Git branches and/or
+  the Git reflog
 - Implement pre-applypatch hook for use with commit-uuid commit-msg hook that
   generates a new UUID rather than using the UUID included in the patch
