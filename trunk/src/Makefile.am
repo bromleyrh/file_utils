@@ -6,8 +6,9 @@
 
 if LINUX
 
-EXTRA_DIST += src/replicate.conf.sample src/replicate.spec \
-	src/simpledb_obj.idl src/verify.conf.sample src/verify.spec
+EXTRA_DIST += src/distribute.conf.sample src/replicate.conf.sample \
+	src/replicate.spec src/simpledb_obj.idl src/verify.conf.sample \
+	src/verify.spec
 
 noinst_HEADERS += src/common.h src/debug.h src/replicate_common.h \
 	src/replicate_conf.h src/replicate_gram.h src/replicate_trans.h src/util.h \
