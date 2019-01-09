@@ -36,7 +36,7 @@ do_sync()
 
 sync_with_origin()
 {
-    do_sync "origin/\$b"
+    do_sync "$origin/\$b"
 }
 
 sync_with_bundles()
@@ -70,6 +70,9 @@ if [[ $sync_origin = 0 ]] || [[ $sync_bundles = 1 ]]; then
 fi
 
 if [[ $sync_origin = 1 ]]; then
+    origin=$(git config user.upstreamRemoteName)
+    [[ $origin = "" ]] && origin="origin"
+
     sync_with_origin
 elif [[ $sync_bundles = 1 ]]; then
     sync_with_bundles
