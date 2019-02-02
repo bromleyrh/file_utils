@@ -10,14 +10,23 @@ SUBDIRS = man
 
 fortify_source_defines = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 
+if CODE_COVERAGE_ENABLED
+debug_cflags_debug = -g -O0
+debug_cflags_ndebug = -DNDEBUG -g -O0
+else
+debug_cflags_debug = -ggdb3 -O0
+debug_cflags_ndebug = -DNDEBUG -O2
+endif
+
 if SANITIZERS
-AM_CFLAGS = @sanitizer@ @stack_protector@ -ftrapv -ggdb3 -O0 -pipe -Wall -Wextra
+AM_CFLAGS = $(debug_cflags_debug) @sanitizer@ @stack_protector@ -ftrapv -pipe \
+	-Wall -Wextra
 else
 if DEBUG
-AM_CFLAGS = @stack_protector@ -ftrapv -ggdb3 -O0 -pipe -Wall -Wextra
+AM_CFLAGS = $(debug_cflags_debug) @stack_protector@ -ftrapv -pipe -Wall -Wextra
 else
-AM_CFLAGS = $(fortify_source_defines) -DNDEBUG -ftrapv -fvisibility=hidden -O2 \
-	-pipe -Wall -Wextra
+AM_CFLAGS = $(debug_cflags_ndebug) $(fortify_source_defines) -ftrapv \
+	-fvisibility=hidden -pipe -Wall -Wextra
 endif
 endif
 
