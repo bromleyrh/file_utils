@@ -8,14 +8,14 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = man
 
-fortify_source_defines = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
-
 if CODE_COVERAGE_ENABLED
 debug_cflags_debug = -g -O0
 debug_cflags_ndebug = -DNDEBUG -g -O0
+fortify_source_defines =
 else
 debug_cflags_debug = -ggdb3 -O0
 debug_cflags_ndebug = -DNDEBUG -O2
+fortify_source_defines = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 endif
 
 if SANITIZERS
