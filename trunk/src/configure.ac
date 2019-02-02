@@ -32,8 +32,6 @@ AC_PROG_RANLIB
 
 AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
-AX_CODE_COVERAGE
-
 AC_ARG_ENABLE([sanitizers],
               [  --enable-sanitizers     enable GCC sanitizers],
               [AS_CASE(
@@ -64,6 +62,24 @@ AS_IF(
     [debug=true]
 )
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+
+AC_ARG_ENABLE([coverage_analysis],
+              [  --enable-coverage-analysis
+                          enable code coverage analysis],
+              [AS_CASE(
+                  ["$enableval"],
+                      [yes],
+                          [coverage_analysis=true],
+                      [no],
+                          [coverage_analysis=false],
+                      [AC_MSG_ERROR(
+                          [invalid "--enable-coverage-analysis" argument]
+                       )
+                      ]
+               )
+              ],
+              [coverage_analysis=false])
+AM_CONDITIONAL([COVERAGE_ANALYSIS], [test x$coverage_analysis = xtrue])
 
 AS_IF(
     [test "x$sanitizers" = xtrue],
@@ -167,12 +183,13 @@ cat <<- EOF
 
 $PACKAGE_NAME configuration
 
-               Compiler: $CC
+                  Compiler: $CC
 
-              Debugging: $debug
-         GCC sanitizers: $sanitizers
+                 Debugging: $debug
+            GCC sanitizers: $sanitizers
+    Code coverage analysis: $coverage_analysis
 
-    Installation prefix: $prefix
+       Installation prefix: $prefix
 
 EOF
 

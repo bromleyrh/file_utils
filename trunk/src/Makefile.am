@@ -8,25 +8,28 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = man
 
-if CODE_COVERAGE_ENABLED
+if COVERAGE_ANALYSIS
 debug_cflags_debug = -g -O0
 debug_cflags_ndebug = -DNDEBUG -g -O0
 fortify_source_defines =
+coverage_analysis_cflags = -fprofile-arcs -ftest-coverage
 else
 debug_cflags_debug = -ggdb3 -O0
 debug_cflags_ndebug = -DNDEBUG -O2
 fortify_source_defines = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
+coverage_analysis_cflags =
 endif
 
 if SANITIZERS
-AM_CFLAGS = $(debug_cflags_debug) @sanitizer@ @stack_protector@ -ftrapv -pipe \
-	-Wall -Wextra
+AM_CFLAGS = $(debug_cflags_debug) $(coverage_analysis_cflags) @sanitizer@ \
+	@stack_protector@ -ftrapv -pipe -Wall -Wextra
 else
 if DEBUG
-AM_CFLAGS = $(debug_cflags_debug) @stack_protector@ -ftrapv -pipe -Wall -Wextra
+AM_CFLAGS = $(debug_cflags_debug) $(coverage_analysis_cflags) \
+	@stack_protector@ -ftrapv -pipe -Wall -Wextra
 else
-AM_CFLAGS = $(debug_cflags_ndebug) $(fortify_source_defines) -ftrapv \
-	-fvisibility=hidden -pipe -Wall -Wextra
+AM_CFLAGS = $(debug_cflags_ndebug) $(coverage_analysis_cflags) \
+	$(fortify_source_defines) -ftrapv -fvisibility=hidden -pipe -Wall -Wextra
 endif
 endif
 
@@ -67,7 +70,7 @@ include_HEADERS =
 noinst_LIBRARIES = libfileutil.a
 
 libfileutil_a_SOURCES = util.c
-libfileutil_a_CFLAGS = $(AM_CFLAGS) $(CODE_COVERAGE_CFLAGS)
+libfileutil_a_CFLAGS = $(AM_CFLAGS)
 
 lib_LTLIBRARIES = libdirectio.la
 
@@ -86,8 +89,8 @@ if HAVE_LIBXFS
 bin_PROGRAMS += xfsutil
 endif
 
-bin_cflags = $(CODE_COVERAGE_CFLAGS)
-bin_libs = $(CODE_COVERAGE_LIBS)
+bin_cflags =
+bin_libs =
 
 attr_idx_SOURCES = attr_idx.c
 attr_idx_CFLAGS = $(AM_CFLAGS) $(bin_cflags) @libutil_cflags@
@@ -150,8 +153,6 @@ verify_LDADD = libfileutil.a
 verify_LDFLAGS = -lcap -lm -lmount -lrt $(backup_link) $(backup_link_dep) \
 	@dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ @openssl_link_dep@
 verify_DEPENDENCIES = libfileutil.a libbackup/libbackup.la
-
-@CODE_COVERAGE_RULES@
 
 install-exec-hook:
 	ln -fs open $(bindir)/delete_input
