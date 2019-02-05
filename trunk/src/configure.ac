@@ -183,13 +183,13 @@ cat <<- EOF
 
 $PACKAGE_NAME configuration
 
-                  Compiler: $CC
+               Compiler: $CC
 
-                 Debugging: $debug
-            GCC sanitizers: $sanitizers
-    Code coverage analysis: $coverage_analysis
+              Debugging: $debug
+         GCC sanitizers: $sanitizers
+      Coverage analysis: $coverage_analysis
 
-       Installation prefix: $prefix
+    Installation prefix: $prefix
 
 EOF
 
