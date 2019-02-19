@@ -128,26 +128,26 @@ AC_CHECK_LIB([mount], [mnt_table_uniq_fs],
 AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
 
 PKG_CHECK_MODULES([dbus], [dbus-1],
-    [dbus_cflags=$dbus_CFLAGS
+    [dbus_cppflags=$dbus_CFLAGS
      dbus_link_dep=$dbus_LIBS]
 )
 PKG_CHECK_MODULES([libjson], [libjson],
-    [libjson_cflags=$libjson_CFLAGS
+    [libjson_cppflags=$libjson_CFLAGS
      libjson_link_dep=$libjson_LIBS]
 )
 PKG_CHECK_MODULES([libutil], [libutil],
-    [libutil_cflags=$libutil_CFLAGS
+    [libutil_cppflags=$libutil_CFLAGS
      libutil_link_dep=$libutil_LIBS]
 )
 PKG_CHECK_MODULES([openssl], [openssl],
-    [openssl_cflags=$openssl_CFLAGS
+    [openssl_cppflags=$openssl_CFLAGS
      openssl_link_dep=$openssl_LIBS]
 )
 
-AC_SUBST([dbus_cflags])
-AC_SUBST([libjson_cflags])
-AC_SUBST([libutil_cflags])
-AC_SUBST([openssl_cflags])
+AC_SUBST([dbus_cppflags])
+AC_SUBST([libjson_cppflags])
+AC_SUBST([libutil_cppflags])
+AC_SUBST([openssl_cppflags])
 
 AC_SUBST([dbus_link_dep])
 AC_SUBST([libjson_link_dep])
