@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <error.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -103,6 +104,9 @@ open_pipes(struct pipe_data *pd)
 
     if (pd->npipes == 0)
         return 0;
+    if ((pd->npipes < 0)
+        || ((size_t)(pd->npipes) > SIZE_MAX / sizeof(pipes[0])))
+        return -EINVAL;
 
     pipes = calloc(pd->npipes, sizeof(pipes[0]));
     if (pipes == NULL) {
