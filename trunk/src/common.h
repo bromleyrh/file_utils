@@ -18,4 +18,6 @@ static __thread int asserttmp;
 
 #endif
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 /* vi: set expandtab sw=4 ts=4: */

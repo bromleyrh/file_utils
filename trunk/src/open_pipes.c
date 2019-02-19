@@ -4,6 +4,8 @@
 
 #define _GNU_SOURCE
 
+#include "common.h"
+
 #include <errno.h>
 #include <error.h>
 #include <stddef.h>
@@ -151,8 +153,8 @@ main(int argc, char **argv)
     int ret;
     static int def_pipefds[] = {DEFAULT_PIPEFDS};
     struct pipe_data pd = {
-        .npipes = sizeof(def_pipefds) / sizeof(def_pipefds[0]),
-        .pipefds = def_pipefds
+        .npipes     = ARRAY_SIZE(def_pipefds),
+        .pipefds    = def_pipefds
     };
 
     ret = parse_cmdline(argc, argv, &cmd, &pd);

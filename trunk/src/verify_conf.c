@@ -2,6 +2,7 @@
  * verify_conf.c
  */
 
+#include "common.h"
 #include "util.h"
 #include "verify_common.h"
 #include "verify_conf.h"
@@ -454,8 +455,7 @@ read_verifs_opt(json_val_t opt, void *data)
         }
 
         ctx->verifs[i].check_cmd = NULL;
-        err = json_oscanf(&ctx->verifs[i], spec,
-                          (int)(sizeof(spec)/sizeof(spec[0])), 0, val);
+        err = json_oscanf(&ctx->verifs[i], spec, (int)ARRAY_SIZE(spec), 0, val);
         if (err)
             goto err;
     }

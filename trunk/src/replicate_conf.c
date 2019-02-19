@@ -2,6 +2,7 @@
  * replicate_conf.c
  */
 
+#include "common.h"
 #include "replicate_common.h"
 #include "replicate_conf.h"
 #include "replicate_gram.h"
@@ -392,8 +393,7 @@ read_transfers_opt(json_val_t opt, void *data)
 
         transfer->force_write = 1;
         transfer->setro = 0;
-        err = json_oscanf(transfer, spec, (int)(sizeof(spec)/sizeof(spec[0])),
-                          0, val);
+        err = json_oscanf(transfer, spec, (int)ARRAY_SIZE(spec), 0, val);
         if (err)
             goto err;
     }

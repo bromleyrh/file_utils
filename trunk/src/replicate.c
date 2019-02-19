@@ -2,6 +2,7 @@
  * replicate.c
  */
 
+#include "common.h"
 #include "replicate_common.h"
 #include "replicate_conf.h"
 #include "replicate_trans.h"
@@ -213,7 +214,7 @@ set_capabilities()
         CAP_SETUID,
         CAP_SYS_ADMIN
     };
-    static const int ncapvals = (int)(sizeof(capvals)/sizeof(capvals[0]));
+    static const int ncapvals = (int)ARRAY_SIZE(capvals);
 
     caps = cap_init();
     if (caps == NULL)
@@ -378,7 +379,7 @@ set_signal_handlers()
     sa.sa_handler = &int_handler;
     sa.sa_flags = SA_RESETHAND;
 
-    for (i = 0; i < sizeof(intsignals)/sizeof(intsignals[0]); i++) {
+    for (i = 0; i < ARRAY_SIZE(intsignals); i++) {
         if (sigaction(intsignals[i], &sa, NULL) == -1)
             return -errno;
     }

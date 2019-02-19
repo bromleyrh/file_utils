@@ -4,6 +4,8 @@
 
 #define _GNU_SOURCE
 
+#include "common.h"
+
 #include <option_parsing.h>
 #include <proc_ext.h>
 #include <strings_ext.h>
@@ -120,7 +122,7 @@ set_signal_handlers()
     sa.sa_handler = SIG_IGN;
     sa.sa_flags = SA_RESETHAND;
 
-    for (i = 0; i < sizeof(intsignals)/sizeof(intsignals[0]); i++) {
+    for (i = 0; i < ARRAY_SIZE(intsignals); i++) {
         if (sigaction(intsignals[i], &sa, NULL) == -1)
             return -errno;
     }
@@ -144,7 +146,7 @@ main(int argc, char **argv)
         {.file = "osort", .argv = cmd2},
         {.file = "fastcat", .argv = cmd3}
     };
-    static const int ncmds = (int)(sizeof(cmds)/sizeof(cmds[0]));
+    static const int ncmds = (int)ARRAY_SIZE(cmds);
 
     ret = parse_cmdline(argc, argv, conf_path, template_path);
     if (ret != 0)

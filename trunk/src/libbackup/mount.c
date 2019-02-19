@@ -7,6 +7,7 @@
 #include "config.h"
 
 #include "backup.h"
+#include "common.h"
 #include "util.h"
 
 #include <libmount/libmount.h>
@@ -136,7 +137,7 @@ keep_mnt(const char *target)
     if (strcmp("/", target) == 0)
         return 1;
 
-    for (i = 0; i < sizeof(keep)/sizeof(keep[0]); i++) {
+    for (i = 0; i < ARRAY_SIZE(keep); i++) {
         mnt = &keep[i];
 
         if ((strncmp(target, mnt->target, mnt->len) == 0)
