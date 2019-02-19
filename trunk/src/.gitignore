@@ -25,6 +25,7 @@ stamp-h1
 /replicate_gram.h
 /verify_gram.h
 
+*.a
 *.la
 *.lo
 
