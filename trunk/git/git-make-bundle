@@ -24,7 +24,13 @@ get_repo_name()
     local rootdir=$(git rev-parse --show-toplevel)
     [[ $? != 0 ]] && return 1
 
-    reponame=$(basename $rootdir)
+    local multclones=$1
+
+    if [[ $multclones == "true" ]]; then
+        reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
+    else
+        reponame=$(basename $rootdir)
+    fi
 }
 
 get_branches()
@@ -54,11 +60,13 @@ get_bundle_path()
     fi
 }
 
+multclones=$(git config user.multClones)
+
 set -e
 
 parse_cmdline "$@"
 
-get_repo_name
+get_repo_name $multclones
 get_branches
 get_bundle_path
 
