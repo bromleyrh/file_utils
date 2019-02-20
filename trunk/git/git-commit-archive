@@ -5,7 +5,7 @@ do_make_dist()
     cd $1
 
     autoreconf -v
-    ./configure
+    ./configure --disable-dependency-tracking
     make dist-xz
     mv *.xz "../$archive"
     make distclean
