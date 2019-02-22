@@ -2,9 +2,6 @@
 
 get_repo_name()
 {
-    local rootdir=$(git rev-parse --show-toplevel)
-    [[ $? != 0 ]] && return 1
-
     local multclones=$1
 
     if [[ $multclones == "true" ]]; then
@@ -33,6 +30,8 @@ get_bundles()
 multclones=$(git config user.multClones)
 
 set -e
+
+rootdir=$(git rev-parse --show-toplevel)
 
 get_repo_name $multclones
 get_bundle_path
