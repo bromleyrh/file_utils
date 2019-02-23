@@ -22,9 +22,6 @@ AS_CASE(
         [AC_MSG_ERROR([unsupported platform], [1])]
 )
 
-# FIXME: CFLAGS should not be set in configure script
-CFLAGS=""
-
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LN_S
