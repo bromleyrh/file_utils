@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
 
+get_repo_name()
+{
+    local multclones=$1
+
+    if [[ $multclones == "true" ]]; then
+        reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
+    else
+        reponame=$(basename $rootdir)
+    fi
+}
+
+multclones=$(git config user.multClones)
+
 set -e
 
 rootdir=$(git rev-parse --show-toplevel)
-reponame=$(basename $rootdir)
+
+get_repo_name $multclones
 
 for i in $(git remotes); do
     case $i in
