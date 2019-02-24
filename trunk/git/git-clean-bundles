@@ -3,7 +3,6 @@
 set -e
 
 rootdir=$(git rev-parse --show-toplevel)
-[[ $? != 0 ]] && exit 1
 reponame=$(basename $rootdir)
 
 for i in $(git remotes); do
