@@ -2,6 +2,8 @@
 # configure.ac
 #
 
+env_cflags="$CFLAGS"
+
 AC_INIT([file_utils], [0.1])
 AC_PREREQ([2.69])
 
@@ -171,6 +173,9 @@ AC_SUBST([lbu_rev], [0])
 AC_SUBST([ldio_cur], [0])
 AC_SUBST([ldio_age], [0])
 AC_SUBST([ldio_rev], [0])
+
+dnl FIXME: Later, only prevent Autoconf from adding "-g -O2" to CFLAGS
+CFLAGS="$env_cflags"
 
 AC_CONFIG_FILES([Makefile man/Makefile])
 AC_CONFIG_HEADERS([config.h])
