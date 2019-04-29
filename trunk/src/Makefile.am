@@ -152,10 +152,10 @@ src_verify_LDADD = src/libfileutil.a src/sys_dep/libsys.a -lcap -lm -lmount \
 src_verify_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la \
 	src/sys_dep/libsys.a
 
-src_verify-gui_SOURCES = src/verify-gui.c
-src_verify-gui_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @gtk_cppflags@
-src_verify-gui_CFLAGS = $(AM_CFLAGS)
-src_verify-gui_LDADD = @gtk_link_dep@
+src_verify_gui_SOURCES = src/verify-gui.c
+src_verify_gui_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @gtk_cppflags@
+src_verify_gui_CFLAGS = $(AM_CFLAGS)
+src_verify_gui_LDADD = @gtk_link_dep@
 
 src_xfsutil_SOURCES = src/xfsutil.c
 src_xfsutil_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
