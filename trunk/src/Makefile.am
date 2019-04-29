@@ -135,9 +135,9 @@ src_verify_LDADD = src/libfileutil.a -lcap -lm -lmount -lrt $(backup_link) \
 	@openssl_link_dep@
 src_verify_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la
 
-src_verify-gui_SOURCES = src/verify-gui.c
-src_verify-gui_CFLAGS = $(AM_CFLAGS) $(bin_cflags) @gtk_cflags@
-src_verify-gui_LDADD = @gtk_link_dep@
+src_verify_gui_SOURCES = src/verify-gui.c
+src_verify_gui_CFLAGS = $(AM_CFLAGS) $(bin_cflags) @gtk_cppflags@
+src_verify_gui_LDADD = @gtk_link_dep@
 
 else
 
