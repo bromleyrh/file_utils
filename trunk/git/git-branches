@@ -44,6 +44,11 @@ sync_with_bundles()
     do_sync "bundle_\$b/\$b"
 }
 
+if ! declare -A branch_excl_set 2>/dev/null; then
+    echo "bash version 4.0 or greater is required" 1>&2
+    exit 1
+fi
+
 set -e
 
 get_branches
@@ -60,8 +65,6 @@ if [[ $cmd = "sync" ]]; then
 fi
 
 if [[ $sync_origin = 0 ]] || [[ $sync_bundles = 1 ]]; then
-    declare -A branch_excl_set
-
     branches_excl=$(git config user.branchesExcl)
     for b in $branches_excl; do
         branch_excl_set[$b]=1

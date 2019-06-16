@@ -15,9 +15,13 @@ get_remotes()
     done < <(echo "$tmp")
 }
 
+if ! declare -A remote_set 2>/dev/null; then
+    echo "bash version 4.0 or greater is required" 1>&2
+    exit 1
+fi
+
 set -e
 
-declare -A remote_set
 get_remotes
 
 set +e

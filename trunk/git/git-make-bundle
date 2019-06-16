@@ -60,6 +60,11 @@ get_bundle_path()
     fi
 }
 
+if ! declare -A branch_excl_set 2>/dev/null; then
+    echo "bash version 4.0 or greater is required" 1>&2
+    exit 1
+fi
+
 multclones=$(git config user.multClones)
 
 set -e
@@ -71,8 +76,6 @@ get_branches
 get_bundle_path
 
 set +e
-
-declare -A branch_excl_set
 
 branches_excl=$(git config user.branchesExcl)
 for b in $branches_excl; do
