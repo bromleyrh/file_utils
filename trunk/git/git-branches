@@ -24,7 +24,7 @@ do_sync()
         if [[ $b != "master" ]] && [[ ${branch_excl_set[$b]} != 1 ]]; then
             cmd="git checkout $b && git reset --hard $1"
             eval echo \"Running \\\"$cmd\\\"\"
-            read -p "Continue? (y/n/q) " resp
+            read -p "Run command? (y/n/q) " resp
             case $resp in
                 *q* | *Q*)
                     break
