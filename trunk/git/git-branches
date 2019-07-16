@@ -27,7 +27,7 @@ do_sync()
             if [[ $b != $cur_branch ]]; then
                 cmd="git checkout $b && $cmd"
             fi
-            eval echo \"Running \\\"$cmd\\\"\"
+            eval echo \"Running \\\"$cmd\\\"\" 1>&2
             read -p "Run command? (y/n/q) "
             case $REPLY in
                 *q* | *Q*)
