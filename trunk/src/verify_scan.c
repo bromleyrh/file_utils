@@ -74,8 +74,8 @@ struct verif_walk_ctx {
     char                *buf1;
     char                *buf2;
     size_t              bufsz;
-    EVP_MD_CTX          initsumctx;
-    EVP_MD_CTX          sumctx;
+    EVP_MD_CTX          *initsumctx;
+    EVP_MD_CTX          *sumctx;
     DBusConnection      *busconn;
     struct avl_tree     *output_data;
     FILE                *dstf;
@@ -595,7 +595,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     record.record.size = s->st_size;
     wctx->lastoff = 0;
     res = verif_chksums(fd, wctx->buf1, wctx->buf2, wctx->bufsz,
-                        &wctx->initsumctx, &wctx->sumctx, p_record_in,
+                        wctx->initsumctx, wctx->sumctx, p_record_in,
                         record.record.initsum, record.record.sum, &sumlen,
                         &verif_chksums_cb, wctx);
     if (res != 0) {
@@ -688,8 +688,17 @@ verif_fn(void *arg)
     }
     wctx.buf2 = wctx.buf1 + wctx.bufsz / 2;
 
-    if ((EVP_DigestInit(&wctx.sumctx, EVP_sha1()) != 1)
-        || (EVP_DigestInit(&wctx.initsumctx, EVP_sha1()) != 1)) {
+    wctx.sumctx = EVP_MD_CTX_new();
+    if (wctx.sumctx == NULL)
+        return ENOMEM;
+    wctx.initsumctx = EVP_MD_CTX_new();
+    if (wctx.initsumctx == NULL) {
+        EVP_MD_CTX_free(wctx.sumctx);
+        return ENOMEM;
+    }
+
+    if ((EVP_DigestInit(wctx.sumctx, EVP_sha1()) != 1)
+        || (EVP_DigestInit(wctx.initsumctx, EVP_sha1()) != 1)) {
         TRACE(0, "EVP_DigestInit()");
         err = EIO;
         goto end1;
@@ -698,8 +707,8 @@ verif_fn(void *arg)
     err = -avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
                         &verif_record_cmp, 0, NULL, NULL, NULL);
     if (err) {
-        EVP_MD_CTX_cleanup(&wctx.sumctx);
-        EVP_MD_CTX_cleanup(&wctx.initsumctx);
+        EVP_MD_CTX_free(wctx.sumctx);
+        EVP_MD_CTX_free(wctx.initsumctx);
         munmap(wctx.buf1, fullbufsize);
         goto alloc_err1;
     }
@@ -740,9 +749,9 @@ end3:
         feenableexcept(fexcepts);
 end2:
     avl_tree_free(wctx.output_data);
-    EVP_MD_CTX_cleanup(&wctx.sumctx);
-    EVP_MD_CTX_cleanup(&wctx.initsumctx);
 end1:
+    EVP_MD_CTX_free(wctx.sumctx);
+    EVP_MD_CTX_free(wctx.initsumctx);
     munmap(wctx.buf1, fullbufsize);
     return err;
 
