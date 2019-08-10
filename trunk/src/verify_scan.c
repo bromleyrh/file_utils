@@ -697,8 +697,12 @@ verif_fn(void *arg)
 
     err = -avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
                         &verif_record_cmp, 0, NULL, NULL, NULL);
-    if (err)
+    if (err) {
+        EVP_MD_CTX_cleanup(&wctx.sumctx);
+        EVP_MD_CTX_cleanup(&wctx.initsumctx);
+        munmap(wctx.buf1, fullbufsize);
         goto alloc_err1;
+    }
 
     wctx.reg_excl = vargs->reg_excl;
     wctx.detect_hard_links = vargs->detect_hard_links;
