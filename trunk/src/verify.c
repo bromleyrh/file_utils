@@ -694,13 +694,10 @@ print_verifs(FILE *f, struct verif *verifs, int num)
     for (i = 0; i < num; i++) {
         struct verif *verif = &verifs[i];
 
-        fprintf(f,
-                "Verification %d:\n"
-                "\tDevice path: %s\n"
-                "\tSource directory path: %s\n",
-                i + 1,
-                verif->devpath,
-                verif->srcpath);
+        fprintf(f, "Verification %d:\n", i + 1);
+        if (verif->devpath != NULL)
+            fprintf(f, "\tDevice path: %s\n", verif->devpath);
+        fprintf(f, "\tSource directory path: %s\n", verif->srcpath);
     }
 }
 

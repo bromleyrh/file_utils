@@ -30,7 +30,7 @@
 <verifs> = "verifs" : [ <verif>+ ]
 
 <verif> = {
-    <verif_dev>
+    <verif_dev?>
     <verif_source>
     <verif_check_cmd?>
 }
