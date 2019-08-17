@@ -208,6 +208,11 @@ copy_fn(void *arg)
     }
     if (cctx.lastpath != NULL)
         free((void *)(cctx.lastpath));
+    if (ret == EPERM) {
+        error(0, 0, "Permissions error encountered while copying");
+        error(0, 0, "It may be necessary to ensure fs.protected_hardlinks is "
+                    "set to 0");
+    }
 
     return ret;
 }
