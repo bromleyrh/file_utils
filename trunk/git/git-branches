@@ -17,23 +17,16 @@ get_branches()
 
 do_sync()
 {
-    orig_branch=$(git rev-parse --abbrev-ref HEAD)
-    cur_branch=$orig_branch
-
     ret=0
     for b in $branches; do
         if [[ $b = "master" ]] || [[ ${branch_excl_set[$b]} = 1 ]]; then
             continue
         fi
-        cmd="git reset --hard $1"
-        if [[ $b != $cur_branch ]]; then
-            cmd="git checkout $b && $cmd"
-        fi
+        cmd="git branch -f $b $1"
         eval echo \"Running \\\"$cmd\\\"\" 1>&2
         read -p "Run command? (y/n/q) "
         if [[ $REPLY = "y" ]]; then
             eval $cmd || ret=1
-            cur_branch=$b
         else
             echo "Branch $b not reset" 1>&2
             case $REPLY in
@@ -43,8 +36,6 @@ do_sync()
             esac
         fi
     done
-
-    [[ $cur_branch != $orig_branch ]] && git checkout $orig_branch
 
     exit $ret
 }
