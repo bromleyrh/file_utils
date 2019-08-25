@@ -15,6 +15,7 @@
 
 #include <errno.h>
 #include <error.h>
+#include <fcntl.h>
 #include <fenv.h>
 #include <grp.h>
 #include <signal.h>
@@ -27,6 +28,7 @@
 #include <sys/capability.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/types.h>
 
 struct copy_ctx {
     struct timespec starttm;
@@ -40,6 +42,8 @@ struct copy_ctx {
 
 volatile sig_atomic_t quit;
 
+static int check_protected_hard_links(void);
+
 static int getsgids(gid_t **);
 static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
@@ -48,6 +52,44 @@ static int copy_cb(int, int, const char *, const char *, struct stat *, int,
                    void *);
 
 static int copy_fn(void *);
+
+static int
+check_protected_hard_links()
+{
+    char buf[32];
+    int err;
+    int fd;
+    size_t len;
+    ssize_t ret;
+
+    fd = open("/proc/sys/fs/protected_hardlinks", O_RDONLY);
+    if (fd == -1)
+        return -errno;
+
+    for (len = 0; len < sizeof(buf) - 1; len += ret) {
+        ret = read(fd, buf + len, sizeof(buf) - 1 - len);
+        if (ret == -1) {
+            if (errno != EINTR) {
+                err = -errno;
+                goto err;
+            }
+            ret = 0;
+            continue;
+        }
+        if (ret == 0)
+            break;
+    }
+    buf[len] = '\0';
+
+    close(fd);
+
+    return ((buf[0] != '\0')
+            && ((buf[0] != '0') || ((buf[1] != '\n') && (buf[1] != '\0'))));
+
+err:
+    close(fd);
+    return err;
+}
 
 static int
 getsgids(gid_t **sgids)
@@ -226,6 +268,11 @@ do_copy(struct copy_args *copy_args)
     int ret, tmp;
     static const cap_value_t capval_fsetid = CAP_FSETID;
     uid_t euid;
+
+    if (check_protected_hard_links() == 1) {
+        fputs("Warning: fs.protected_hardlinks is nonzero: permissions errors "
+              "may occur\n", stderr);
+    }
 
     ret = check_creds(ruid, rgid, copy_args->uid, copy_args->gid);
     if (ret != 0) {
