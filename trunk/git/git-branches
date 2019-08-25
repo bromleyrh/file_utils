@@ -17,12 +17,18 @@ get_branches()
 
 do_sync()
 {
+    cur_branch=$(git rev-parse --abbrev-ref HEAD)
+
     ret=0
     for b in $branches; do
         if [[ $b = "master" ]] || [[ ${branch_excl_set[$b]} = 1 ]]; then
             continue
         fi
-        cmd="git branch -f $b $1"
+        if [[ $b = $cur_branch ]]; then
+            cmd="git reset --hard $1"
+        else
+            cmd="git branch -f $b $1"
+        fi
         eval echo \"Running \\\"$cmd\\\"\" 1>&2
         read -p "Run command? (y/n/q) "
         if [[ $REPLY = "y" ]]; then
