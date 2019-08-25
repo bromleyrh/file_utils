@@ -194,7 +194,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
             throughput = cctx->bytescopied
                          / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
                          / (1024 * 1024);
-            fprintf(stderr, "\rProgress: %.6f%% (%4.6f MiB/s)", pcnt,
+            fprintf(stderr, "\rProgress: %.6f%% (%11.6f MiB/s)", pcnt,
                     throughput);
         }
         broadcast_progress(cctx->busconn, pcnt);

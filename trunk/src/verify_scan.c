@@ -393,7 +393,7 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     throughput = wctx->bytesverified
                  / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
                  / (1024 * 1024);
-    DEBUG_PRINT_NO_NL("\rProgress: %.6f%% (%4.6f MiB/s)", pcnt, throughput);
+    DEBUG_PRINT_NO_NL("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
 
     broadcast_stat(wctx->busconn, pcnt, "/verify/signal/progress",
                    "verify.signal.Progress", "Progress");
