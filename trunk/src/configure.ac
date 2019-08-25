@@ -124,6 +124,14 @@ AC_CHECK_LIB([mount], [mnt_table_uniq_fs],
     ]
 )
 
+AC_CHECK_LIB([crypto], [EVP_MD_CTX_new],
+    [AC_DEFINE(
+        [HAVE_EVP_MD_CTX_NEW], [1],
+        [Define if you have the 'EVP_MD_CTX_new' function.]
+     )
+    ]
+)
+
 AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
 
 PKG_CHECK_MODULES([dbus], [dbus-1],

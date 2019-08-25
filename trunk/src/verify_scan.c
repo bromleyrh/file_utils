@@ -104,6 +104,9 @@ static int insert_ino(struct verif_record_output *, struct verif_walk_ctx *);
 static int look_up_ino(struct stat *, struct verif_record_output *,
                        struct verif_walk_ctx *);
 
+static EVP_MD_CTX *new_evp_md_ctx(void);
+static void free_evp_md_ctx(EVP_MD_CTX *);
+
 static int broadcast_stat(DBusConnection *, double, const char *, const char *,
                           const char *);
 static int verif_chksums_cb(int, off_t, void *);
@@ -319,6 +322,26 @@ look_up_ino(struct stat *s, struct verif_record_output *record,
     }
 
     return res;
+}
+
+static EVP_MD_CTX *
+new_evp_md_ctx()
+{
+#ifdef HAVE_EVP_MD_CTX_NEW
+    return EVP_MD_CTX_new();
+#else
+    return malloc(sizeof(EVP_MD_CTX));
+#endif
+}
+
+static void
+free_evp_md_ctx(EVP_MD_CTX *ctx)
+{
+#ifdef HAVE_EVP_MD_CTX_NEW
+    EVP_MD_CTX_free(ctx);
+#else
+    free(ctx);
+#endif
 }
 
 static int
@@ -688,12 +711,12 @@ verif_fn(void *arg)
     }
     wctx.buf2 = wctx.buf1 + wctx.bufsz / 2;
 
-    wctx.sumctx = EVP_MD_CTX_new();
+    wctx.sumctx = new_evp_md_ctx();
     if (wctx.sumctx == NULL)
         return ENOMEM;
-    wctx.initsumctx = EVP_MD_CTX_new();
+    wctx.initsumctx = new_evp_md_ctx();
     if (wctx.initsumctx == NULL) {
-        EVP_MD_CTX_free(wctx.sumctx);
+        free_evp_md_ctx(wctx.sumctx);
         return ENOMEM;
     }
 
@@ -707,8 +730,8 @@ verif_fn(void *arg)
     err = -avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
                         &verif_record_cmp, 0, NULL, NULL, NULL);
     if (err) {
-        EVP_MD_CTX_free(wctx.sumctx);
-        EVP_MD_CTX_free(wctx.initsumctx);
+        free_evp_md_ctx(wctx.sumctx);
+        free_evp_md_ctx(wctx.initsumctx);
         munmap(wctx.buf1, fullbufsize);
         goto alloc_err1;
     }
@@ -750,8 +773,8 @@ end3:
 end2:
     avl_tree_free(wctx.output_data);
 end1:
-    EVP_MD_CTX_free(wctx.sumctx);
-    EVP_MD_CTX_free(wctx.initsumctx);
+    free_evp_md_ctx(wctx.sumctx);
+    free_evp_md_ctx(wctx.initsumctx);
     munmap(wctx.buf1, fullbufsize);
     return err;
 
