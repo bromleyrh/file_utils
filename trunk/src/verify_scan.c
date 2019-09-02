@@ -571,6 +571,14 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         return 0;
     }
 
+    /* check if file not opened but callback invoked due to
+       DIR_WALK_ALLOW_ERR */
+    if (fd == -1) {
+        fprintf(stderr, "Warning: Error opening %s/%s: %s\n", wctx->prefix,
+                path, strerror(EPERM));
+        return 0;
+    }
+
     /* if multiple hard links, check if already checksummed */
     mult_links = wctx->detect_hard_links && (s->st_nlink > 1);
     if (mult_links) {
