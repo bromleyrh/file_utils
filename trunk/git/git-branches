@@ -27,7 +27,7 @@ do_sync()
         if [[ $b = $cur_branch ]]; then
             cmd="git reset --hard $1"
         else
-            cmd="git branch -f $b $1"
+            cmd="git branch -f --no-track $b $1"
         fi
         eval echo \"Running \\\"$cmd\\\"\" 1>&2
         read -p "Run command? (y/n/q) "
