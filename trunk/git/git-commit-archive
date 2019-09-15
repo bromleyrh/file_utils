@@ -4,10 +4,18 @@ do_make_dist()
 {
     cd $1
 
+    echo "Generating \"configure\" script" 1>&2
     autoreconf -v
+
+    echo "Generating temporary makefiles containing archive creation recipe" \
+        1>&2
     ./configure --disable-dependency-tracking
+
+    echo "Generating archive" 1>&2
     make dist-xz
     mv *.xz "../$archive"
+
+    echo "Cleaning temporary files" 1>&2
     make distclean
     git clean -fx
     rm -frv autom4te.cache
