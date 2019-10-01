@@ -104,8 +104,9 @@ parse_cmdline(int argc, char **argv, const char **path)
         return -1;
     } END_GET_LONG_OPTIONS;
 
-    if (optind == argc) {
-        error(0, 0, "Must specify file");
+    if (optind != argc - 1) {
+        error(0, 0, (optind >= argc)
+                    ? "Must specify file" : "Unrecognized arguments");
         return -1;
     }
     *path = argv[optind];

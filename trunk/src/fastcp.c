@@ -68,8 +68,10 @@ parse_cmdline(int argc, char **argv, const char **src, const char **dst,
         return -1;
     } END_GET_LONG_OPTIONS;
 
-    if (optind > argc - 2) {
-        error(0, 0, "Must specify source and destination paths");
+    if (optind != argc - 2) {
+        error(0, 0, (optind > argc - 2)
+                    ? "Must specify source and destination paths"
+                    : "Unrecognized arguments");
         return -1;
     }
 

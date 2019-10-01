@@ -80,6 +80,11 @@ parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
         return -1;
     } END_GET_LONG_OPTIONS;
 
+    if (optind != argc) {
+        fputs("Unrecognized arguments\n", stderr);
+        return -1;
+    }
+
     return 0;
 
 path_err:

@@ -259,6 +259,11 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new)
         goto exit;
     } END_GET_LONG_OPTIONS;
 
+    if (optind != argc) {
+        fputs("Unrecognized arguments\n", stderr);
+        return -1;
+    }
+
     if (cfpath != NULL)
         *confpath = cfpath;
     return 0;
