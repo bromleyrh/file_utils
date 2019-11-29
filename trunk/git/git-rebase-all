@@ -1,0 +1,22 @@
+#!/bin/sh
+
+get_branches()
+{
+    tmp=`git branch`
+
+    branches=`cut -b 3- <<-EOF
+$tmp
+EOF
+`
+}
+
+set -e
+
+get_branches
+
+for b in $branches; do
+    [ $b = "master" ] && continue
+    git rebase --force master $b
+done
+
+git checkout master
