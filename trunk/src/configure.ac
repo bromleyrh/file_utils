@@ -13,6 +13,10 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
 
+dnl ensure installed files are accessible by non-root users when parent
+dnl directories are created
+MKDIR_P="install -d -m 0755"
+
 AM_INIT_AUTOMAKE([1.11 foreign no-define subdir-objects])
 AM_SILENT_RULES([yes])
 LT_INIT([disable-static])
