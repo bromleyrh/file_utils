@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 set -e
 cmd=$(echo $0 | cut -d '-' -f 3-)

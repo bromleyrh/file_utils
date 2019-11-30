@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 get_repo_name()
 {
     local multclones=$1
 
-    if [[ $multclones == "true" ]]; then
+    if [ $multclones = "true" ]; then
         reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
     else
         reponame=$(basename $rootdir)
@@ -14,7 +14,7 @@ get_repo_name()
 get_bundle_path()
 {
     bundle_path=$(git config user.bundleIn)
-    if [[ $? != 0 ]]; then
+    if [ $? != 0 ]; then
         return 1
     fi
 }
@@ -22,7 +22,7 @@ get_bundle_path()
 get_bundles()
 {
     bundles=$(ls $1/$reponame.* 2>/dev/null)
-    if [[ $? != 0 ]]; then
+    if [ $? != 0 ]; then
         return 1
     fi
 }
@@ -39,7 +39,7 @@ get_bundles $bundle_path
 
 for b in $bundles; do
     f=$(basename $b)
-    if [[ $f == "$reponame.bundle" ]]; then
+    if [ $f = "$reponame.bundle" ]; then
         echo "Importing bundle $f"
         mv $b $rootdir/../.$f
         git fetch bundle
@@ -47,7 +47,7 @@ for b in $bundles; do
         echo "Importing branch bundle $f"
         mv $b $rootdir/..
         bname=$(echo $f | cut -d '.' -f 2)
-        [[ ($? == 0) && (-n $bname) ]] || exit 1
+        [ ($? = 0) && (-n "$bname") ] || exit 1
         echo "Creating remote bundle_$bname"
         git remote add bundle_$bname ../$f
         git fetch bundle_$bname

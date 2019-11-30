@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 get_cmds()
 {
@@ -11,7 +11,7 @@ set_up_env()
     local old_ifs
 
     env=$(git config user.installDistEnv)
-    [[ $? != 0 ]] && return
+    [ $? != 0 ] && return
 
     old_ifs=$IFS
     IFS=";"
@@ -34,7 +34,7 @@ get_ncpus()
         *)
             ncpus=1;;
     esac
-    if [[ $? != 0 ]]; then
+    if [ $? != 0 ]; then
         return 1
     fi
 }
@@ -42,7 +42,7 @@ get_ncpus()
 get_dirs()
 {
     rootdir=$(git rev-parse --show-toplevel)
-    [[ $? != 0 ]] && return 1
+    [ $? != 0 ] && return 1
 
     distdir=$rootdir/dist
     tmpdir=/tmp/tmp
@@ -55,7 +55,7 @@ apply_patches()
 
     cd $1
 
-    if [[ -d $patchdir ]]; then
+    if [ -d $patchdir ]; then
         for i in $patchdir/*; do
             echo "Applying patch $i to $1"
             patch -p 2 < $i
@@ -71,7 +71,7 @@ do_build()
     ./configure "$@" # TODO: add option to set configure parameters
 
     make -j$ncpus check # TODO: make building tests optional
-    if [[ $noroot = 0 ]]; then
+    if [ $noroot = 0 ]; then
         echo "Root privilege required to install"
         sudo make install
     else
@@ -84,7 +84,7 @@ do_build()
 
     local reponame=$(basename $rootdir)
     local logmsg="Installed $reponame"
-    if [[ -z $@ ]]; then
+    if [ -z "$@" ]; then
         logmsg="$logmsg with default configuration"
     else
         logmsg="$logmsg with configuration \"$@\""
@@ -114,19 +114,19 @@ esac
 get_cmds
 set_up_env
 opts=$(git config user.installDistOpts)
-[[ $? == 0 ]] && set -- $opts $@
+[ $? = 0 ] && set -- $opts $@
 
 cmd=$(echo $0 | cut -d '-' -f 4-)
-if [[ $cmd = "cmdpre" ]] || [[ $cmd = "cmdpost" ]]; then
+if [ x"$cmd" = "xcmdpre" ] || [ x"$cmd" = "xcmdpost" ]; then
     eval command="\$$cmd"
-    [[ -z $command ]] && exit 0
+    [ -z "$command" ] && exit 0
     echo "Running \"$command\""
     eval $command
     exit $?
 fi
 
 noroot=0
-if [[ $1 = "-r" ]]; then
+if [ x"$1" = "x-r" ]; then
     noroot=1
     shift
 fi
@@ -142,12 +142,12 @@ tar -x -f $distdir/*.xz -C $tmpdir -v
 apply_patches $tmpdir/* $(pwd)
 
 cd $tmpdir/*
-if [[ -n $cmdpre ]]; then
+if [ -n "$cmdpre" ]; then
     echo "Running \"$cmdpre\""
     eval $cmdpre
 fi
 do_build "$@"
-if [[ -n $cmdpost ]]; then
+if [ -n "$cmdpost" ]; then
     echo "Running \"$cmdpost\""
     eval $cmdpost
 fi

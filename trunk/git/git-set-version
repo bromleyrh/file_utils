@@ -48,7 +48,7 @@ if [ $inc = 1 ]; then
 else
     version=$1
 fi
-if [ -z $version ]; then
+if [ -z "$version" ]; then
     echo "Nonempty version string required"
     exit 1
 fi
