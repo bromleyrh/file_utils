@@ -15,7 +15,8 @@ AC_CANONICAL_TARGET
 
 dnl ensure installed files are accessible by non-root users when parent
 dnl directories are created
-MKDIR_P="install -d -m 0755"
+dnl FIXME: Honor file mode creation mask for non-installation directories
+MKDIR_P="mkdir -m 0755 -p"
 
 AM_INIT_AUTOMAKE([1.11 foreign no-define subdir-objects])
 AM_SILENT_RULES([yes])
