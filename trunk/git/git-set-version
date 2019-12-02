@@ -11,8 +11,9 @@ dir=.
 inc=0
 sign=0
 tagonly=0
+undo=0
 
-temp=$(getopt d:ist "$@")
+temp=$(getopt d:istu "$@")
 [ $? != 0 ] && exit 1
 eval set -- "$temp"
 while true; do
@@ -29,6 +30,9 @@ while true; do
         -t)
             tagonly=1
             shift;;
+        -u)
+            undo=1
+            shift;;
         --)
             shift
             break;;
@@ -36,6 +40,17 @@ while true; do
 done
 
 vfile=$dir/.version
+
+if [ $undo = 1 ]; then
+    if [ $tagonly = 0 ]; then
+        git reset HEAD^ $vfile
+        git commit --amend --no-edit
+        git checkout $vfile
+    fi
+    version=$(cat "$vfile")
+    git tag -d v$version
+    exit
+fi
 
 [ $sign = 1 ] && tagopts="-s"
 
