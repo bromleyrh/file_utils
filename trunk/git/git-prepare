@@ -19,8 +19,9 @@ distdir=dist
 inc=0
 sign=0
 trunkdir=trunk
+undo=0
 
-temp=$(getopt ad:imst: "$@")
+temp=$(getopt ad:imst:u "$@")
 [ $? != 0 ] && exit 1
 eval set -- "$temp"
 while true; do
@@ -43,6 +44,9 @@ while true; do
         -t)
             trunkdir=$2
             shift 2;;
+        -u)
+            undo=1
+            shift;;
         --)
             shift
             break;;
@@ -51,12 +55,24 @@ done
 
 vfile=$trunkdir/.version
 
+if [ $sign = 1 ]; then
+    commitarchopts="-s"
+fi
+
+if [ $undo = 1 ]; then
+    git set-version -d "$trunkdir" -tu
+    git commit-archive -a -d "$distdir" -u $commitarchopts
+    git reset HEAD^ $vfile
+    git commit --amend --no-edit
+    git checkout $vfile
+    exit
+fi
+
 if [ $automake = 1 ]; then
-    commitarchopts="-m"
+    commitarchopts="$commitarchopts -m"
 fi
 
 if [ $sign = 1 ]; then
-    commitarchopts="$commitarchopts -s"
     setversopts="-s"
     if [ $agent = 1 ]; then
         gpg-agent --daemon --use-standard-socket
@@ -80,4 +96,3 @@ git commit-archive -a -d "$distdir" $commitarchopts "$trunkdir" || do_exit 1
 git set-version -d "$trunkdir" -t $setversopts $version || do_exit 1
 
 do_exit 0
-
