@@ -40,8 +40,9 @@ reponame=$(basename $(pwd))
 amend=0
 automake=0
 sign=0
+undo=0
 
-temp=$(getopt ad:ms "$@")
+temp=$(getopt ad:msu "$@")
 [ $? != 0 ] && exit 1
 eval set -- "$temp"
 while true; do
@@ -58,13 +59,29 @@ while true; do
         -s)
             sign=1
             shift;;
+        -u)
+            undo=1
+            shift;;
         --)
             shift
             break;;
     esac
 done
-[ $amend = 1 ] && commitopts="--amend --no-edit"
 archive="$dstdir$reponame.tar.xz"
+
+if [ $undo = 1 ]; then
+    if [ $amend = 1 ]; then
+        git reset HEAD^ $archive
+        [ $sign = 1 ] && git reset HEAD^ $archive.asc
+        git commit --amend --no-edit
+        git checkout $archive $archive.asc
+    else
+        git reset --hard HEAD^
+    fi
+    exit
+fi
+
+[ $amend = 1 ] && commitopts="--amend --no-edit"
 
 trap restore_files EXIT
 mv "$archive" "$archive.save" 2>/dev/null 1>&2
