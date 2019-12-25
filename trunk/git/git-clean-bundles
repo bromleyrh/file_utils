@@ -4,7 +4,7 @@ get_repo_name()
 {
     local multclones=$1
 
-    if [ $multclones = "true" ]; then
+    if [ "x$multclones" = "xtrue" ]; then
         reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
     else
         reponame=$(basename $rootdir)

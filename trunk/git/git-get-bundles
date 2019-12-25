@@ -4,7 +4,7 @@ get_repo_name()
 {
     local multclones=$1
 
-    if [ $multclones = "true" ]; then
+    if [ "x$multclones" = "xtrue" ]; then
         reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
     else
         reponame=$(basename $rootdir)
@@ -47,7 +47,9 @@ for b in $bundles; do
         echo "Importing branch bundle $f"
         mv $b $rootdir/..
         bname=$(echo $f | cut -d '.' -f 2)
-        [ ($? = 0) && (-n "$bname") ] || exit 1
+        if [ $? = 0 ] && [ -n "$bname" ]; then
+            exit 1
+        fi
         echo "Creating remote bundle_$bname"
         git remote add bundle_$bname ../$f
         git fetch bundle_$bname
