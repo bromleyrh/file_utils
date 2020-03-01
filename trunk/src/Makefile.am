@@ -54,8 +54,8 @@ pkgconfigdir = @pkgconfigdir@
 
 $(pkgconfig_DATA): config.status
 
-EXTRA_DIST = backtrace.c bootstrap build-aux replicate.conf.sample \
-	replicate.spec verify.conf.sample verify.spec
+EXTRA_DIST = bootstrap build-aux replicate.conf.sample replicate.spec \
+	verify.conf.sample verify.spec
 
 include scripts/Makefile.am
 
