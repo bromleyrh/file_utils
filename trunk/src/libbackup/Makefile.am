@@ -4,6 +4,8 @@
 
 include libbackup/include/Makefile.am
 
+noinst_HEADERS += libbackup/util.h
+
 lib_LTLIBRARIES += libbackup/libbackup.la
 
 libbackup_libbackup_la_SOURCES = libbackup/blkdev.c libbackup/mount.c \
