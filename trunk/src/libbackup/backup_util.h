@@ -1,9 +1,9 @@
 /*
- * util.h
+ * backup_util.h
  */
 
-#ifndef _UTIL_H
-#define _UTIL_H
+#ifndef _BACKUP_UTIL_H
+#define _BACKUP_UTIL_H
 
 void debug_print(const char *fmt, ...);
 

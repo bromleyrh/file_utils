@@ -1,9 +1,9 @@
 /*
- * util.c
+ * backup_util.c
  */
 
 #include "backup.h"
-#include "util.h"
+#include "backup_util.h"
 
 #include <strings_ext.h>
 

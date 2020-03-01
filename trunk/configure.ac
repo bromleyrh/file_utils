@@ -4,10 +4,10 @@
 
 env_cflags="$CFLAGS"
 
-AC_INIT([file_utils], [0.1])
+AC_INIT([file_utils], m4_esyscmd_s([cat .version]))
 AC_PREREQ([2.69])
 
-AC_CONFIG_SRCDIR([fastcat.c])
+AC_CONFIG_SRCDIR([src/fastcat.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 

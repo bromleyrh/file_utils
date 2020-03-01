@@ -1,5 +1,37 @@
+/aclocal.m4
+/autom4te.cache
+/conf??????
+/confdefs.h
+/config.h
+/config.h.in
+/config.h.in~
+/config.log
+/config.status
+/configure
+/conftest.err
+/libtool
+/scan_build
+
+Makefile
+Makefile.in
+
+.deps
+.dirstamp
+*.stamp
+stamp-h1
+
+.libs
+
+*.a
+*.la
+*.lo
 *.o
 
 *.class
 
 *.jar
+
+*.gcda
+*.gcno
+/file_utils-0.1-coverage
+/file_utils-0.1-coverage.info

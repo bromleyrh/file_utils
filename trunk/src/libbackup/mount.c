@@ -7,8 +7,8 @@
 #include "config.h"
 
 #include "backup.h"
+#include "backup_util.h"
 #include "common.h"
-#include "util.h"
 
 #include <libmount/libmount.h>
 
