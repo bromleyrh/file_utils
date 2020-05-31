@@ -564,6 +564,12 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         if (ca.dstfd < 0) {
             err = ca.dstfd;
             error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
+            if (err == -EINVAL) {
+                error(0, 0, "/etc/fstab definition for device %s on "
+                            "mount point", transfer->dstpath);
+                error(0, 0, "%s must match replicate configuration",
+                      transfer->dstmntpath);
+            }
             goto err2;
         }
 

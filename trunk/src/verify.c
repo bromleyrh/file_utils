@@ -633,6 +633,13 @@ do_verifs(struct verify_ctx *ctx)
         if (va.srcfd < 0) {
             err = va.srcfd;
             error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
+            if (err == -EINVAL) {
+                error(0, 0, "/etc/fstab definition for device %s on mount "
+                            "point",
+                      verif->devpath);
+                error(0, 0, "%s must match file system on device",
+                      verif->srcpath);
+            }
             goto err1;
         }
 
