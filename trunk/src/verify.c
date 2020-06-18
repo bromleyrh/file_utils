@@ -76,6 +76,7 @@ static int get_regex(regex_t *, const char *);
 static void int_handler(int);
 
 static int set_signal_handlers(void);
+static int wait_for_quit(int);
 
 static int input_data_walk_cb(const char *, void *, void *);
 
@@ -469,6 +470,18 @@ set_signal_handlers()
 }
 
 static int
+wait_for_quit(int seconds)
+{
+    extern volatile sig_atomic_t quit;
+    int rem;
+
+    for (rem = seconds; (rem > 0) && !quit; rem = sleep(rem))
+        ;
+
+    return quit;
+}
+
+static int
 input_data_walk_cb(const char *str, void *val, void *ctx)
 {
     FILE *f = (FILE *)ctx;
@@ -592,9 +605,17 @@ do_verifs(struct verify_ctx *ctx)
     struct verif *verif;
     struct verif_args va;
 
-    if (strcmp("-", ctx->output_file) == 0)
+    if (strcmp("-", ctx->output_file) == 0) {
+        errno = 0;
+        if (isatty(fileno(stdout))) {
+            fputs("Warning: Standard output is a terminal device: waiting 10 "
+                  "seconds\n", stderr);
+            if (wait_for_quit(10))
+                return -EINTR;
+        } else if (errno != ENOTTY)
+            return -errno;
         va.dstf = stdout;
-    else {
+    } else {
         va.dstf = fopen(ctx->output_file, "w");
         if (va.dstf == NULL) {
             err = -errno;

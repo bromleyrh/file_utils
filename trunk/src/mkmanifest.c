@@ -162,6 +162,17 @@ main(int argc, char **argv)
             && (get_path(TEMPLATE_PATH, template_path) != 0)))
         return EXIT_FAILURE;
 
+    errno = 0;
+    if (isatty(fileno(stdout))) {
+        int rem;
+
+        fputs("Warning: Standard output is a terminal device: waiting 10 "
+              "seconds\n", stderr);
+        for (rem = 10; rem > 0; rem = sleep(rem))
+            ;
+    } else if (errno != ENOTTY)
+        return EXIT_FAILURE;
+
     if (set_signal_handlers() != 0)
         return EXIT_FAILURE;
 
