@@ -418,7 +418,7 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
     int err;
     int init_verif = 0;
     off_t flen = 0, initrem = 512;
-    size_t len;
+    ssize_t len;
     struct aiocb aiocb;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
 
