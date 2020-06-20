@@ -59,6 +59,8 @@ int tracing = 0;
 uid_t ruid;
 gid_t rgid;
 
+uint64_t nfilesproc;
+
 static signed char from_hex(char);
 
 static int scan_chksum(const char *, unsigned char *, unsigned);
@@ -740,10 +742,19 @@ do_verifs(struct verify_ctx *ctx)
         }
 
         va.prefix = verif->srcpath;
+        nfilesproc = 0;
         err = do_verif(&va);
         if (err) {
             error(0, -err, "Error verifying %s", verif->srcpath);
             goto err2;
+        }
+        if (nfilesproc < 2) {
+            fprintf(stderr, "No files processed in %s: if not expected, check "
+                            "for\n"
+                            "errors in /etc/fstab (for example, a duplicate "
+                            "entry for\n"
+                            "%s)\n",
+                    verif->srcpath, verif->devpath);
         }
 
         err = unmount_file_system(verif->srcpath, va.srcfd);

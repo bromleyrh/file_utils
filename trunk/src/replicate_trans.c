@@ -20,6 +20,7 @@
 #include <grp.h>
 #include <signal.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -27,8 +28,8 @@
 
 #include <sys/capability.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 
 struct copy_ctx {
     struct timespec starttm;
@@ -37,6 +38,7 @@ struct copy_ctx {
     off_t           bytescopied;
     off_t           lastoff;
     ino_t           lastino;
+    uint64_t        filesprocessed;
     const char      *lastpath;
 };
 
@@ -206,14 +208,15 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
 static int
 copy_fn(void *arg)
 {
+    extern uint64_t nfilesproc;
     int fexcepts = 0;
     int fl;
     int ret;
     struct copy_args *cargs = (struct copy_args *)arg;
     struct copy_ctx cctx;
-    struct statvfs s;
+    struct statfs s;
 
-    if (fstatvfs(cargs->srcfd, &s) == -1) {
+    if (fstatfs(cargs->srcfd, &s) == -1) {
         ret = errno;
         error(0, errno, "Error getting file system statistics");
         return ret;
@@ -222,6 +225,7 @@ copy_fn(void *arg)
     cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     cctx.bytescopied = 0;
     cctx.lastino = 0;
+    cctx.filesprocessed = 0;
     cctx.lastpath = NULL;
 
     fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_PRESERVE_LINKS
@@ -250,7 +254,9 @@ copy_fn(void *arg)
     }
     if (cctx.lastpath != NULL)
         free((void *)(cctx.lastpath));
-    if (ret == EPERM) {
+    if (ret == 0)
+        nfilesproc = cctx.filesprocessed;
+    else if (ret == EPERM) {
         error(0, 0, "Permissions error encountered while copying");
         error(0, 0, "It may be necessary to ensure fs.protected_hardlinks is "
                     "set to 0");

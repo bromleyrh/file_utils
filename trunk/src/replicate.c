@@ -60,6 +60,8 @@ int tracing = 0;
 uid_t ruid;
 gid_t rgid;
 
+uint64_t nfilesproc;
+
 static int enable_debugging_features(int);
 
 static int set_capabilities(void);
@@ -656,11 +658,20 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             goto err3;
         }
 
+        nfilesproc = 0;
         err = do_copy(&ca);
         if (err) {
             error(0, -err, "Error copying from %s to %s", transfer->srcpath,
                   transfer->dstmntpath);
             goto err3;
+        }
+        if (nfilesproc < 2) {
+            fprintf(stderr, "No files processed in %s: if not expected, check "
+                            "for\n"
+                            "errors in /etc/fstab (for example, a duplicate "
+                            "entry for the device associated\n"
+                            "with %s)\n",
+                    transfer->srcpath, transfer->srcpath);
         }
 
         err = unmount_file_system(transfer->dstmntpath, ca.dstfd);

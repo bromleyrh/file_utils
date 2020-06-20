@@ -69,6 +69,7 @@ struct verif_walk_ctx {
     off_t               fsbytesused;
     off_t               bytesverified;
     off_t               lastoff;
+    uint64_t            filesprocessed;
     int                 use_direct_io;
     regex_t             *reg_excl;
     int                 detect_hard_links;
@@ -580,6 +581,8 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     (void)name;
     (void)flags;
 
+    ++(wctx->filesprocessed);
+
     if (quit)
         return -EINTR;
 
@@ -701,6 +704,7 @@ verif_err:
 static int
 verif_fn(void *arg)
 {
+    extern uint64_t nfilesproc;
     int err;
     int fexcepts = 0;
     int hugetlbfl, nhugep;
@@ -739,6 +743,7 @@ verif_fn(void *arg)
     }
     wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     wctx.bytesverified = 0;
+    wctx.filesprocessed = 0;
     wctx.use_direct_io = direct_io_supported(&s);
 
     wctx.buf1 = mmap(NULL, wctx.bufsz, PROT_READ | PROT_WRITE,
@@ -814,6 +819,7 @@ end1:
     free_evp_md_ctx(wctx.sumctx);
     free_evp_md_ctx(wctx.initsumctx);
     munmap(wctx.buf1, fullbufsize);
+    nfilesproc = wctx.filesprocessed;
     return err;
 
 alloc_err2:
