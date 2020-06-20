@@ -4,6 +4,7 @@
 
 #include "config.h"
 
+#include "common.h"
 #include "util.h"
 #include "verify_common.h"
 #include "verify_io.h"
@@ -40,11 +41,13 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <linux/magic.h>
+
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 
 #ifdef HAVE_XFS_XFS_H
 #include <xfs/xfs.h>
@@ -66,6 +69,7 @@ struct verif_walk_ctx {
     off_t               fsbytesused;
     off_t               bytesverified;
     off_t               lastoff;
+    int                 use_direct_io;
     regex_t             *reg_excl;
     int                 detect_hard_links;
     struct timespec     starttm;
@@ -94,6 +98,7 @@ static ssize_t get_io_size(int);
 static int64_t get_huge_page_size(void);
 #endif
 
+static int direct_io_supported(const struct statfs *);
 static int set_direct_io(int);
 
 static void cancel_aio(struct aiocb *);
@@ -242,6 +247,28 @@ end:
 #undef HUGE_PAGE_SIZE_KEY
 
 #endif
+
+static int
+direct_io_supported(const struct statfs *s)
+{
+    int i;
+
+    static const __fsword_t no_direct_io[] = {
+        /* ext4 read() calls may return EINVAL when the file offset is
+           positioned at the end of the file and O_DIRECT is enabled */
+        /* FIXME: check if behavior the same on ext2 and ext3 */
+        EXT2_SUPER_MAGIC,
+        EXT3_SUPER_MAGIC,
+        EXT4_SUPER_MAGIC
+    };
+
+    for (i = 0; i < (int)ARRAY_SIZE(no_direct_io); i++) {
+        if (s->f_type == no_direct_io[i])
+            return 0;
+    }
+
+    return 1;
+}
 
 static int
 set_direct_io(int fd)
@@ -617,10 +644,12 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     } else
         p_record_in = NULL;
 
-    res = set_direct_io(fd);
-    if (res != 0) {
-        error(0, -res, "Error reading %s", fullpath);
-        return res;
+    if (wctx->use_direct_io) {
+        res = set_direct_io(fd);
+        if (res != 0) {
+            error(0, -res, "Error reading %s", fullpath);
+            return res;
+        }
     }
 
     record.record.size = s->st_size;
@@ -677,7 +706,7 @@ verif_fn(void *arg)
     int hugetlbfl, nhugep;
     int64_t fullbufsize;
     ssize_t bufsz;
-    struct statvfs s;
+    struct statfs s;
     struct verif_args *vargs = (struct verif_args *)arg;
     struct verif_walk_ctx wctx;
 
@@ -704,12 +733,13 @@ verif_fn(void *arg)
     fullbufsize = wctx.bufsz;
 #endif
 
-    if (fstatvfs(vargs->srcfd, &s) == -1) {
+    if (fstatfs(vargs->srcfd, &s) == -1) {
         err = errno;
         goto stat_err;
     }
     wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     wctx.bytesverified = 0;
+    wctx.use_direct_io = direct_io_supported(&s);
 
     wctx.buf1 = mmap(NULL, wctx.bufsz, PROT_READ | PROT_WRITE,
                      MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
