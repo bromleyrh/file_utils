@@ -49,6 +49,9 @@
 
 #define CONFIG_PATH "\"$HOME/.verify.conf\""
 
+#define DBUS_LAUNCH_BIN "dbus-launch"
+#define DBUS_SESSION_BUS_ADDRESS_ENV "DBUS_SESSION_BUS_ADDRESS"
+
 int debug = 0;
 int log_verifs = 0;
 int tracing = 0;
@@ -83,6 +86,7 @@ static int input_data_walk_cb(const char *, void *, void *);
 static int scan_input_file(const char *, struct radix_tree **);
 static int print_input_data(FILE *, struct radix_tree *);
 
+static int exec_dbus_daemon(void);
 static int init_dbus(DBusConnection **);
 
 void
@@ -566,12 +570,83 @@ print_input_data(FILE *f, struct radix_tree *input_data)
     return radix_tree_walk(input_data, &input_data_walk_cb, (void *)f);
 }
 
+/*
+ * FIXME: also terminate DBus daemon automatically, without race conditions
+ */
+static int
+exec_dbus_daemon()
+{
+    char *line, *token;
+    FILE *proc;
+    int res;
+    size_t n;
+
+    proc = popen(DBUS_LAUNCH_BIN, "r");
+    if (proc == NULL) {
+        res = -errno;
+        goto err1;
+    }
+
+    line = NULL;
+    n = 0;
+    for (;;) {
+        errno = 0;
+        if (getline(&line, &n, proc) == -1) {
+            res = (errno == 0) ? -EIO : -errno;
+            if (line != NULL)
+                free(line);
+            goto err2;
+        }
+
+        token = strchr(line, '=');
+        if (token == NULL) {
+            res = -EIO;
+            goto err3;
+        }
+        if (strncmp(DBUS_SESSION_BUS_ADDRESS_ENV, line, token - line) == 0)
+            break;
+    }
+
+    ++token;
+    n = strlen(line);
+    if ((n > 1) && (line[n-1] == '\n'))
+        line[n-1] = '\0';
+
+    if (setenv(DBUS_SESSION_BUS_ADDRESS_ENV, token, 1) == -1) {
+        res = -errno;
+        goto err3;
+    }
+    fprintf(stderr, DBUS_SESSION_BUS_ADDRESS_ENV " = %s\n", token);
+
+    free(line);
+
+    res = pclose(proc);
+    if (res != 0) {
+        res = (res > 0) ? -EIO : -errno;
+        goto err1;
+    }
+
+    return 0;
+
+err3:
+    free(line);
+err2:
+    pclose(proc);
+err1:
+    error(0, -res, "Error executing " DBUS_LAUNCH_BIN);
+    return res;
+}
+
 static int
 init_dbus(DBusConnection **busconn)
 {
     DBusConnection *ret;
     DBusError buserr;
     int res;
+
+    res = exec_dbus_daemon();
+    if (res != 0)
+        return res;
 
     dbus_error_init(&buserr);
 
