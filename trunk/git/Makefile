@@ -8,7 +8,7 @@ bindir=$(prefix)/bin
 helpers=git-branches git-ck git-clean-bundles git-commit-archive git-cscope \
 git-get-bundles git-install-dist git-make-bundle git-prepare git-prepare-init \
 git-rebase-all git-remotes git-set-version git-skel git-submodule-commit \
-git-submodule-repeat git-verify
+git-submodule-repeat git-update git-verify
 
 .PHONY: install clean
 

@@ -1,0 +1,48 @@
+#!/bin/sh
+
+set -e
+
+force=0
+ignore_errors=0
+
+temp=$(getopt ef "$@")
+[ $? != 0 ] && exit 1
+eval set -- "$temp"
+while true; do
+	case "$1" in
+		-e)
+			ignore_errors=1
+			shift;;
+		-f)
+			force=1
+			shift;;
+		--)
+			shift
+			break;;
+	esac
+done
+
+if [ -z "$1" ]; then
+	echo "Must specify remote" 1>&2
+	exit 1
+fi
+remote="$1"
+
+trunkdir=trunk
+
+vfile=$trunkdir/.version
+
+version=$(cat "$vfile")
+
+[ $ignore_errors = 1 ] && set +e
+
+if [ $force = 1 ]; then
+	git push "$remote" :v$version
+	git push --force-with-lease --all "$remote"
+	git push --tags "$remote"
+else
+	git push --tags "$remote" master
+	git push --force-with-lease --all "$remote"
+fi
+
+# vi: set noexpandtab sw=4 ts=4:
