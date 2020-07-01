@@ -70,13 +70,13 @@ set +e
 cmd=$(echo $0 | cut -d '-' -f 2-)
 if [[ $cmd = "sync" ]]; then
     if [[ $1 = "--bundles" ]]; then
-        sync_bundles=1
+        sync=2
     else
-        sync_origin=1
+        sync=1
     fi
 fi
 
-if [[ $sync_origin = 1 ]]; then
+if [[ $sync = 1 ]]; then
     origin=$(git config user.upstreamRemoteName)
     [[ $origin = "" ]] && origin="origin"
 
@@ -90,7 +90,7 @@ for b in $branches_excl; do
 done
 branch_excl_set["master"]=1
 
-if [[ $sync_bundles = 1 ]]; then
+if [[ $sync = 2 ]]; then
     sync_with_bundles
     exit $?
 fi
