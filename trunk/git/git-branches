@@ -15,6 +15,46 @@ get_branches()
     done < <(echo "$tmp")
 }
 
+confirm_cmd()
+{
+    read -p "Run command? (y/n/q) "
+    case $REPLY in
+        y)
+            return 1
+            ;;
+        *q* | *Q*)
+            return 2
+            ;;
+    esac
+
+    return 0
+}
+
+do_sync_branch()
+{
+    if [[ $1 = $cur_branch ]]; then
+        cmd="git reset --hard $2"
+    else
+        cmd="git branch -f --no-track $1 $2"
+    fi
+
+    eval echo \"Running \\\"$cmd\\\"\" 1>&2
+
+    if [[ $force != 1 ]]; then
+        confirm_cmd
+        res=$?
+        if [[ $res != 1 ]]; then
+            echo "Branch $b not reset" 1>&2
+            if [[ $res = 2 ]]; then
+                return 1
+            fi
+            return 0
+        fi
+    fi
+
+    eval $cmd || ret=1
+}
+
 do_sync()
 {
     cur_branch=$(git rev-parse --abbrev-ref HEAD)
@@ -24,22 +64,9 @@ do_sync()
         if [[ $b = "master" ]] || [[ ${branch_excl_set[$b]} = 1 ]]; then
             continue
         fi
-        if [[ $b = $cur_branch ]]; then
-            cmd="git reset --hard $1"
-        else
-            cmd="git branch -f --no-track $b $1"
-        fi
-        eval echo \"Running \\\"$cmd\\\"\" 1>&2
-        read -p "Run command? (y/n/q) "
-        if [[ $REPLY = "y" ]]; then
-            eval $cmd || ret=1
-        else
-            echo "Branch $b not reset" 1>&2
-            case $REPLY in
-                *q* | *Q*)
-                    break
-                    ;;
-            esac
+        do_sync_branch $b $1
+        if [[ $? = 1 ]]; then
+            break
         fi
     done
 
@@ -69,11 +96,18 @@ set +e
 
 cmd=$(echo $0 | cut -d '-' -f 2-)
 if [[ $cmd = "sync" ]]; then
-    if [[ $1 = "--bundles" ]]; then
-        sync=2
-    else
-        sync=1
-    fi
+    sync=1
+    while [[ $1 ]]; do
+        case $1 in
+            --bundles)
+                sync=2
+                ;;
+            -f)
+                force=1
+                ;;
+        esac
+        shift
+    done
 fi
 
 if [[ $sync = 1 ]]; then
