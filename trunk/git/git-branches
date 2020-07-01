@@ -76,21 +76,23 @@ if [[ $cmd = "sync" ]]; then
     fi
 fi
 
-if [[ $sync_origin = 0 ]] || [[ $sync_bundles = 1 ]]; then
-    branches_excl=$(git config user.branchesExcl)
-    for b in $branches_excl; do
-        branch_excl_set[$b]=1
-    done
-    branch_excl_set["master"]=1
-fi
-
 if [[ $sync_origin = 1 ]]; then
     origin=$(git config user.upstreamRemoteName)
     [[ $origin = "" ]] && origin="origin"
 
     sync_with_origin
-elif [[ $sync_bundles = 1 ]]; then
+    exit $?
+fi
+
+branches_excl=$(git config user.branchesExcl)
+for b in $branches_excl; do
+    branch_excl_set[$b]=1
+done
+branch_excl_set["master"]=1
+
+if [[ $sync_bundles = 1 ]]; then
     sync_with_bundles
+    exit $?
 fi
 
 for b in $branches; do
