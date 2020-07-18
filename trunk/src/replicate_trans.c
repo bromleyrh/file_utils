@@ -37,6 +37,7 @@ struct copy_ctx {
     off_t           fsbytesused;
     off_t           bytescopied;
     off_t           lastoff;
+    dev_t           lastdev;
     ino_t           lastino;
     uint64_t        filesprocessed;
     const char      *lastpath;
@@ -174,12 +175,13 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
     if (dcpctx->off >= 0) {
         struct copy_ctx *cctx = (struct copy_ctx *)(dcpctx->ctx);
 
-        if (s->st_ino != cctx->lastino) {
+        if ((s->st_ino != cctx->lastino) || (s->st_dev != cctx->lastdev)) {
             if (debug && (cctx->lastpath != NULL)) {
                 fprintf(stderr, " (copied %s)\n", cctx->lastpath);
                 free((void *)(cctx->lastpath));
             }
             cctx->bytescopied += dcpctx->off;
+            cctx->lastdev = s->st_dev;
             cctx->lastino = s->st_ino;
             cctx->lastpath = strdup(path);
         } else
@@ -224,6 +226,7 @@ copy_fn(void *arg)
     cctx.busconn = cargs->busconn;
     cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
     cctx.bytescopied = 0;
+    cctx.lastdev = 0;
     cctx.lastino = 0;
     cctx.filesprocessed = 0;
     cctx.lastpath = NULL;
