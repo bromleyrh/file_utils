@@ -176,8 +176,9 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         struct copy_ctx *cctx = (struct copy_ctx *)(dcpctx->ctx);
 
         if ((s->st_ino != cctx->lastino) || (s->st_dev != cctx->lastdev)) {
-            if (debug && (cctx->lastpath != NULL)) {
-                fprintf(stderr, " (copied %s)\n", cctx->lastpath);
+            if (cctx->lastpath != NULL) {
+                if (debug)
+                    fprintf(stderr, " (copied %s)\n", cctx->lastpath);
                 free((void *)(cctx->lastpath));
             }
             cctx->bytescopied += dcpctx->off;
