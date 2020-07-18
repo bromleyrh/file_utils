@@ -163,19 +163,23 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         int flags, void *ctx)
 {
     double pcnt;
+    int new_file;
+    struct copy_ctx *cctx;
     struct dir_copy_ctx *dcpctx = (struct dir_copy_ctx *)ctx;
 
     (void)fd;
     (void)dirfd;
     (void)name;
-    (void)path;
-    (void)s;
     (void)flags;
 
-    if (dcpctx->off >= 0) {
-        struct copy_ctx *cctx = (struct copy_ctx *)(dcpctx->ctx);
+    cctx = (struct copy_ctx *)(dcpctx->ctx);
 
-        if ((s->st_ino != cctx->lastino) || (s->st_dev != cctx->lastdev)) {
+    new_file = ((s->st_ino != cctx->lastino) || (s->st_dev != cctx->lastdev));
+    if (new_file)
+        ++(cctx->filesprocessed);
+
+    if (dcpctx->off >= 0) {
+        if (new_file) {
             if (cctx->lastpath != NULL) {
                 if (debug)
                     fprintf(stderr, " (copied %s)\n", cctx->lastpath);
