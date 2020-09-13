@@ -727,7 +727,7 @@ do_verifs(struct verify_ctx *ctx)
         }
 
         va.srcfd = mount_file_system(verif->devpath, verif->srcpath,
-                                     MNT_FS_READ);
+                                     verif->srcmntopts, MNT_FS_READ);
         if (va.srcfd < 0) {
             err = va.srcfd;
             error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
@@ -817,6 +817,10 @@ print_verifs(FILE *f, struct verif *verifs, int num)
         if (verif->devpath != NULL)
             fprintf(f, "\tDevice path: %s\n", verif->devpath);
         fprintf(f, "\tSource directory path: %s\n", verif->srcpath);
+        if (verif->srcmntopts != NULL) {
+            fprintf(f, "\tSource mount options: \"-o %s\"\n",
+                    verif->srcmntopts);
+        }
     }
 }
 

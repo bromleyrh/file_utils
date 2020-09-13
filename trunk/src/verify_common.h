@@ -28,6 +28,7 @@ extern gid_t rgid;
 struct verif {
     const char *devpath;
     const char *srcpath;
+    const char *srcmntopts;
     const char *check_cmd;
 };
 

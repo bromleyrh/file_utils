@@ -435,6 +435,8 @@ read_verifs_opt(json_val_t opt, void *data)
          VERIF_PARAM(devpath)},
         {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(srcpath)},
+        {L"srcmntopts", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
+         VERIF_PARAM(srcmntopts)},
         {L"check_cmd", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(check_cmd)}
     };

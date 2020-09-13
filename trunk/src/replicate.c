@@ -612,7 +612,8 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
 
-        ca.srcfd = mount_file_system(NULL, transfer->srcpath, MNT_FS_READ);
+        ca.srcfd = mount_file_system(NULL, transfer->srcpath,
+                                     transfer->srcmntopts, MNT_FS_READ);
         if (ca.srcfd < 0) {
             error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
             return ca.srcfd;
@@ -636,6 +637,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         }
 
         ca.dstfd = mount_file_system(transfer->dstpath, transfer->dstmntpath,
+                                     NULL,
                                      transfer->force_write
                                      ? MNT_FS_FORCE_WRITE : MNT_FS_WRITE);
         if (ca.dstfd < 0) {
@@ -726,12 +728,17 @@ print_transfers(FILE *f, struct transfer *transfers, int num)
 
         fprintf(f,
                 "Transfer %d:\n"
-                "\tSource directory path: %s\n"
+                "\tSource directory path: %s\n",
+                i + 1,
+                transfer->srcpath);
+        if (transfer->srcmntopts != NULL) {
+            fprintf(f, "\tSource mount options: \"-o %s\"\n",
+                    transfer->srcmntopts);
+        }
+        fprintf(f,
                 "\tDestination device path: %s\n"
                 "\tDestination formatting command: \"%s\"\n"
                 "\tSet block device read-only flag: %d\n",
-                i + 1,
-                transfer->srcpath,
                 transfer->dstpath,
                 transfer->format_cmd,
                 !!(transfer->setro));

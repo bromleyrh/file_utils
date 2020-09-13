@@ -363,6 +363,8 @@ read_transfers_opt(json_val_t opt, void *data)
     static const struct json_scan_spec spec[] = {
         {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
          TRANSFER_PARAM(srcpath)},
+        {L"srcmntopts", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
+         TRANSFER_PARAM(srcmntopts)},
         {L"dest", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
          TRANSFER_PARAM(dstpath)},
         {L"dstpath", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,

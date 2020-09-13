@@ -32,6 +32,7 @@
 <verif> = {
     <verif_dev?>
     <verif_source>
+    <verif_srcmntopts?>
     <verif_check_cmd?>
 }
 
@@ -48,6 +49,8 @@
 <verif_dev> = "dev" : <string>
 
 <verif_source> = "src" : <string>
+
+<verif_srcmntopts> = "srcmntopts" : <string>
 
 <verif_check_cmd> = "check_cmd" : <string>
 

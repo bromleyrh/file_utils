@@ -14,6 +14,7 @@
 
 struct transfer {
     const char  *srcpath;
+    const char  *srcmntopts;
     const char  *dstpath;
     const char  *dstmntpath;
     const char  *format_cmd;

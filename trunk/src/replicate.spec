@@ -22,6 +22,7 @@
 
 <transfer> = {
     <transfer_source>
+    <transfer_srcmntopts?>
     <transfer_destination>
     <transfer_dstpath>
     <transfer_format_cmd>
@@ -40,6 +41,8 @@
 }
 
 <transfer_source> = "src" : <string>
+
+<transfer_srcmntopts> = "srcmntopts" : <string>
 
 <transfer_destination> = "dest" : <string>
 
