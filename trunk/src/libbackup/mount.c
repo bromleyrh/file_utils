@@ -235,7 +235,8 @@ err:
 }
 
 int
-mount_file_system(const char *devpath, const char *mntpath, int flags)
+mount_file_system(const char *devpath, const char *mntpath, const char *opts,
+                  int flags)
 {
     int mflags;
     int ret;
@@ -254,8 +255,9 @@ mount_file_system(const char *devpath, const char *mntpath, int flags)
     if (mnt_context_set_mflags(mntctx, mflags) != 0)
         goto err1;
 
-    if ((flags == MNT_FS_FORCE_WRITE)
-        && (mnt_context_set_options(mntctx, "rw") != 0))
+    if (((opts != NULL) && (mnt_context_append_options(mntctx, opts) != 0))
+        || ((flags == MNT_FS_FORCE_WRITE)
+            && (mnt_context_append_options(mntctx, "rw") != 0)))
         goto err1;
 
     if (devpath != NULL) {
