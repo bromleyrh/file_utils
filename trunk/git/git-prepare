@@ -80,8 +80,9 @@ if [ $sign = 1 ]; then
 fi
 
 version=$(cat "$vfile")
+ret=$?
 if [ $inc = 1 ]; then
-    [ $? != 0 ] && exit 1
+    [ $ret != 0 ] && exit 1
     maj=$(echo "$version" | cut -d . -f 1)
     min=$(echo "$version" | cut -d . -f 2)
     version=$maj.$((min+1))
