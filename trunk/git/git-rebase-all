@@ -2,12 +2,12 @@
 
 get_branches()
 {
-    tmp=`git branch`
+    tmp=$(git branch)
 
-    branches=`cut -b 3- <<-EOF
+    branches=$(cut -b 3- <<-EOF
 $tmp
 EOF
-`
+)
 }
 
 set -e
