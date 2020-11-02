@@ -37,7 +37,7 @@ version=$(cat "$vfile")
 [ $ignore_errors = 1 ] && set +e
 
 if [ $force = 1 ]; then
-	git push "$remote" :v$version
+	git push "$remote" ":v$version"
 	git push --force-with-lease --all "$remote"
 	git push --tags "$remote"
 else

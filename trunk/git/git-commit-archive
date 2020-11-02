@@ -2,7 +2,7 @@
 
 do_make_dist()
 {
-    cd $1
+    cd "$1"
 
     echo "Generating \"configure\" script" 1>&2
     autoreconf -v
@@ -35,7 +35,7 @@ if [ ! -d .git ] && [ ! -f .git ]; then
     echo "Current directory is not root of a Git repository" 1>&2
     exit 1
 fi
-reponame=$(basename $(pwd))
+reponame=$(basename "$(pwd)")
 
 amend=0
 automake=0
@@ -71,10 +71,10 @@ archive="$dstdir$reponame.tar.xz"
 
 if [ $undo = 1 ]; then
     if [ $amend = 1 ]; then
-        git reset HEAD^ $archive
-        [ $sign = 1 ] && git reset HEAD^ $archive.asc
+        git reset HEAD^ "$archive"
+        [ $sign = 1 ] && git reset HEAD^ "$archive.asc"
         git commit --amend --no-edit
-        git checkout $archive $archive.asc
+        git checkout "$archive" "$archive.asc"
     else
         git reset --hard HEAD^
     fi

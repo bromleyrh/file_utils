@@ -16,8 +16,8 @@ set_up_env()
     old_ifs=$IFS
     IFS=";"
     for e in $env; do
-        e=$(echo $e | sed -e 's/^[[:space:]][[:space:]]*//')
-        eval export $e
+        e=$(echo "$e" | sed -e 's/^[[:space:]][[:space:]]*//')
+        eval export "$e"
     done
     IFS=$old_ifs
 }
@@ -50,15 +50,15 @@ get_dirs()
 
 apply_patches()
 {
-    local reponame=$(basename $2)
+    local reponame=$(basename "$2")
     local patchdir=$2/../patches/$reponame
 
-    cd $1
+    cd "$1"
 
-    if [ -d $patchdir ]; then
-        for i in $patchdir/*; do
+    if [ -d "$patchdir" ]; then
+        for i in "$patchdir"/*; do
             echo "Applying patch $i to $1"
-            patch -p 2 < $i
+            patch -p 2 < "$i"
         done
         autoreconf -fv
     fi
@@ -71,7 +71,7 @@ do_build()
     ./configure "$@" # TODO: add option to set configure parameters
 
     make -j$ncpus check # TODO: make building tests optional
-    if [ $noroot = 0 ]; then
+    if [ "$noroot" = 0 ]; then
         echo "Root privilege required to install"
         sudo make install
     else
@@ -82,7 +82,7 @@ do_build()
 
     sync
 
-    local reponame=$(basename $rootdir)
+    local reponame=$(basename "$rootdir")
     local logmsg="Installed $reponame"
     if [ -z "$@" ]; then
         logmsg="$logmsg with default configuration"
@@ -94,7 +94,7 @@ do_build()
 
 run_install_cmd()
 {
-    cmd=$(git config user.installDistCmd${1})
+    cmd=$(git config user.installDistCmd"${1}")
 
     echo "Running \"$cmd\""
     eval $cmd
@@ -114,9 +114,9 @@ esac
 get_cmds
 set_up_env
 opts=$(git config user.installDistOpts)
-[ $? = 0 ] && set -- $opts $@
+[ $? = 0 ] && set -- $opts "$@"
 
-cmd=$(echo $0 | cut -d '-' -f 4-)
+cmd=$(echo "$0" | cut -d '-' -f 4-)
 if [ x"$cmd" = "xcmdpre" ] || [ x"$cmd" = "xcmdpost" ]; then
     eval command="\$$cmd"
     [ -z "$command" ] && exit 0
@@ -137,9 +137,9 @@ get_dirs
 set -e
 
 mkdir -v $tmpdir
-tar -x -f $distdir/*.xz -C $tmpdir -v
+tar -x -f "$distdir"/*.xz -C $tmpdir -v
 
-apply_patches $tmpdir/* $(pwd)
+apply_patches $tmpdir/* "$(pwd)"
 
 cd $tmpdir/*
 if [ -n "$cmdpre" ]; then

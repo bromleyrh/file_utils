@@ -5,9 +5,9 @@ get_repo_name()
     local multclones=$1
 
     if [ "x$multclones" = "xtrue" ]; then
-        reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
+        reponame=$(basename "$(dirname "$rootdir")" | cut -d '.' -f 2-)
     else
-        reponame=$(basename $rootdir)
+        reponame=$(basename "$rootdir")
     fi
 }
 
@@ -17,14 +17,14 @@ set -e
 
 rootdir=$(git rev-parse --show-toplevel)
 
-get_repo_name $multclones
+get_repo_name "$multclones"
 
 for i in $(git remotes); do
     case $i in
         bundle_*)
-            git remote remove $i
+            git remote remove "$i"
     esac
 done
 
-rm -fv $rootdir/../.$reponame.bundle
-rm -fv $rootdir/../$reponame.*.bundle
+rm -fv "$rootdir/../.$reponame.bundle"
+rm -fv "$rootdir/../$reponame".*.bundle

@@ -6,8 +6,8 @@ configure_opts="--enable-debugging"
 
 do_configure()
 {
-	if [ $cache_file != /dev/null ]; then
-		rm -fv $cache_file
+	if [ "$cache_file" != /dev/null ]; then
+		rm -fv "$cache_file"
 	fi
 	
 	scan-build ./configure $configure_opts

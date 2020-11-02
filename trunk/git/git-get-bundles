@@ -5,9 +5,9 @@ get_repo_name()
     local multclones=$1
 
     if [ "x$multclones" = "xtrue" ]; then
-        reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
+        reponame=$(basename "$(dirname "$rootdir")" | cut -d '.' -f 2-)
     else
-        reponame=$(basename $rootdir)
+        reponame=$(basename "$rootdir")
     fi
 }
 
@@ -21,7 +21,7 @@ get_bundle_path()
 
 get_bundles()
 {
-    bundles=$(ls $1/$reponame.* 2>/dev/null)
+    bundles=$(ls "$1/$reponame".* 2>/dev/null)
     if [ $? != 0 ]; then
         return 1
     fi
@@ -33,25 +33,25 @@ set -e
 
 rootdir=$(git rev-parse --show-toplevel)
 
-get_repo_name $multclones
+get_repo_name "$multclones"
 get_bundle_path
-get_bundles $bundle_path
+get_bundles "$bundle_path"
 
 for b in $bundles; do
-    f=$(basename $b)
-    if [ $f = "$reponame.bundle" ]; then
+    f=$(basename "$b")
+    if [ "$f" = "$reponame.bundle" ]; then
         echo "Importing bundle $f"
-        mv $b $rootdir/../.$f
+        mv "$b" "$rootdir/../.$f"
         git fetch bundle
     else
         echo "Importing branch bundle $f"
-        mv $b $rootdir/..
-        bname=$(echo $f | cut -d '.' -f 2)
+        mv "$b" "$rootdir/.."
+        bname=$(echo "$f" | cut -d '.' -f 2)
         if [ $? = 0 ] && [ -n "$bname" ]; then
             exit 1
         fi
         echo "Creating remote bundle_$bname"
-        git remote add bundle_$bname ../$f
-        git fetch bundle_$bname
+        git remote add "bundle_$bname" "../$f"
+        git fetch "bundle_$bname"
     fi
 done
