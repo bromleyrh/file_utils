@@ -21,8 +21,7 @@ sign=0
 trunkdir=trunk
 undo=0
 
-temp=$(getopt ad:imst:u "$@")
-[ $? != 0 ] && exit 1
+! temp=$(getopt ad:imst:u "$@") && exit 1
 eval set -- "$temp"
 while true; do
     case "$1" in

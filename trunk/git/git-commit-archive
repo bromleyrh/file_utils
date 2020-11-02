@@ -42,8 +42,7 @@ automake=0
 sign=0
 undo=0
 
-temp=$(getopt ad:msu "$@")
-[ $? != 0 ] && exit 1
+! temp=$(getopt ad:msu "$@") && exit 1
 eval set -- "$temp"
 while true; do
     case "$1" in

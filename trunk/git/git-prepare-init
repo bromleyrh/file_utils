@@ -12,8 +12,7 @@ distdir=dist
 trunkdir=trunk
 
 opts="$*"
-temp=$(getopt ad:imst: "$@")
-[ $? != 0 ] && exit 1
+! temp=$(getopt ad:imst: "$@") && exit 1
 eval set -- "$temp"
 while true; do
     case "$1" in

@@ -13,8 +13,7 @@ sign=0
 tagonly=0
 undo=0
 
-temp=$(getopt d:istu "$@")
-[ $? != 0 ] && exit 1
+! temp=$(getopt d:istu "$@") && exit 1
 eval set -- "$temp"
 while true; do
     case "$1" in
@@ -55,8 +54,7 @@ fi
 [ $sign = 1 ] && tagopts="-s"
 
 if [ $inc = 1 ]; then
-    version=$(cat "$vfile")
-    [ $? != 0 ] && exit 1
+    ! version=$(cat "$vfile") && exit 1
     maj=$(echo "$version" | cut -d . -f 1)
     min=$(echo "$version" | cut -d . -f 2)
     version=$maj.$((min+1))
