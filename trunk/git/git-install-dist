@@ -84,7 +84,7 @@ do_build()
 
     local reponame=$(basename "$rootdir")
     local logmsg="Installed $reponame"
-    if [ -z "$@" ]; then
+    if [ -z "$*" ]; then
         logmsg="$logmsg with default configuration"
     else
         logmsg="$logmsg with configuration \"$*\""
