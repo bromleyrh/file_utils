@@ -69,10 +69,10 @@ while true; do
 done
 archive="$dstdir$reponame.tar.xz"
 
-if [ $undo = 1 ]; then
-    if [ $amend = 1 ]; then
+if [ $undo -eq 1 ]; then
+    if [ $amend -eq 1 ]; then
         git reset HEAD^ "$archive"
-        [ $sign = 1 ] && git reset HEAD^ "$archive.asc"
+        [ $sign -eq 1 ] && git reset HEAD^ "$archive.asc"
         git commit --amend --no-edit
         git checkout "$archive" "$archive.asc"
     else
@@ -81,20 +81,20 @@ if [ $undo = 1 ]; then
     exit
 fi
 
-[ $amend = 1 ] && commitopts="--amend --no-edit"
+[ $amend -eq 1 ] && commitopts="--amend --no-edit"
 
 trap restore_files EXIT
 mv "$archive" "$archive.save" 2>/dev/null 1>&2
 mv "$archive.asc" "$archive.asc.save" 2>/dev/null 1>&2
 
 git config tar.tar.xz.command "xz -9c"
-if [ $automake = 1 ]; then
+if [ $automake -eq 1 ]; then
     do_make_dist "$@"
 else
     git archive -o "$archive" HEAD "$@"
 fi
 git add "$archive"
-if [ $sign = 1 ]; then
+if [ $sign -eq 1 ]; then
     gpg -a --detach-sign -o "$archive.asc" "$archive"
     git add "$archive.asc"
 fi
