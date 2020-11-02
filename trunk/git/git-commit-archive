@@ -13,7 +13,7 @@ do_make_dist()
 
     echo "Generating archive" 1>&2
     make dist-xz
-    mv *.xz "../$archive"
+    mv -- *.xz "../$archive"
 
     echo "Cleaning temporary files" 1>&2
     make distclean
