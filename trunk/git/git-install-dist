@@ -32,9 +32,6 @@ get_ncpus()
         *)
             ncpus=1;;
     esac
-    if [ $? != 0 ]; then
-        return 1
-    fi
 }
 
 get_dirs()

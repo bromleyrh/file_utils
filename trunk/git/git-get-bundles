@@ -14,17 +14,11 @@ get_repo_name()
 get_bundle_path()
 {
     bundle_path=$(git config user.bundleIn)
-    if [ $? != 0 ]; then
-        return 1
-    fi
 }
 
 get_bundles()
 {
     bundles=$(ls "$1/$reponame".* 2>/dev/null)
-    if [ $? != 0 ]; then
-        return 1
-    fi
 }
 
 multclones=$(git config user.multClones)
