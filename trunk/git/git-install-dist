@@ -8,8 +8,6 @@ get_cmds()
 
 set_up_env()
 {
-    local old_ifs
-
     env=$(git config user.installDistEnv)
     [ $? != 0 ] && return
 
@@ -24,7 +22,7 @@ set_up_env()
 
 get_ncpus()
 {
-    local platform=$(uname)
+    platform=$(uname)
 
     case $platform in
         "Darwin" | "FreeBSD")
@@ -50,8 +48,8 @@ get_dirs()
 
 apply_patches()
 {
-    local reponame=$(basename "$2")
-    local patchdir=$2/../patches/$reponame
+    reponame=$(basename "$2")
+    patchdir=$2/../patches/$reponame
 
     cd "$1"
 
@@ -82,8 +80,8 @@ do_build()
 
     sync
 
-    local reponame=$(basename "$rootdir")
-    local logmsg="Installed $reponame"
+    reponame=$(basename "$rootdir")
+    logmsg="Installed $reponame"
     if [ -z "$*" ]; then
         logmsg="$logmsg with default configuration"
     else
