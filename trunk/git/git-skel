@@ -8,6 +8,6 @@ rootdir=$(git rev-parse --show-toplevel)
 [ $? != 0 ] && exit 1
 pushd "$rootdir" > /dev/null
 
-cp -irv $skeldir/* $skeldir/.[^.]* .
+cp -irv $skeldir/* $skeldir/.[!.]* .
 
 popd > /dev/null
