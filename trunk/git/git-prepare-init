@@ -11,7 +11,7 @@ reponame=$(basename $(pwd))
 distdir=dist
 trunkdir=trunk
 
-opts="$@"
+opts="$*"
 temp=$(getopt ad:imst: "$@")
 [ $? != 0 ] && exit 1
 eval set -- "$temp"

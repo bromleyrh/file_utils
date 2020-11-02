@@ -87,7 +87,7 @@ do_build()
     if [ -z "$@" ]; then
         logmsg="$logmsg with default configuration"
     else
-        logmsg="$logmsg with configuration \"$@\""
+        logmsg="$logmsg with configuration \"$*\""
     fi
     logger "$logmsg"
 }
