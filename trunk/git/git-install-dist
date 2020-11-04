@@ -14,7 +14,9 @@ set_up_env()
     IFS=";"
     for e in $env; do
         e=$(echo "$e" | sed -e 's/^[[:space:]][[:space:]]*//')
+        set -f
         eval export "$e"
+        set +f
     done
     IFS=$old_ifs
 }
@@ -118,7 +120,7 @@ if [ x"$cmd" = "xcmdpre" ] || [ x"$cmd" = "xcmdpost" ]; then
 fi
 
 noroot=0
-if [ x"$1" = "x-r" ]; then
+if [ "x$1" = "x-r" ]; then
     noroot=1
     shift
 fi
