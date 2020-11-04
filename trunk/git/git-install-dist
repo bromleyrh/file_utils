@@ -106,7 +106,7 @@ esac
 
 get_cmds
 set_up_env
-! opts=$(git config user.installDistOpts) && set -- $opts "$@"
+opts=$(git config user.installDistOpts) && set -- $opts "$@"
 
 cmd=$(echo "$0" | cut -d '-' -f 4-)
 if [ x"$cmd" = "xcmdpre" ] || [ x"$cmd" = "xcmdpost" ]; then
