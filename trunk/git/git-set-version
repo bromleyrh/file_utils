@@ -40,8 +40,8 @@ done
 
 vfile=$dir/.version
 
-if [ $undo = 1 ]; then
-    if [ $tagonly = 0 ]; then
+if [ $undo -eq 1 ]; then
+    if [ $tagonly -eq 0 ]; then
         git reset HEAD^ "$vfile"
         git commit --amend --no-edit
         git checkout "$vfile"
@@ -51,7 +51,7 @@ if [ $undo = 1 ]; then
     exit
 fi
 
-if [ $inc = 1 ]; then
+if [ $inc -eq 1 ]; then
     ! version=$(cat "$vfile") && exit 1
     maj=$(echo "$version" | cut -d . -f 1)
     min=$(echo "$version" | cut -d . -f 2)
@@ -65,10 +65,10 @@ if [ -z "$version" ]; then
 fi
 
 args="\"-m\" \"Version $version\""
-[ $sign = 1 ] && args="$args -s"
+[ $sign -eq 1 ] && args="$args -s"
 eval set -- "$args"
 
-if [ $tagonly = 0 ]; then
+if [ $tagonly -eq 0 ]; then
     echo "$version" > "$vfile"
     git add "$vfile"
     git commit --amend --no-edit
