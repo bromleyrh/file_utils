@@ -112,6 +112,7 @@ opts=$(git config user.installDistOpts) && eval set -- "$opts" \"\$@\"
 
 cmd=$(echo "$0" | cut -d '-' -f 4-)
 if [ "x$cmd" = "xcmdpre" ] || [ "x$cmd" = "xcmdpost" ]; then
+    command=
     eval command="\$$cmd"
     [ -z "$command" ] && exit 0
     echo "Running \"$command\""
