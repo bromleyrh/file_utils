@@ -80,8 +80,6 @@ if [ $undo -eq 1 ]; then
     exit
 fi
 
-[ $amend -eq 1 ] && commitopts="--amend --no-edit"
-
 trap restore_files EXIT
 mv "$archive" "$archive.save" 2>/dev/null 1>&2
 mv "$archive.asc" "$archive.asc.save" 2>/dev/null 1>&2
@@ -97,7 +95,11 @@ if [ $sign -eq 1 ]; then
     gpg -a --detach-sign -o "$archive.asc" "$archive"
     git add "$archive.asc"
 fi
-git commit $commitopts
+if [ $amend -eq 1 ]; then
+    git commit --amend --no-edit
+else
+    git commit
+fi
 
 trap '' EXIT
 rm "$archive.save" "$archive.asc.save"

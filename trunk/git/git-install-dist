@@ -79,7 +79,7 @@ do_build()
 
     reponame=$(basename "$rootdir")
     logmsg="Installed $reponame"
-    if [ -z "$*" ]; then
+    if [ -z "$1" ]; then
         logmsg="$logmsg with default configuration"
     else
         logmsg="$logmsg with configuration \"$*\""
@@ -89,10 +89,10 @@ do_build()
 
 run_install_cmd()
 {
-    cmd=$(git config user.installDistCmd"${1}")
+    cmd=$(git config "user.installDistCmd$1")
 
     echo "Running \"$cmd\""
-    eval $cmd
+    eval "$cmd"
 
     exit $?
 }
@@ -108,14 +108,14 @@ esac
 
 get_cmds
 set_up_env
-opts=$(git config user.installDistOpts) && set -- $opts "$@"
+opts=$(git config user.installDistOpts) && eval set -- "$opts" \"\$@\"
 
 cmd=$(echo "$0" | cut -d '-' -f 4-)
-if [ x"$cmd" = "xcmdpre" ] || [ x"$cmd" = "xcmdpost" ]; then
+if [ "x$cmd" = "xcmdpre" ] || [ "x$cmd" = "xcmdpost" ]; then
     eval command="\$$cmd"
     [ -z "$command" ] && exit 0
     echo "Running \"$command\""
-    eval $command
+    eval "$command"
     exit $?
 fi
 
@@ -139,12 +139,12 @@ apply_patches $tmpdir/* "$(pwd)"
     cd $tmpdir/*
     if [ -n "$cmdpre" ]; then
         echo "Running \"$cmdpre\""
-        eval $cmdpre
+        eval "$cmdpre"
     fi
     do_build "$@"
     if [ -n "$cmdpost" ]; then
         echo "Running \"$cmdpost\""
-        eval $cmdpost
+        eval "$cmdpost"
     fi
 )
 

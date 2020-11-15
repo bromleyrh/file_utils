@@ -1,6 +1,26 @@
 #!/bin/sh
 
+esc_str()
+{
+    sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/' \\\\/"
+}
+
+add_to_args()
+{
+    if [ -n "$args" ]; then
+        args="$(printf %s\\n%s "$args" "$(printf %s\\n "$1" | esc_str)")"
+    else
+        args="$(printf %s\\n "$1" | esc_str)"
+    fi
+}
+
 set -e
 cmd=$(echo "$0" | cut -d '-' -f 3-)
 
-eval exec git submodule foreach \'"git $cmd $*"\'
+args=
+for i; do
+    add_to_args "$i"
+done
+
+exec git submodule foreach \
+    "$(printf "set -- %s\n; set -x; git $cmd \"\$@\"" "$args")"

@@ -18,6 +18,5 @@ for f in $excl; do
     fi
 done
 
-findcmd="find \"$rootdir\" \( \( \"$exclexpr\" \) -prune \) "
-findcmd="$findcmd -o \( -type f -exec chmod -w \{\} \; \)"
-eval $findcmd
+find "$rootdir" \( \( "$exclexpr" \) -prune \) \
+    -o \( -type f -exec chmod -w '{}' \; \)
