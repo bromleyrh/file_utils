@@ -10,9 +10,6 @@ set -e
     exec find "$rootdir" -name '*.c' -o -name '*.h' > "$rootdir/cscope.files"
 )
 
-ret=0
 if ! cscope -bq; then
-    ret=1
+    exit 1
 fi
-
-exit $ret
