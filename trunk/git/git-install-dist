@@ -115,7 +115,7 @@ if [ "x$cmd" = "xcmdpre" ] || [ "x$cmd" = "xcmdpost" ]; then
     eval command="\$$cmd"
     [ -z "$command" ] && exit 0
     echo "Running \"$command\""
-    eval "$command"
+    sh -c "$command"
     exit $?
 fi
 
@@ -139,12 +139,12 @@ apply_patches $tmpdir/* "$(pwd)"
     cd $tmpdir/*
     if [ -n "$cmdpre" ]; then
         echo "Running \"$cmdpre\""
-        eval "$cmdpre"
+        sh -c "$cmdpre"
     fi
     do_build "$@"
     if [ -n "$cmdpost" ]; then
         echo "Running \"$cmdpost\""
-        eval "$cmdpost"
+        sh -c "$cmdpost"
     fi
 )
 
