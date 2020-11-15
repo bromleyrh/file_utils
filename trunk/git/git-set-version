@@ -74,4 +74,4 @@ if [ $tagonly = 0 ]; then
     git commit --amend --no-edit
 fi
 eval git tag $tagopts "v$version"
-echo "Version $version"
+echo "Version $version" 1>&2
