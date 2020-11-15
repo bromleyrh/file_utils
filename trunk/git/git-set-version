@@ -62,7 +62,7 @@ else
     version=$1
 fi
 if [ -z "$version" ]; then
-    echo "Nonempty version string required"
+    echo "Nonempty version string required" 1>&2
     exit 1
 fi
 
