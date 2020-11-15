@@ -135,16 +135,17 @@ tar -x -f "$distdir"/*.xz -C $tmpdir -v
 
 apply_patches $tmpdir/* "$(pwd)"
 
-cd $tmpdir/*
-if [ -n "$cmdpre" ]; then
-    echo "Running \"$cmdpre\""
-    eval $cmdpre
-fi
-do_build "$@"
-if [ -n "$cmdpost" ]; then
-    echo "Running \"$cmdpost\""
-    eval $cmdpost
-fi
-cd - 1>/dev/null
+(
+    cd $tmpdir/*
+    if [ -n "$cmdpre" ]; then
+        echo "Running \"$cmdpre\""
+        eval $cmdpre
+    fi
+    do_build "$@"
+    if [ -n "$cmdpost" ]; then
+        echo "Running \"$cmdpost\""
+        eval $cmdpost
+    fi
+)
 
 rm -frv $tmpdir
