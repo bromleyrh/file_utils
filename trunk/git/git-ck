@@ -3,9 +3,6 @@
 get_commands()
 {
     commands=$(git config user.checkCommands)
-    if [[ $? != 0 ]]; then
-        return 1
-    fi
 }
 
 get_commands || exit 1
