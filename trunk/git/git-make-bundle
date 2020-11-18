@@ -6,7 +6,7 @@ parse_cmdline()
     [[ $(basename $0) == "git-make-bundles" ]] && all_branches=1
 
     if [[ -z $1 ]]; then
-        echo "Must specify commit ID"
+        echo "Must specify commit ID" 1>&2
         return 1
     fi
     commit=$1
