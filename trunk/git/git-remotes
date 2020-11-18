@@ -32,7 +32,7 @@ for rmt in $remotes_excl; do
 done
 
 for rmt in $remotes; do
-    if [[ ${remote_set[$rmt]} = 1 ]]; then
+    if [[ ${remote_set[$rmt]} -eq 1 ]]; then
         echo "$rmt"
     fi
 done

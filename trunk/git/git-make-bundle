@@ -84,7 +84,7 @@ done
 
 ret=0
 for b in $branches; do
-    if [[ ${branch_excl_set[$b]} != 1 ]]; then
+    if [[ ${branch_excl_set[$b]} -ne 1 ]]; then
         bname="$reponame"
         [[ $b != "master" ]] && bname+=".$b"
         git bundle create "$bundle_path/$bname.bundle" "$commit..$b" || ret=1

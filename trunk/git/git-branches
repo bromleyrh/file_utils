@@ -40,12 +40,12 @@ do_sync_branch()
 
     eval echo "\"Running \\\"$cmd\\\"\"" 1>&2
 
-    if [[ $force != 1 ]]; then
+    if [[ $force -ne 1 ]]; then
         confirm_cmd
         res=$?
-        if [[ $res != 1 ]]; then
+        if [[ $res -ne 1 ]]; then
             echo "Branch $b not reset" 1>&2
-            if [[ $res = 2 ]]; then
+            if [[ $res -eq 2 ]]; then
                 return 1
             fi
             return 0
@@ -61,7 +61,7 @@ do_sync()
 
     ret=0
     for b in $branches; do
-        if [[ $b = "master" ]] || [[ ${branch_excl_set[$b]} = 1 ]]; then
+        if [[ $b = "master" ]] || [[ ${branch_excl_set[$b]} -eq 1 ]]; then
             continue
         fi
         do_sync_branch "$b" "$1"
@@ -110,7 +110,7 @@ if [[ $cmd = "sync" ]]; then
     done
 fi
 
-if [[ $sync = 1 ]]; then
+if [[ $sync -eq 1 ]]; then
     origin=$(git config user.upstreamRemoteName)
     [[ $origin = "" ]] && origin="origin"
 
@@ -124,13 +124,13 @@ for b in $branches_excl; do
 done
 branch_excl_set["master"]=1
 
-if [[ $sync = 2 ]]; then
+if [[ $sync -eq 2 ]]; then
     sync_with_bundles
     exit $?
 fi
 
 for b in $branches; do
-    if [[ ${branch_excl_set[$b]} != 1 ]]; then
+    if [[ ${branch_excl_set[$b]} -ne 1 ]]; then
         echo "$b"
     fi
 done

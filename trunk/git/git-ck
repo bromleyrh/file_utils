@@ -14,7 +14,7 @@ ret=0
 IFS=";"
 first=1
 for c in $commands; do
-    if [[ $first = 1 ]]; then
+    if [[ $first -eq 1 ]]; then
         first=0
     else
         echo "--More--"
