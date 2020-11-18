@@ -4,8 +4,7 @@ get_branches()
 {
     local tmp
 
-    tmp=$(git branch)
-    if [[ $? != 0 ]]; then
+    if ! tmp=$(git branch); then
         return 1
     fi
 

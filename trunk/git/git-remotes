@@ -4,10 +4,7 @@ get_remotes()
 {
     local tmp
 
-    tmp=$(git remote)
-    if [[ $? != 0 ]]; then
-        return 1
-    fi
+    tmp=$(git remote) || return 1
 
     for rmt in $tmp; do
         remotes+="$rmt "

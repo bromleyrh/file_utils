@@ -42,10 +42,7 @@ get_branches()
         return
     fi
 
-    tmp=$(git branch)
-    if [[ $? != 0 ]]; then
-        return 1
-    fi
+    tmp=$(git branch) || return 1
 
     while IFS= read -r line; do
         branches+="${line##??} "
@@ -54,10 +51,7 @@ get_branches()
 
 get_bundle_path()
 {
-    bundle_path=$(git config user.bundleOut)
-    if [[ $? != 0 ]]; then
-        return 1
-    fi
+    bundle_path=$(git config user.bundleOut) || return 1
 }
 
 if ! declare -A branch_excl_set 2>/dev/null; then
