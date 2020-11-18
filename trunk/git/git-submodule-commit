@@ -22,9 +22,11 @@ get_commit_message()
     printf "Commit to submodules\n\nCommit UUIDs:\n"
 
     for m in $1; do
-        cd $m
-        git show | grep "Commit UUID:" | cut -d ':' -f 2 | cut -b 2-
-        cd - 1>/dev/null
+        (
+            set -e
+            cd $m
+            git show | grep "Commit UUID:" | cut -d ':' -f 2 | cut -b 2-
+        )
     done
 }
 
