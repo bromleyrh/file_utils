@@ -44,11 +44,9 @@ declare -a submodules
 set -e
 
 get_excluded_submodules
-
-get_submodules || exit 1
+get_submodules
 
 msg=$(get_commit_message "${submodules[@]}")
-[[ $? != 0 ]] && exit 1
 
 git add "${submodules[@]}"
 git commit -F - <<< "$msg"
