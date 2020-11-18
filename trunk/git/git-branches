@@ -17,7 +17,7 @@ get_branches()
 
 confirm_cmd()
 {
-    read -p "Run command? (y/n/q) "
+    read -p -r "Run command? (y/n/q) "
     case $REPLY in
         y)
             return 1

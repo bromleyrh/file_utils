@@ -18,7 +18,7 @@ for c in $commands; do
         first=0
     else
         echo "--More--"
-        IFS= read -n 1 -s tmp
+        IFS= read -n 1 -r -s tmp
         if [[ $tmp != " " ]]; then
             ret=1
             break
