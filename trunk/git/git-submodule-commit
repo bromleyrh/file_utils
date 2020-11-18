@@ -9,10 +9,15 @@ get_excluded_submodules()
 
 get_submodules()
 {
+    n=0
     while IFS= read -r line; do
-        if [[ $line = +* ]]; then
-            submodule=$(echo $line | cut -d '+' -f 2- | cut -d ' ' -f 2)
-            [[ ${excluded_submodules[$submodule]} != 1 ]] && echo $submodule
+        if [[ $line != +* ]]; then
+            continue
+        fi
+        submodule=$(echo "$line" | cut -d '+' -f 2- | cut -d ' ' -f 2)
+        if [[ ${excluded_submodules[$submodule]} != 1 ]]; then
+            submodules[$n]=$submodule
+            n=$((++n))
         fi
     done < <(git submodule status)
 }
@@ -21,10 +26,10 @@ get_commit_message()
 {
     printf "Commit to submodules\n\nCommit UUIDs:\n"
 
-    for m in $1; do
+    for m; do
         (
             set -e
-            cd $m
+            cd "$m"
             git show | grep "Commit UUID:" | cut -d ':' -f 2 | cut -b 2-
         )
     done
@@ -34,16 +39,16 @@ if ! declare -A excluded_submodules 2>/dev/null; then
     echo "bash version 4.0 or greater is required" 1>&2
     exit 1
 fi
+declare -a submodules
 
 set -e
 
 get_excluded_submodules
 
-submodules=$(get_submodules)
+get_submodules || exit 1
+
+msg=$(get_commit_message "${submodules[@]}")
 [[ $? != 0 ]] && exit 1
 
-msg=$(get_commit_message "$submodules")
-[[ $? != 0 ]] && exit 1
-
-git add $submodules
+git add "${submodules[@]}"
 git commit -F - <<< "$msg"

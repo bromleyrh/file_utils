@@ -3,7 +3,7 @@
 parse_cmdline()
 {
     all_branches=0
-    [[ $(basename $0) == "git-make-bundles" ]] && all_branches=1
+    [[ $(basename "$0") == "git-make-bundles" ]] && all_branches=1
 
     if [[ -z $1 ]]; then
         echo "Must specify commit ID" 1>&2
@@ -27,9 +27,9 @@ get_repo_name()
     local multclones=$1
 
     if [[ $multclones == "true" ]]; then
-        reponame=$(basename $(dirname $rootdir) | cut -d '.' -f 2-)
+        reponame=$(basename "$(dirname "$rootdir")" | cut -d '.' -f 2-)
     else
-        reponame=$(basename $rootdir)
+        reponame=$(basename "$rootdir")
     fi
 }
 
@@ -71,7 +71,7 @@ set -e
 
 parse_cmdline "$@"
 
-get_repo_name $multclones
+get_repo_name "$multclones"
 get_branches
 get_bundle_path
 
@@ -87,7 +87,7 @@ for b in $branches; do
     if [[ ${branch_excl_set[$b]} != 1 ]]; then
         bname="$reponame"
         [[ $b != "master" ]] && bname+=".$b"
-        git bundle create $bundle_path/$bname.bundle $commit..$b || ret=1
+        git bundle create "$bundle_path/$bname.bundle" "$commit..$b" || ret=1
     fi
 done
 

@@ -32,13 +32,13 @@ confirm_cmd()
 
 do_sync_branch()
 {
-    if [[ $1 = $cur_branch ]]; then
+    if [[ $1 = "$cur_branch" ]]; then
         cmd="git reset --hard $2"
     else
         cmd="git branch -f --no-track $1 $2"
     fi
 
-    eval echo \"Running \\\"$cmd\\\"\" 1>&2
+    eval echo "\"Running \\\"$cmd\\\"\"" 1>&2
 
     if [[ $force != 1 ]]; then
         confirm_cmd
@@ -52,7 +52,7 @@ do_sync_branch()
         fi
     fi
 
-    eval $cmd || ret=1
+    eval "$cmd" || ret=1
 }
 
 do_sync()
@@ -64,7 +64,7 @@ do_sync()
         if [[ $b = "master" ]] || [[ ${branch_excl_set[$b]} = 1 ]]; then
             continue
         fi
-        do_sync_branch $b $1
+        do_sync_branch "$b" "$1"
         if [[ $? = 1 ]]; then
             break
         fi
@@ -94,7 +94,7 @@ get_branches
 
 set +e
 
-cmd=$(echo $0 | cut -d '-' -f 2-)
+cmd=$(echo "$0" | cut -d '-' -f 2-)
 if [[ $cmd = "sync" ]]; then
     sync=1
     while [[ $1 ]]; do
