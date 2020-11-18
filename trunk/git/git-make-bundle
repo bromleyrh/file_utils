@@ -39,7 +39,7 @@ get_branches()
 
     if [[ $all_branches = 0 ]]; then
         branches="$branch"
-        return
+        return 0
     fi
 
     tmp=$(git branch) || return 1
