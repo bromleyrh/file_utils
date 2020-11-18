@@ -21,8 +21,8 @@ parse_cmdline()
 
 get_repo_name()
 {
-    local rootdir=$(git rev-parse --show-toplevel)
-    [[ $? != 0 ]] && return 1
+    local rootdir
+    rootdir=$(git rev-parse --show-toplevel) || return 1
 
     local multclones=$1
 
