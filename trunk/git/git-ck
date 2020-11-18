@@ -27,7 +27,7 @@ for c in $commands; do
     fi
     cmd=$(eval echo "$c" | sed -e "s/^[[:space:]][[:space:]]*//")
     echo "$ $cmd"
-    eval "$cmd"
+    /usr/bin/env bash -c "$cmd"
     echo "\`- $?"
 done
 
