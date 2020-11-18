@@ -111,7 +111,7 @@ fi
 
 if [[ $sync -eq 1 ]]; then
     origin=$(git config user.upstreamRemoteName)
-    [[ $origin = "" ]] && origin="origin"
+    [[ -z $origin ]] && origin="origin"
 
     sync_with_origin
     exit $?
