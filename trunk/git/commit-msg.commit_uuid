@@ -3,4 +3,4 @@
 key="Commit UUID"
 
 grep "$key:" "$1" \
-	|| printf "\n$key: %s\n" "$(uuidgen | tr "[:upper:]" "[:lower:]")" >> "$1"
+	|| printf "\n$key: %s\n" "$(uuidgen | tr "[:upper:]" "[:lower:]")" >>"$1"

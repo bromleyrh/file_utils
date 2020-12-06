@@ -69,7 +69,7 @@ args="\"-m\" \"Version $version\""
 eval "set -- $args"
 
 if [ $tagonly -eq 0 ]; then
-    echo "$version" > "$vfile"
+    echo "$version" >"$vfile"
     git add "$vfile"
     git commit --amend --no-edit
 fi
