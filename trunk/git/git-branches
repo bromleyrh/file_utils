@@ -4,9 +4,7 @@ get_branches()
 {
     local tmp
 
-    if ! tmp=$(git branch); then
-        return 1
-    fi
+    tmp=$(git branch) || return 1
 
     while IFS= read -r line; do
         b="${line##??}"
@@ -42,9 +40,7 @@ do_sync_branch()
         res=$?
         if [[ $res -ne 1 ]]; then
             echo "Branch $b not reset" 1>&2
-            if [[ $res -eq 2 ]]; then
-                return 1
-            fi
+            [[ $res -eq 2 ]] && return 1
             return 0
         fi
     fi
@@ -62,9 +58,7 @@ do_sync()
             continue
         fi
         do_sync_branch "$b" "$1"
-        if [[ $? = 1 ]]; then
-            break
-        fi
+        [[ $? = 1 ]] && break
     done
 
     exit $ret
@@ -125,7 +119,5 @@ if [[ $sync -eq 2 ]]; then
 fi
 
 for b in $branches; do
-    if [[ ${branch_excl_set[$b]} -ne 1 ]]; then
-        echo "$b"
-    fi
+    [[ ${branch_excl_set[$b]} -ne 1 ]] && echo "$b"
 done

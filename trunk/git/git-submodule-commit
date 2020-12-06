@@ -11,9 +11,7 @@ get_submodules()
 {
     n=0
     while IFS= read -r line; do
-        if [[ $line != +* ]]; then
-            continue
-        fi
+        [[ $line != +* ]] && continue
         submodule=$(echo "$line" | cut -d '+' -f 2- | cut -d ' ' -f 2)
         if [[ ${excluded_submodules[$submodule]} -ne 1 ]]; then
             submodules[$n]=$submodule

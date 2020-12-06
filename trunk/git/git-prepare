@@ -54,9 +54,7 @@ done
 
 vfile=$trunkdir/.version
 
-if [ $sign -eq 1 ]; then
-    commitarchopts="-s"
-fi
+[ $sign -eq 1 ] && commitarchopts="-s"
 
 if [ $undo -eq 1 ]; then
     git set-version -d "$trunkdir" -tu
@@ -67,15 +65,11 @@ if [ $undo -eq 1 ]; then
     exit
 fi
 
-if [ $automake -eq 1 ]; then
-    commitarchopts="$commitarchopts -m"
-fi
+[ $automake -eq 1 ] && commitarchopts="$commitarchopts -m"
 
 if [ $sign -eq 1 ]; then
     setversopts="-s"
-    if [ $agent -eq 1 ]; then
-        gpg-agent --daemon --use-standard-socket
-    fi
+    [ $agent -eq 1 ] && gpg-agent --daemon --use-standard-socket
 fi
 
 version=$(cat "$vfile")
