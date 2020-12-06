@@ -99,11 +99,9 @@ run_install_cmd()
 
 case $1 in
     "--pre")
-        run_install_cmd pre
-        ;;
+        run_install_cmd pre;;
     "--post")
-        run_install_cmd post
-        ;;
+        run_install_cmd post;;
 esac
 
 get_cmds

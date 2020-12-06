@@ -19,11 +19,9 @@ confirm_cmd()
     read -p -r "Run command? (y/n/q) "
     case $REPLY in
         y)
-            return 1
-            ;;
+            return 1;;
         *q* | *Q*)
-            return 2
-            ;;
+            return 2;;
     esac
 
     return 0
@@ -99,11 +97,9 @@ if [[ $cmd = "sync" ]]; then
     while [[ $1 ]]; do
         case $1 in
             --bundles)
-                sync=2
-                ;;
+                sync=2;;
             -f)
-                force=1
-                ;;
+                force=1;;
         esac
         shift
     done
