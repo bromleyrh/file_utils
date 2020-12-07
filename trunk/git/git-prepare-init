@@ -53,8 +53,8 @@ vfile=$trunkdir/.version
 echo "0.0" > "$vfile"
 
 mkdir "$distdir"
-touch "${distdir}/${reponame}.tar.xz"
-touch "${distdir}/${reponame}.tar.xz.asc"
+touch "$distdir/${reponame}.tar.xz"
+touch "$distdir/${reponame}.tar.xz.asc"
 
 eval "set -- $args"
 git prepare "$@"
