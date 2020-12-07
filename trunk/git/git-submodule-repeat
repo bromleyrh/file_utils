@@ -17,10 +17,10 @@ add_to_args()
 set -e
 cmd=$(echo "$0" | cut -d '-' -f 3-)
 
-args=
 for i; do
     add_to_args "$i"
 done
+args=$(printf "%s\n " "$args")
 
 exec git submodule foreach \
     "$(printf "set -- %s\n; set -x; git $cmd \"\$@\"" "$args")"
