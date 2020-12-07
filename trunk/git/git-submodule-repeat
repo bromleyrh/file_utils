@@ -8,9 +8,9 @@ esc_str()
 add_to_args()
 {
     if [ -n "$args" ]; then
-        args="$(printf %s\\n%s "$args" "$(printf %s\\n "$1" | esc_str)")"
+        args="$(printf "%s\n%s" "$args" "$(printf "%s\n" "$1" | esc_str)")"
     else
-        args="$(printf %s\\n "$1" | esc_str)"
+        args="$(printf "%s\n" "$1" | esc_str)"
     fi
 }
 
