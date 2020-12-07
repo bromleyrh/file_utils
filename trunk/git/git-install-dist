@@ -48,17 +48,17 @@ apply_patches()
     reponame=$(basename "$2")
     patchdir=$2/../patches/$reponame
 
-    cd "$1"
+    (
+        cd "$1"
 
-    if [ -d "$patchdir" ]; then
-        for i in "$patchdir"/*; do
-            echo "Applying patch $i to $1"
-            patch -p 2 < "$i"
-        done
-        autoreconf -fv
-    fi
-
-    cd - 1>/dev/null
+        if [ -d "$patchdir" ]; then
+            for i in "$patchdir"/*; do
+                echo "Applying patch $i to $1" 1>&2
+                patch -p 2 < "$i"
+            done
+            autoreconf -fv
+        fi
+    )
 }
 
 do_build()
