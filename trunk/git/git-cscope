@@ -2,7 +2,7 @@
 
 set -e
 
-! rootdir=$(git rev-parse --show-toplevel) && exit 1
+rootdir=$(git rev-parse --show-toplevel)
 
 (
     set -e
@@ -10,6 +10,4 @@ set -e
     exec find "$rootdir" -name '*.c' -o -name '*.h' > "$rootdir/cscope.files"
 )
 
-if ! cscope -bq; then
-    exit 1
-fi
+exec cscope -bq
