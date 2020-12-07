@@ -2,7 +2,7 @@
 
 do_exit()
 {
-    [ "$sign" -eq 1 ] && [ "$agent" -eq 1 ] && killall gpg-agent
+    [ "$sign" -ne 1 ] || [ "$agent" -ne 1 ] || killall gpg-agent
     exit "$1"
 }
 
@@ -87,12 +87,13 @@ if [ $inc -eq 1 ]; then
     version=$maj.$((min+1))
 fi
 
-set +e
-
-echo "$version" > "$vfile" || do_exit 1
-git add "$vfile" || do_exit 1
-git commit --amend --no-edit || do_exit 1
-git commit-archive -a -d "$distdir" $commitarchopts "$trunkdir" || do_exit 1
-git set-version -d "$trunkdir" -t $setversopts "$version" || do_exit 1
+(
+    set -e
+    echo "$version" >"$vfile"
+    git add "$vfile"
+    git commit --amend --no-edit
+    git commit-archive -a -d "$distdir" $commitarchopts "$trunkdir"
+    git set-version -d "$trunkdir" -t $setversopts "$version"
+) || do_exit 1
 
 do_exit 0
