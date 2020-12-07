@@ -92,7 +92,7 @@ run_install_cmd()
     cmd=$(git config "user.installDistCmd$1")
 
     echo "Running \"$cmd\""
-    eval "$cmd"
+    ( eval "$cmd" )
 
     exit $?
 }
