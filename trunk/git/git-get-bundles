@@ -40,9 +40,8 @@ for b in $bundles; do
     else
         echo "Importing branch bundle $f" 1>&2
         mv "$b" "$rootdir/.."
-        if bname=$(echo "$f" | cut -d '.' -f 2) && [ -z "$bname" ]; then
-            exit 1
-        fi
+        bname=$(echo "$f" | cut -d '.' -f 2)
+        [ -z "$bname" ] && exit 1
         echo "Creating remote bundle_$bname" 1>&2
         git remote add "bundle_$bname" "../$f"
         git fetch "bundle_$bname"
