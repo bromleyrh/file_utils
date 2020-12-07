@@ -1,5 +1,19 @@
 #!/bin/sh
 
+esc_str()
+{
+    sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/' \\\\/"
+}
+
+add_to_args()
+{
+    if [ -n "$args" ]; then
+        args="$(printf "%s\n%s" "$args" "$(printf "%s\n" "$1" | esc_str)")"
+    else
+        args="$(printf "%s\n" "$1" | esc_str)"
+    fi
+}
+
 set -e
 
 if [ ! -d .git ] && [ ! -f .git ]; then
@@ -11,7 +25,11 @@ reponame=$(basename "$(pwd)")
 distdir=dist
 trunkdir=trunk
 
-opts="$*"
+for i; do
+    add_to_args "$i"
+done
+args=$(printf "%s\n " "$args")
+
 ! temp=$(getopt ad:imst: "$@") && exit 1
 eval set -- "$temp"
 while true; do
@@ -38,4 +56,5 @@ mkdir "$distdir"
 touch "${distdir}/${reponame}.tar.xz"
 touch "${distdir}/${reponame}.tar.xz.asc"
 
-git prepare "$opts"
+eval "set -- $args"
+git prepare "$@"
