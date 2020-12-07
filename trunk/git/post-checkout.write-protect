@@ -7,7 +7,7 @@ rootdir=$(git rev-parse --show-toplevel) || exit 1
 excludefiles=$(git config user.writeProtectExclude)
 
 excl=".git, .gitmodules"
-[ "$excludefiles" != "" ] && excl="$excl, $excludefiles"
+[ -n "$excludefiles" ] && excl="$excl, $excludefiles"
 IFS=","
 for f in $excl; do
     f=$(echo "$f" | sed -e 's/^[[:space:]][[:space:]]*//')
