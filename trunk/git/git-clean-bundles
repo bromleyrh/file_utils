@@ -22,7 +22,7 @@ get_repo_name "$multclones"
 for i in $(git remotes); do
     case $i in
         bundle_*)
-            git remote remove "$i"
+            git remote remove "$i";;
     esac
 done
 
