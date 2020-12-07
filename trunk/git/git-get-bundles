@@ -41,7 +41,7 @@ for b in $bundles; do
         echo "Importing branch bundle $f" 1>&2
         mv "$b" "$rootdir/.."
         bname=$(echo "$f" | cut -d '.' -f 2)
-        [ -z "$bname" ] && exit 1
+        [ -n "$bname" ]
         echo "Creating remote bundle_$bname" 1>&2
         git remote add "bundle_$bname" "../$f"
         git fetch "bundle_$bname"
