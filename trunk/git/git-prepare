@@ -24,7 +24,7 @@ undo=0
 temp=$(getopt ad:imst:u "$@") || exit 1
 eval set -- "$temp"
 while true; do
-    case "$1" in
+    case $1 in
         -a)
             agent=1
             shift;;

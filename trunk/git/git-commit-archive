@@ -39,7 +39,7 @@ undo=0
 temp=$(getopt ad:msu "$@") || exit 1
 eval set -- "$temp"
 while true; do
-    case "$1" in
+    case $1 in
         -a)
             amend=1
             shift;;
@@ -60,7 +60,7 @@ while true; do
             break;;
     esac
 done
-archive="$dstdir$reponame.tar.xz"
+archive=$dstdir$reponame.tar.xz
 
 if [ $undo -eq 1 ]; then
     if [ $amend -eq 1 ]; then

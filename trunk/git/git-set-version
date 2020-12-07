@@ -16,7 +16,7 @@ undo=0
 temp=$(getopt d:istu "$@") || exit 1
 eval set -- "$temp"
 while true; do
-    case "$1" in
+    case $1 in
         -d)
             dir=$2
             shift 2;;

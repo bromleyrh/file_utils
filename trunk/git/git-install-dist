@@ -26,9 +26,9 @@ get_ncpus()
     platform=$(uname)
 
     case $platform in
-        "Darwin" | "FreeBSD")
+        Darwin | FreeBSD)
             ncpus=$(sysctl hw.ncpu | cut -d ' ' -f 2);;
-        "Linux")
+        Linux)
             ncpus=$(nproc);;
         *)
             ncpus=1;;
