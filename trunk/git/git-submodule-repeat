@@ -23,4 +23,4 @@ done
 args=$(printf "%s\n " "$args")
 
 exec git submodule foreach \
-    "$(printf "set -- %s\n; set -x; git $cmd \"\$@\"" "$args")"
+    "$(printf "set -- %s\n; git $cmd \"\$@\"" "$args")"
