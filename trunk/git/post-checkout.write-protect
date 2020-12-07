@@ -7,7 +7,7 @@
 excludefiles=$(git config user.writeProtectExclude)
 
 excl=".git, .gitmodules"
-[ "x$excludefiles" != "x" ] && excl="$excl, $excludefiles"
+[ "$excludefiles" != "" ] && excl="$excl, $excludefiles"
 IFS=","
 for f in $excl; do
     f=$(echo "$f" | sed -e 's/^[[:space:]][[:space:]]*//')

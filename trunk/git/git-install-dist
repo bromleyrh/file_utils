@@ -111,7 +111,7 @@ set_up_env
 opts=$(git config user.installDistOpts) && eval set -- "$opts" \"\$@\"
 
 cmd=$(echo "$0" | cut -d '-' -f 4-)
-if [ "x$cmd" = "xcmdpre" ] || [ "x$cmd" = "xcmdpost" ]; then
+if [ "$cmd" = "cmdpre" ] || [ "$cmd" = "cmdpost" ]; then
     command=
     eval command="\$$cmd"
     [ -z "$command" ] && exit 0
@@ -121,7 +121,7 @@ if [ "x$cmd" = "xcmdpre" ] || [ "x$cmd" = "xcmdpost" ]; then
 fi
 
 noroot=0
-if [ "x$1" = "x-r" ]; then
+if [ "$1" = "-r" ]; then
     noroot=1
     shift
 fi
