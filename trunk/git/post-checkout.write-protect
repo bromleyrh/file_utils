@@ -2,7 +2,7 @@
 
 [ "$3" -eq 0 ] && exit 0
 
-! rootdir=$(git rev-parse --show-toplevel) && exit 1
+rootdir=$(git rev-parse --show-toplevel) || exit 1
 
 excludefiles=$(git config user.writeProtectExclude)
 

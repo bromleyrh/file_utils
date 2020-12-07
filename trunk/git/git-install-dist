@@ -8,7 +8,7 @@ get_cmds()
 
 set_up_env()
 {
-    ! env=$(git config user.installDistEnv) && return
+    env=$(git config user.installDistEnv) || return
 
     old_ifs=$IFS
     IFS=";"
@@ -37,7 +37,7 @@ get_ncpus()
 
 get_dirs()
 {
-    ! rootdir=$(git rev-parse --show-toplevel) && return 1
+    rootdir=$(git rev-parse --show-toplevel) || return 1
 
     distdir=$rootdir/dist
     tmpdir=/tmp/tmp

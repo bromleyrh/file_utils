@@ -21,7 +21,7 @@ sign=0
 trunkdir=trunk
 undo=0
 
-! temp=$(getopt ad:imst:u "$@") && exit 1
+temp=$(getopt ad:imst:u "$@") || exit 1
 eval set -- "$temp"
 while true; do
     case "$1" in
@@ -75,7 +75,7 @@ fi
 version=$(cat "$vfile")
 ret=$?
 if [ $inc -eq 1 ]; then
-    ! [ $ret -eq 0 ] && exit 1
+    [ $ret -eq 0 ] || exit 1
     maj=$(echo "$version" | cut -d . -f 1)
     min=$(echo "$version" | cut -d . -f 2)
     version=$maj.$((min+1))

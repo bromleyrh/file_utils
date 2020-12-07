@@ -5,7 +5,7 @@ set -e
 force=0
 ignore_errors=0
 
-! temp=$(getopt ef "$@") && exit 1
+temp=$(getopt ef "$@") || exit 1
 eval set -- "$temp"
 while true; do
 	case "$1" in

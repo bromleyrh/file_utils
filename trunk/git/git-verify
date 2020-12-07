@@ -9,7 +9,7 @@ if [ ! -d .git ] && [ ! -f .git ]; then
     exit 1
 fi
 
-! temp=$(getopt p: "$@") && exit 1
+temp=$(getopt p: "$@") || exit 1
 eval set -- "$temp"
 while true; do
     case "$1" in
