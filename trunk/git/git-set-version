@@ -14,7 +14,7 @@ tagonly=0
 undo=0
 
 temp=$(getopt d:istu "$@") || exit 1
-eval set -- "$temp"
+eval "set -- $temp"
 while true; do
     case $1 in
         -d)
@@ -66,7 +66,7 @@ fi
 
 args="\"-m\" \"Version $version\""
 [ $sign -eq 1 ] && args="$args -s"
-eval set -- "$args"
+eval "set -- $args"
 
 if [ $tagonly -eq 0 ]; then
     echo "$version" > "$vfile"

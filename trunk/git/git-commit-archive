@@ -37,7 +37,7 @@ sign=0
 undo=0
 
 temp=$(getopt ad:msu "$@") || exit 1
-eval set -- "$temp"
+eval "set -- $temp"
 while true; do
     case $1 in
         -a)
