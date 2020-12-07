@@ -23,12 +23,6 @@ do_make_dist()
     cd ..
 }
 
-restore_files()
-{
-    mv "$archive.save" "$archive" 2>/dev/null 1>&2
-    mv "$archive.asc.save" "$archive.asc" 2>/dev/null 1>&2
-}
-
 set -e
 
 if [ ! -d .git ] && [ ! -f .git ]; then
@@ -80,10 +74,6 @@ if [ $undo -eq 1 ]; then
     exit
 fi
 
-trap restore_files EXIT
-mv "$archive" "$archive.save" 2>/dev/null 1>&2
-mv "$archive.asc" "$archive.asc.save" 2>/dev/null 1>&2
-
 git config tar.tar.xz.command "xz -9c"
 if [ $automake -eq 1 ]; then
     do_make_dist "$@"
@@ -100,6 +90,3 @@ if [ $amend -eq 1 ]; then
 else
     git commit
 fi
-
-trap '' EXIT
-rm "$archive.save" "$archive.asc.save"
