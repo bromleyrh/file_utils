@@ -40,7 +40,7 @@ for b in $bundles; do
     else
         echo "Importing branch bundle $f" 1>&2
         mv "$b" "$rootdir/.."
-        if ! bname=$(echo "$f" | cut -d '.' -f 2) && [ -n "$bname" ]; then
+        if bname=$(echo "$f" | cut -d '.' -f 2) && [ -n "$bname" ]; then
             exit 1
         fi
         echo "Creating remote bundle_$bname" 1>&2
