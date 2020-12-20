@@ -41,6 +41,9 @@ declare -a submodules
 
 set -e
 
+rootdir=$(git rev-parse --show-toplevel)
+cd "$rootdir"
+
 get_excluded_submodules
 get_submodules
 
