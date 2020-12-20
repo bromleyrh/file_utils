@@ -1,0 +1,45 @@
+#!/bin/sh
+
+conf=config
+
+set -e
+
+rootdir=$(git rev-parse --show-toplevel)
+cd "${rootdir}"
+
+if [ -f .git ]; then
+	gitfile=$(head -n 1 .git)
+	echo "$gitfile" | grep -E '^gitdir: ' >/dev/null 2>&1
+	gitdir=$(echo "$gitfile" | sed 's/^gitdir: //g')
+	cd "$gitdir"
+else
+	cd .git
+fi
+
+awk '
+BEGIN {
+ last_section="";
+}
+
+{
+ if ($0 ~ /\[[^\]]*\]/) {
+  last_section = $0;
+  printf("%s\t\n", $0);
+ } else {
+  printf("%s\t%s\n", last_section, $0);
+ }
+}' <$conf \
+	| sort \
+	| awk '
+{
+ if ($0 ~ /\[[^\]]*\]\t$/) {
+  print substr($0, 0, length($0) - 1);
+ } else {
+  sub(/\[[^\]]*\]\t/, "\t");
+  print $0;
+ }
+}' >${conf}_new
+
+mv ${conf}_new $conf || rm ${conf}_new
+
+# vi: set noexpandtab sw=4 ts=4:
