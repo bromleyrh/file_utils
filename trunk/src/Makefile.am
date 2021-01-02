@@ -44,8 +44,8 @@ backup_link = -L$(abs_builddir)/src/libbackup/.libs -lbackup
 backup_link_dep = @libutil_link_dep@
 
 bin_PROGRAMS += src/attr_idx src/cp_mem src/fastcat src/fastcp src/md_verify \
-	src/mkmanifest src/open src/open_pipes src/replicate src/sparse_scan \
-	src/tmpfile src/verify
+	src/mkmanifest src/open src/open_pipes src/replicate src/simpledb \
+	src/sparse_scan src/tmpfile src/verify
 if HAVE_LIBXFS
 bin_PROGRAMS += src/xfsutil
 endif
@@ -98,6 +98,11 @@ src_replicate_CFLAGS = $(AM_CFLAGS)
 src_replicate_LDADD = src/libfileutil.a -lcap -lm -lmount $(backup_link) \
 	$(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
 src_replicate_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la
+
+src_simpledb_SOURCES = src/simpledb.c
+src_simpledb_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
+src_simpledb_CFLAGS = $(AM_CFLAGS)
+src_simpledb_LDADD = @libutil_link_dep@
 
 src_sparse_scan_SOURCES = src/sparse_scan.c
 src_sparse_scan_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
