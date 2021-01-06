@@ -895,7 +895,7 @@ do_insert(const char *pathname, struct key *key, int datafd)
         abort();
     }
 
-    err = do_db_hl_insert(dbctx, &k, &d, dlen);
+    err = do_db_hl_insert(dbctx, &k, d, dlen);
     if (err) {
         error(0, -err, "Error inserting into database file %s", pathname);
         goto err2;
