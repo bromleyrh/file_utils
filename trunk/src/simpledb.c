@@ -617,6 +617,10 @@ free_id_find(uint64_t *used_id, uint64_t base)
         word >>= 8;
         idx += 8;
     }
+    if (!(word & 0xf)) {
+        word >>= 4;
+        idx += 4;
+    }
     if (!(word & 0x3)) {
         word >>= 2;
         idx += 2;
