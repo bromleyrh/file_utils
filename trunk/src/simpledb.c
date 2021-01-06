@@ -817,6 +817,7 @@ do_insert(const char *pathname, struct key *key, int datafd)
     struct db_ctx *dbctx;
     struct db_key k;
     struct db_obj_free_id freeid;
+    struct db_obj_header hdr;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -839,6 +840,15 @@ do_insert(const char *pathname, struct key *key, int datafd)
         if (err) {
             error(0, -err, "Error creating database file %s", pathname);
             return err;
+        }
+
+        k.type = TYPE_HEADER;
+        hdr.version = FMT_VERSION;
+        hdr.numobj = 0;
+        err = do_db_hl_insert(dbctx, &k, &hdr, sizeof(hdr));
+        if (err) {
+            error(0, -err, "Error creating database file %s", pathname);
+            goto err1;
         }
 
         k.type = TYPE_FREE_ID;
