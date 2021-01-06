@@ -178,7 +178,7 @@ parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
     for (;;) {
         int opt = getopt(argc, argv, "df:hik:ln:");
 
-        if (opt == 1)
+        if (opt == -1)
             break;
 
         switch (opt) {
