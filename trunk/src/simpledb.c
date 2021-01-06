@@ -767,6 +767,7 @@ do_read_data(const char **data, size_t *datalen, int fd)
                 continue;
             goto err;
         }
+        len += numread;
 
         if (len + MAX_READ > sz) {
             sz *= 2;
