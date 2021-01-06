@@ -817,10 +817,10 @@ do_write_data(const char *data, size_t datalen, int fd)
 static int
 do_insert(const char *pathname, struct key *key, int datafd)
 {
-    const char *d;
+    const char *d = NULL;
     int alloc_id = 0;
     int err;
-    size_t dlen;
+    size_t dlen = 0;
     struct db_ctx *dbctx;
     struct db_key k;
     struct db_obj_free_id freeid;
@@ -878,7 +878,7 @@ do_insert(const char *pathname, struct key *key, int datafd)
     err = do_db_hl_trans_new(dbctx);
     if (err) {
         error(0, -err, "Error inserting into database file %s", pathname);
-        goto err1;
+        goto err2;
     }
 
     switch (key->type) {
@@ -888,7 +888,7 @@ do_insert(const char *pathname, struct key *key, int datafd)
             err = get_id(dbctx, &k.id);
             if (err) {
                 error(0, -err, "Error allocating ID");
-                goto err2;
+                goto err3;
             }
             alloc_id = 1;
         } else
@@ -905,13 +905,16 @@ do_insert(const char *pathname, struct key *key, int datafd)
     err = do_db_hl_insert(dbctx, &k, d, dlen);
     if (err) {
         error(0, -err, "Error inserting into database file %s", pathname);
-        goto err2;
+        goto err3;
     }
+
+    free((void *)d);
 
     err = do_db_hl_trans_commit(dbctx);
     if (err) {
         error(0, -err, "Error inserting into database file %s", pathname);
-        goto err2;
+        do_db_hl_trans_abort(dbctx);
+        goto err1;
     }
 
     if (alloc_id)
@@ -923,8 +926,10 @@ do_insert(const char *pathname, struct key *key, int datafd)
 
     return err;
 
-err2:
+err3:
     do_db_hl_trans_abort(dbctx);
+err2:
+    free((void *)d);
 err1:
     do_db_hl_close(dbctx);
     return err;
