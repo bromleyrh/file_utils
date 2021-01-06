@@ -1109,7 +1109,7 @@ main(int argc, char **argv)
         ret = do_delete(pathname, &key);
         break;
     default:
-        error(0, 0, "Must specify database file");
+        error(0, 0, "Must specify operation");
         ret = -EIO;
     }
 
