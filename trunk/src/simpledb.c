@@ -205,6 +205,7 @@ parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
             break;
         case 'n':
             key->id = strtoull(optarg, NULL, 10);
+            key->type = KEY_INTERNAL;
             break;
         default:
             return -1;
