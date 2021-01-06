@@ -460,8 +460,10 @@ do_db_hl_iter_new(struct db_iter **iter, struct db_ctx *dbctx)
     ret->dbctx = dbctx;
 
     ret->srch_key = do_malloc(dbctx->key_size);
-    if (ret->srch_key == NULL)
+    if (ret->srch_key == NULL) {
+        err = MINUS_ERRNO;
         goto err2;
+    }
     ret->srch_status = -EINVAL;
 
     *iter = ret;
