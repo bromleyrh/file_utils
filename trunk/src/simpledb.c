@@ -1057,10 +1057,12 @@ do_delete(const char *pathname, struct key *key)
         goto err2;
     }
 
-    err = release_id(dbctx, ROOT_ID, k.id);
-    if (err) {
-        error(0, -err, "Error deleting from database file %s", pathname);
-        goto err2;
+    if (k.type == TYPE_INTERNAL) {
+        err = release_id(dbctx, ROOT_ID, k.id);
+        if (err) {
+            error(0, -err, "Error deleting from database file %s", pathname);
+            goto err2;
+        }
     }
 
     err = do_db_hl_trans_commit(dbctx);
