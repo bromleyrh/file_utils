@@ -878,7 +878,7 @@ do_insert(const char *pathname, struct key *key, int datafd)
     case KEY_INTERNAL:
         k.type = TYPE_INTERNAL;
         if (key->id == 0) {
-            err = get_id(dbctx, &key->id);
+            err = get_id(dbctx, &k.id);
             if (err) {
                 error(0, -err, "Error allocating ID");
                 goto err2;
@@ -908,7 +908,7 @@ do_insert(const char *pathname, struct key *key, int datafd)
     }
 
     if (alloc_id)
-        printf("%" PRIu64 "\n", key->id);
+        printf("%" PRIu64 "\n", k.id);
 
     err = do_db_hl_close(dbctx);
     if (err)
