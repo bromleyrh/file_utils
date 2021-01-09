@@ -31,7 +31,8 @@
 enum op {
     OP_INSERT = 1,
     OP_LOOK_UP,
-    OP_DELETE
+    OP_DELETE,
+    OP_DUMP
 };
 
 enum key_type {
@@ -124,8 +125,8 @@ static int do_db_hl_look_up(struct db_ctx *, const void *, void *, void *,
                             size_t *, int);
 static int do_db_hl_delete(struct db_ctx *, const void *);
 
-/*static int do_db_hl_walk(struct db_ctx *, db_hl_walk_cb_t, void *);
-*/
+static int do_db_hl_walk(struct db_ctx *, db_hl_walk_cb_t, void *);
+
 static int do_db_hl_iter_new(struct db_iter **, struct db_ctx *);
 static int do_db_hl_iter_free(struct db_iter *);
 static int do_db_hl_iter_get(struct db_iter *, void *, void *, size_t *);
@@ -144,6 +145,8 @@ static int release_id(struct db_ctx *, uint64_t, uint64_t);
 
 static int do_read_data(const char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
+
+static int do_dump(const char *, int);
 
 static int
 get_str_arg(const char **str)
@@ -167,7 +170,8 @@ print_usage(const char *prognm)
            "    -i         insert specified entry\n"
            "    -k STRING  operate on entry specified by given external key\n"
            "    -l         look up specified entry\n"
-           "    -n INTEGER operate on entry specified by given internal key\n",
+           "    -n INTEGER operate on entry specified by given internal key\n"
+           "    -w         output contents of database\n",
            prognm);
 }
 
@@ -175,16 +179,27 @@ static int
 parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
               struct key *key)
 {
+    static const enum op ops[256] = {
+        [(unsigned char)'d']    = OP_DELETE,
+        [(unsigned char)'i']    = OP_INSERT,
+        [(unsigned char)'l']    = OP_LOOK_UP,
+        [(unsigned char)'w']    = OP_DUMP
+    };
+
     for (;;) {
-        int opt = getopt(argc, argv, "df:hik:ln:");
+        enum op operation;
+        int opt = getopt(argc, argv, "df:hik:ln:w");
 
         if (opt == -1)
             break;
 
+        operation = ops[(unsigned char)opt];
+        if (operation != 0) {
+            *op = operation;
+            continue;
+        }
+
         switch (opt) {
-        case 'd':
-            *op = OP_DELETE;
-            break;
         case 'f':
             if (get_str_arg(pathname) == -1)
                 return -1;
@@ -192,16 +207,10 @@ parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
         case 'h':
             print_usage(argv[0]);
             return -2;
-        case 'i':
-            *op = OP_INSERT;
-            break;
         case 'k':
             if (get_str_arg(&key->key) == -1)
                 return -1;
             key->type = KEY_EXTERNAL;
-            break;
-        case 'l':
-            *op = OP_LOOK_UP;
             break;
         case 'n':
             key->id = strtoull(optarg, NULL, 10);
@@ -247,6 +256,39 @@ db_key_cmp(const void *k1, const void *k2, void *key_ctx)
     return (key1->type == TYPE_EXTERNAL)
            ? strcmp(key1->key, key2->key)
            : uint64_cmp(key1->id, key2->id);
+}
+
+static int
+db_walk_cb(const void *key, const void *data, size_t datasize, void *ctx)
+{
+    int datafd = (intptr_t)ctx;
+    int ret;
+    struct db_key *k = (struct db_key *)key;
+
+    switch (k->type) {
+    case TYPE_INTERNAL:
+        ret = dprintf(datafd, "%" PRIu64 "\n", k->id);
+        break;
+    case TYPE_EXTERNAL:
+        ret = dprintf(datafd, "%s\n", k->key);
+        break;
+    default:
+        return 0;
+    }
+    if (ret == -1) {
+        ret = MINUS_ERRNO;
+        goto err;
+    }
+
+    ret = do_write_data(data, datasize, datafd);
+    if (ret != 0)
+        goto err;
+
+    return 0;
+
+err:
+    error(0, -ret, "Error writing data");
+    return ret;
 }
 
 static int
@@ -438,12 +480,12 @@ do_db_hl_delete(struct db_ctx *dbctx, const void *key)
     return db_hl_delete(dbctx->dbh, key);
 }
 
-/*static int
+static int
 do_db_hl_walk(struct db_ctx *dbctx, db_hl_walk_cb_t fn, void *wctx)
 {
     return db_hl_walk(dbctx->dbh, fn, wctx);
 }
-*/
+
 static int
 do_db_hl_iter_new(struct db_iter **iter, struct db_ctx *dbctx)
 {
@@ -1095,6 +1137,33 @@ err1:
     return err;
 }
 
+static int
+do_dump(const char *pathname, int datafd)
+{
+    int err;
+    struct db_ctx *dbctx;
+
+    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        1);
+    if (err) {
+        error(0, -err, "Error opening database file %s", pathname);
+        return err;
+    }
+
+    err = do_db_hl_walk(dbctx, &db_walk_cb, (void *)(intptr_t)datafd);
+    if (err) {
+        error(0, -err, "Error reading database file %s", pathname);
+        do_db_hl_close(dbctx);
+        return err;
+    }
+
+    err = do_db_hl_close(dbctx);
+    if (err)
+        error(0, -err, "Error closing database file %s", pathname);
+
+    return err;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1122,6 +1191,9 @@ main(int argc, char **argv)
         break;
     case OP_DELETE:
         ret = do_delete(pathname, &key);
+        break;
+    case OP_DUMP:
+        ret = do_dump(pathname, STDOUT_FILENO);
         break;
     default:
         error(0, 0, "Must specify operation");
