@@ -1094,7 +1094,7 @@ err1:
 int
 main(int argc, char **argv)
 {
-    const char *pathname = DEFAULT_PATHNAME;
+    const char *pathname = NULL;
     enum op op = 0;
     int ret;
     struct key key = {.type = 0};
@@ -1102,6 +1102,8 @@ main(int argc, char **argv)
     ret = parse_cmdline(argc, argv, &pathname, &op, &key);
     if (ret != 0)
         return (ret == -2) ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (pathname == NULL)
+        pathname = DEFAULT_PATHNAME;
 
     switch (op) {
     case OP_INSERT:
