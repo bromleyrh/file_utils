@@ -1099,11 +1099,13 @@ main(int argc, char **argv)
     int ret;
     struct key key = {.type = 0};
 
+    static const char default_pathname[] = DEFAULT_PATHNAME;
+
     ret = parse_cmdline(argc, argv, &pathname, &op, &key);
     if (ret != 0)
         return (ret == -2) ? EXIT_SUCCESS : EXIT_FAILURE;
     if (pathname == NULL)
-        pathname = DEFAULT_PATHNAME;
+        pathname = default_pathname;
 
     switch (op) {
     case OP_INSERT:
@@ -1120,6 +1122,8 @@ main(int argc, char **argv)
         ret = -EIO;
     }
 
+    if (pathname != default_pathname)
+        free((void *)pathname);
     if (key.key != NULL)
         free((void *)(key.key));
 
