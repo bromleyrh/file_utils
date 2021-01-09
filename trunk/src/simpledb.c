@@ -30,6 +30,7 @@
 
 enum op {
     OP_INSERT = 1,
+    OP_UPDATE,
     OP_LOOK_UP,
     OP_DELETE,
     OP_DUMP
@@ -146,6 +147,7 @@ static int release_id(struct db_ctx *, uint64_t, uint64_t);
 static int do_read_data(const char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
 
+static int do_update(const char *, struct key *, int);
 static int do_dump(const char *, int);
 
 static int
@@ -171,6 +173,7 @@ print_usage(const char *prognm)
            "    -k STRING  operate on entry specified by given external key\n"
            "    -l         look up specified entry\n"
            "    -n INTEGER operate on entry specified by given internal key\n"
+           "    -u         update specified entry\n"
            "    -w         output contents of database\n",
            prognm);
 }
@@ -183,12 +186,13 @@ parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
         [(unsigned char)'d']    = OP_DELETE,
         [(unsigned char)'i']    = OP_INSERT,
         [(unsigned char)'l']    = OP_LOOK_UP,
+        [(unsigned char)'u']    = OP_UPDATE,
         [(unsigned char)'w']    = OP_DUMP
     };
 
     for (;;) {
         enum op operation;
-        int opt = getopt(argc, argv, "df:hik:ln:w");
+        int opt = getopt(argc, argv, "df:hik:ln:uw");
 
         if (opt == -1)
             break;
@@ -980,6 +984,86 @@ err1:
 }
 
 static int
+do_update(const char *pathname, struct key *key, int datafd)
+{
+    const char *d = NULL;
+    int err;
+    size_t dlen = 0;
+    struct db_ctx *dbctx;
+    struct db_key k;
+
+    if ((key->type == 0) || ((key->type == KEY_INTERNAL) && (key->id == 0))) {
+        error(0, 0, "Must specify key");
+        return -EINVAL;
+    }
+    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+        error(0, 0, "Key too long");
+        return -ENAMETOOLONG;
+    }
+
+    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        0);
+    if (err) {
+        error(0, -err, "Error opening database file %s", pathname);
+        return err;
+    }
+
+    err = do_read_data(&d, &dlen, datafd);
+    if (err) {
+        error(0, -err, "Error reading data");
+        goto err1;
+    }
+
+    err = do_db_hl_trans_new(dbctx);
+    if (err) {
+        error(0, -err, "Error inserting into database file %s", pathname);
+        goto err2;
+    }
+
+    switch (key->type) {
+    case KEY_INTERNAL:
+        k.type = TYPE_INTERNAL;
+        k.id = key->id;
+        break;
+    case KEY_EXTERNAL:
+        k.type = TYPE_EXTERNAL;
+        strlcpy(k.key, key->key, sizeof(k.key));
+        break;
+    default:
+        abort();
+    }
+
+    err = do_db_hl_replace(dbctx, &k, d, dlen);
+    if (err) {
+        error(0, -err, "Error updating database file %s", pathname);
+        goto err3;
+    }
+
+    free((void *)d);
+
+    err = do_db_hl_trans_commit(dbctx);
+    if (err) {
+        error(0, -err, "Error updating database file %s", pathname);
+        do_db_hl_trans_abort(dbctx);
+        goto err1;
+    }
+
+    err = do_db_hl_close(dbctx);
+    if (err)
+        error(0, -err, "Error closing database file %s", pathname);
+
+    return err;
+
+err3:
+    do_db_hl_trans_abort(dbctx);
+err2:
+    free((void *)d);
+err1:
+    do_db_hl_close(dbctx);
+    return err;
+}
+
+static int
 do_look_up(const char *pathname, struct key *key, int datafd)
 {
     char *d;
@@ -1185,6 +1269,9 @@ main(int argc, char **argv)
     switch (op) {
     case OP_INSERT:
         ret = do_insert(pathname, &key, STDIN_FILENO);
+        break;
+    case OP_UPDATE:
+        ret = do_update(pathname, &key, STDIN_FILENO);
         break;
     case OP_LOOK_UP:
         ret = do_look_up(pathname, &key, STDOUT_FILENO);
