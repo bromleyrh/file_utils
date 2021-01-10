@@ -1105,6 +1105,8 @@ main(int argc, char **argv)
 
     static const char default_pathname[] = DEFAULT_PATHNAME;
 
+    setlinebuf(stdout);
+
     ret = parse_cmdline(argc, argv, &pathname, &op, &key);
     if (ret != 0)
         return (ret == -2) ? EXIT_SUCCESS : EXIT_FAILURE;
