@@ -114,7 +114,7 @@ static int get_next_elem(void *, void *, size_t *, const void *,
 static int do_db_hl_create(struct db_ctx **, const char *, mode_t, size_t,
                            db_hl_key_cmp_t);
 static int do_db_hl_open(struct db_ctx **, const char *, size_t,
-                         db_hl_key_cmp_t);
+                         db_hl_key_cmp_t, int);
 static int do_db_hl_close(struct db_ctx *);
 
 static int do_db_hl_insert(struct db_ctx *, const void *, const void *, size_t);
@@ -327,7 +327,7 @@ err1:
 
 static int
 do_db_hl_open(struct db_ctx **dbctx, const char *pathname, size_t key_size,
-              db_hl_key_cmp_t key_cmp)
+              db_hl_key_cmp_t key_cmp, int ro)
 {
     int err;
     struct db_ctx *ret;
@@ -351,7 +351,8 @@ do_db_hl_open(struct db_ctx **dbctx, const char *pathname, size_t key_size,
     }
     ret->key_ctx->last_key_valid = 0;
 
-    err = db_hl_open(&ret->dbh, pathname, key_size, key_cmp, ret->key_ctx, 0);
+    err = db_hl_open(&ret->dbh, pathname, key_size, key_cmp, ret->key_ctx,
+                     ro ? DB_HL_RDONLY : 0);
     if (err)
         goto err3;
 
@@ -835,7 +836,8 @@ do_insert(const char *pathname, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp);
+    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        0);
     if (err) {
         if (err != -ENOENT) {
             error(0, -err, "Error opening database file %s", pathname);
@@ -953,7 +955,8 @@ do_look_up(const char *pathname, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp);
+    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        1);
     if (res != 0) {
         error(0, -res, "Error opening database file %s", pathname);
         return res;
@@ -1033,7 +1036,8 @@ do_delete(const char *pathname, struct key *key)
         return -ENAMETOOLONG;
     }
 
-    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp);
+    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        0);
     if (err) {
         error(0, -err, "Error opening database file %s", pathname);
         return err;
