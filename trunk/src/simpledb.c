@@ -147,7 +147,10 @@ static int release_id(struct db_ctx *, uint64_t, uint64_t);
 static int do_read_data(const char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
 
+static int do_insert(const char *, struct key *, int);
 static int do_update(const char *, struct key *, int);
+static int do_look_up(const char *, struct key *, int);
+static int do_delete(const char *, struct key *);
 static int do_dump(const char *, int);
 
 static int
