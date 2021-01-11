@@ -1115,13 +1115,13 @@ do_look_up(const char *pathname, struct key *key, int datafd)
             res = -EADDRNOTAVAIL;
         } else
             error(0, -res, "Error looking up in database file %s", pathname);
-        goto err;
+        goto err1;
     }
 
     d = do_malloc(dlen);
     if (d == NULL) {
         res = MINUS_ERRNO;
-        goto err;
+        goto err1;
     }
 
     res = do_db_hl_look_up(dbctx, &k, NULL, d, &dlen, 0);
@@ -1129,26 +1129,26 @@ do_look_up(const char *pathname, struct key *key, int datafd)
         if (res == 0)
             res = -EIO;
         error(0, -res, "Error looking up in database file %s", pathname);
-        goto err;
+        goto err2;
     }
 
     res = do_db_hl_close(dbctx);
     if (res != 0) {
         error(0, -res, "Error closing database file %s", pathname);
-        return res;
+        goto end;
     }
 
     res = do_write_data(d, dlen, datafd);
-    if (res != 0) {
+    if (res != 0)
         error(0, -res, "Error writing data");
-        return res;
-    }
 
+end:
     free(d);
+    return res;
 
-    return 0;
-
-err:
+err2:
+    free(d);
+err1:
     do_db_hl_close(dbctx);
     return res;
 }
