@@ -32,6 +32,9 @@ enum op {
     OP_INSERT = 1,
     OP_UPDATE,
     OP_LOOK_UP,
+    OP_LOOK_UP_NEAREST,
+    OP_LOOK_UP_NEXT,
+    OP_LOOK_UP_PREV,
     OP_DELETE,
     OP_DUMP
 };
@@ -131,7 +134,8 @@ static int do_db_hl_walk(struct db_ctx *, db_hl_walk_cb_t, void *);
 static int do_db_hl_iter_new(struct db_iter **, struct db_ctx *);
 static int do_db_hl_iter_free(struct db_iter *);
 static int do_db_hl_iter_get(struct db_iter *, void *, void *, size_t *);
-/*static int do_db_hl_iter_next(struct db_iter *);*/
+static int do_db_hl_iter_next(struct db_iter *);
+static int do_db_hl_iter_prev(struct db_iter *);
 static int do_db_hl_iter_search(struct db_iter *, const void *);
 
 static int do_db_hl_trans_new(struct db_ctx *);
@@ -150,6 +154,9 @@ static int do_write_data(const char *, size_t, int);
 static int do_insert(const char *, struct key *, int);
 static int do_update(const char *, struct key *, int);
 static int do_look_up(const char *, struct key *, int);
+static int do_look_up_nearest(const char *, struct key *, int);
+static int do_look_up_next(const char *, struct key *, int);
+static int do_look_up_prev(const char *, struct key *, int);
 static int do_delete(const char *, struct key *);
 static int do_dump(const char *, int);
 
@@ -174,8 +181,12 @@ print_usage(const char *prognm)
            "    -h         output help\n"
            "    -i         insert specified entry\n"
            "    -k STRING  operate on entry specified by given external key\n"
+           "    -L         look up nearest entry greater than or equal to "
+           "given key\n"
            "    -l         look up specified entry\n"
            "    -n INTEGER operate on entry specified by given internal key\n"
+           "    -p         look up nearest entry less than given key\n"
+           "    -s         look up nearest entry greater than given key\n"
            "    -u         update specified entry\n"
            "    -w         output contents of database\n",
            prognm);
@@ -188,14 +199,17 @@ parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
     static const enum op ops[256] = {
         [(unsigned char)'d']    = OP_DELETE,
         [(unsigned char)'i']    = OP_INSERT,
+        [(unsigned char)'L']    = OP_LOOK_UP_NEAREST,
         [(unsigned char)'l']    = OP_LOOK_UP,
+        [(unsigned char)'p']    = OP_LOOK_UP_PREV,
+        [(unsigned char)'s']    = OP_LOOK_UP_NEXT,
         [(unsigned char)'u']    = OP_UPDATE,
         [(unsigned char)'w']    = OP_DUMP
     };
 
     for (;;) {
         enum op operation;
-        int opt = getopt(argc, argv, "df:hik:ln:uw");
+        int opt = getopt(argc, argv, "df:hik:Lln:psuw");
 
         if (opt == -1)
             break;
@@ -573,12 +587,14 @@ do_db_hl_iter_get(struct db_iter *iter, void *retkey, void *retdata,
             if (res != 0)
                 return res;
         }
+
+        iter->srch_status = 1; /* XXX */
     }
 
     return db_hl_iter_get(dbiter, retkey, retdata, retdatasize);
 }
 
-/*static int
+static int
 do_db_hl_iter_next(struct db_iter *iter)
 {
     int err;
@@ -589,7 +605,19 @@ do_db_hl_iter_next(struct db_iter *iter)
 
     return err;
 }
-*/
+
+static int
+do_db_hl_iter_prev(struct db_iter *iter)
+{
+    int err;
+
+    err = db_hl_iter_prev(iter->iter);
+
+    iter->srch_status = err ? err : 1;
+
+    return err;
+}
+
 static int
 do_db_hl_iter_search(struct db_iter *iter, const void *key)
 {
@@ -1154,6 +1182,356 @@ err1:
 }
 
 static int
+do_look_up_nearest(const char *pathname, struct key *key, int datafd)
+{
+    char *d;
+    int res;
+    size_t dlen;
+    struct db_ctx *dbctx;
+    struct db_iter *iter;
+    struct db_key k;
+
+    if (key->type == 0) {
+        error(0, 0, "Must specify key");
+        return -EINVAL;
+    }
+    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+        error(0, 0, "Key too long");
+        return -ENAMETOOLONG;
+    }
+
+    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        1);
+    if (res != 0) {
+        error(0, -res, "Error opening database file %s", pathname);
+        return res;
+    }
+
+    res = do_db_hl_iter_new(&iter, dbctx);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err1;
+    }
+
+    switch (key->type) {
+    case KEY_INTERNAL:
+        k.type = TYPE_INTERNAL;
+        k.id = key->id;
+        break;
+    case KEY_EXTERNAL:
+        k.type = TYPE_EXTERNAL;
+        strlcpy(k.key, key->key, sizeof(k.key));
+        break;
+    default:
+        abort();
+    }
+
+    res = do_db_hl_iter_search(iter, &k);
+    if (res < 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+
+    res = do_db_hl_iter_get(iter, &k, NULL, &dlen);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+    if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
+        error(0, 0, "Key not found");
+        res = -EADDRNOTAVAIL;
+        goto err2;
+    }
+
+    d = do_malloc(dlen);
+    if (d == NULL) {
+        res = MINUS_ERRNO;
+        goto err2;
+    }
+
+    res = do_db_hl_iter_get(iter, &k, d, &dlen);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err3;
+    }
+
+    do_db_hl_iter_free(iter);
+
+    res = do_db_hl_close(dbctx);
+    if (res != 0) {
+        error(0, -res, "Error closing database file %s", pathname);
+        goto end;
+    }
+
+    switch (k.type) {
+    case TYPE_INTERNAL:
+        printf("%" PRIu64 "\n", k.id);
+        break;
+    case TYPE_EXTERNAL:
+        printf("%s\n", k.key);
+        break;
+    default:
+        abort();
+    }
+
+    res = do_write_data(d, dlen, datafd);
+    if (res != 0)
+        error(0, -res, "Error writing data");
+
+end:
+    free(d);
+    return res;
+
+err3:
+    free(d);
+err2:
+    do_db_hl_iter_free(iter);
+err1:
+    do_db_hl_close(dbctx);
+    return res;
+}
+
+static int
+do_look_up_next(const char *pathname, struct key *key, int datafd)
+{
+    char *d;
+    int res;
+    size_t dlen;
+    struct db_ctx *dbctx;
+    struct db_iter *iter;
+    struct db_key k;
+
+    if (key->type == 0) {
+        error(0, 0, "Must specify key");
+        return -EINVAL;
+    }
+    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+        error(0, 0, "Key too long");
+        return -ENAMETOOLONG;
+    }
+
+    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        1);
+    if (res != 0) {
+        error(0, -res, "Error opening database file %s", pathname);
+        return res;
+    }
+
+    res = do_db_hl_iter_new(&iter, dbctx);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err1;
+    }
+
+    switch (key->type) {
+    case KEY_INTERNAL:
+        k.type = TYPE_INTERNAL;
+        k.id = key->id;
+        break;
+    case KEY_EXTERNAL:
+        k.type = TYPE_EXTERNAL;
+        strlcpy(k.key, key->key, sizeof(k.key));
+        break;
+    default:
+        abort();
+    }
+
+    res = do_db_hl_iter_search(iter, &k);
+    if (res != 1) {
+        if (res == 0) {
+            error(0, 0, "Key not found");
+            res = -EADDRNOTAVAIL;
+        } else
+            error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+
+    res = do_db_hl_iter_next(iter);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+
+    res = do_db_hl_iter_get(iter, &k, NULL, &dlen);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+    if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
+        error(0, 0, "Key not found");
+        res = -EADDRNOTAVAIL;
+        goto err2;
+    }
+
+    d = do_malloc(dlen);
+    if (d == NULL) {
+        res = MINUS_ERRNO;
+        goto err2;
+    }
+
+    res = do_db_hl_iter_get(iter, &k, d, &dlen);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err3;
+    }
+
+    do_db_hl_iter_free(iter);
+
+    res = do_db_hl_close(dbctx);
+    if (res != 0) {
+        error(0, -res, "Error closing database file %s", pathname);
+        goto end;
+    }
+
+    switch (k.type) {
+    case TYPE_INTERNAL:
+        printf("%" PRIu64 "\n", k.id);
+        break;
+    case TYPE_EXTERNAL:
+        printf("%s\n", k.key);
+        break;
+    default:
+        abort();
+    }
+
+    res = do_write_data(d, dlen, datafd);
+    if (res != 0)
+        error(0, -res, "Error writing data");
+
+end:
+    free(d);
+    return res;
+
+err3:
+    free(d);
+err2:
+    do_db_hl_iter_free(iter);
+err1:
+    do_db_hl_close(dbctx);
+    return res;
+}
+
+static int
+do_look_up_prev(const char *pathname, struct key *key, int datafd)
+{
+    char *d;
+    int res;
+    size_t dlen;
+    struct db_ctx *dbctx;
+    struct db_iter *iter;
+    struct db_key k;
+
+    if (key->type == 0) {
+        error(0, 0, "Must specify key");
+        return -EINVAL;
+    }
+    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+        error(0, 0, "Key too long");
+        return -ENAMETOOLONG;
+    }
+
+    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                        1);
+    if (res != 0) {
+        error(0, -res, "Error opening database file %s", pathname);
+        return res;
+    }
+
+    res = do_db_hl_iter_new(&iter, dbctx);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err1;
+    }
+
+    switch (key->type) {
+    case KEY_INTERNAL:
+        k.type = TYPE_INTERNAL;
+        k.id = key->id;
+        break;
+    case KEY_EXTERNAL:
+        k.type = TYPE_EXTERNAL;
+        strlcpy(k.key, key->key, sizeof(k.key));
+        break;
+    default:
+        abort();
+    }
+
+    res = do_db_hl_iter_search(iter, &k);
+    if (res != 1) {
+        if (res == 0) {
+            error(0, 0, "Key not found");
+            res = -EADDRNOTAVAIL;
+        } else
+            error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+
+    res = do_db_hl_iter_prev(iter);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+
+    res = do_db_hl_iter_get(iter, &k, NULL, &dlen);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err2;
+    }
+    if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
+        error(0, 0, "Key not found");
+        res = -EADDRNOTAVAIL;
+        goto err2;
+    }
+
+    d = do_malloc(dlen);
+    if (d == NULL) {
+        res = MINUS_ERRNO;
+        goto err2;
+    }
+
+    res = do_db_hl_iter_get(iter, &k, d, &dlen);
+    if (res != 0) {
+        error(0, -res, "Error reading database file %s", pathname);
+        goto err3;
+    }
+
+    do_db_hl_iter_free(iter);
+
+    res = do_db_hl_close(dbctx);
+    if (res != 0) {
+        error(0, -res, "Error closing database file %s", pathname);
+        goto end;
+    }
+
+    switch (k.type) {
+    case TYPE_INTERNAL:
+        printf("%" PRIu64 "\n", k.id);
+        break;
+    case TYPE_EXTERNAL:
+        printf("%s\n", k.key);
+        break;
+    default:
+        abort();
+    }
+
+    res = do_write_data(d, dlen, datafd);
+    if (res != 0)
+        error(0, -res, "Error writing data");
+
+end:
+    free(d);
+    return res;
+
+err3:
+    free(d);
+err2:
+    do_db_hl_iter_free(iter);
+err1:
+    do_db_hl_close(dbctx);
+    return res;
+}
+
+static int
 do_delete(const char *pathname, struct key *key)
 {
     int err;
@@ -1282,6 +1660,15 @@ main(int argc, char **argv)
         break;
     case OP_LOOK_UP:
         ret = do_look_up(pathname, &key, STDOUT_FILENO);
+        break;
+    case OP_LOOK_UP_NEAREST:
+        ret = do_look_up_nearest(pathname, &key, STDOUT_FILENO);
+        break;
+    case OP_LOOK_UP_NEXT:
+        ret = do_look_up_next(pathname, &key, STDOUT_FILENO);
+        break;
+    case OP_LOOK_UP_PREV:
+        ret = do_look_up_prev(pathname, &key, STDOUT_FILENO);
         break;
     case OP_DELETE:
         ret = do_delete(pathname, &key);
