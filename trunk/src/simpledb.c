@@ -379,6 +379,7 @@ do_db_hl_open(struct db_ctx **dbctx, const char *pathname, size_t key_size,
               db_hl_key_cmp_t key_cmp, int ro)
 {
     int err;
+    int fl;
     struct db_ctx *ret;
 
     ret = do_malloc(sizeof(*ret));
@@ -400,8 +401,11 @@ do_db_hl_open(struct db_ctx **dbctx, const char *pathname, size_t key_size,
     }
     ret->key_ctx->last_key_valid = 0;
 
-    err = db_hl_open(&ret->dbh, pathname, key_size, key_cmp, ret->key_ctx,
-                     ro ? DB_HL_RDONLY : 0);
+    fl = DB_HL_NDELAY;
+    if (ro)
+        fl |= DB_HL_RDONLY;
+
+    err = db_hl_open(&ret->dbh, pathname, key_size, key_cmp, ret->key_ctx, fl);
     if (err)
         goto err3;
 
