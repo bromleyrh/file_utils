@@ -185,8 +185,9 @@ print_usage(const char *prognm)
            "given key\n"
            "    -l         look up specified entry\n"
            "    -n INTEGER operate on entry specified by given internal key\n"
-           "    -p         look up nearest entry less than given key\n"
-           "    -s         look up nearest entry greater than given key\n"
+           "    -p         look up nearest entry less than given existing key\n"
+           "    -s         look up nearest entry greater than given existing "
+           "key\n"
            "    -u         update specified entry\n"
            "    -w         output contents of database\n",
            prognm);
