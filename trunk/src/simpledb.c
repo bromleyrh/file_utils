@@ -24,12 +24,17 @@
 #include <unistd.h>
 
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/un.h>
+#include <sys/wait.h>
 
 #define NBWD (sizeof(uint64_t) * NBBY)
 
 enum op {
-    OP_INSERT = 1,
+    OP_INIT_CONNECTION = 1,
+    OP_CONNECT,
+    OP_INSERT,
     OP_UPDATE,
     OP_LOOK_UP,
     OP_LOOK_UP_NEAREST,
@@ -99,6 +104,7 @@ struct db_obj_header {
 #define FREE_ID_LAST_USED 1 /* values in all following ranges are free */
 
 #define DEFAULT_PATHNAME "db.db"
+#define DEFAULT_SOCK_PATHNAME "db.socket"
 
 #define MAX_READ 4096
 
@@ -107,7 +113,8 @@ struct db_obj_free_id {
     uint8_t     flags;
 } __attribute__((packed));
 
-static int parse_cmdline(int, char **, const char **, enum op *, struct key *);
+static int parse_cmdline(int, char **, const char **, const char **, enum op *,
+                         struct key *);
 
 static int uint64_cmp(uint64_t, uint64_t);
 
@@ -151,6 +158,12 @@ static int release_id(struct db_ctx *, uint64_t, uint64_t);
 static int do_read_data(const char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
 
+static int read_msg(char **, size_t *, int);
+static int init_connection(const char *, const char *, int);
+static int do_init_connection(const char *, const char *);
+
+static int do_connect(const char *);
+
 static int do_insert(const char *, struct key *, int);
 static int do_update(const char *, struct key *, int);
 static int do_look_up(const char *, struct key *, int);
@@ -176,6 +189,8 @@ print_usage(const char *prognm)
 {
     printf("Usage: %s [options]\n"
            "\n"
+           "    -C         create named socket and listen in background\n"
+           "    -c         connect through named socket\n"
            "    -d         delete specified entry\n"
            "    -f PATH    perform operation in specified database file\n"
            "    -h         output help\n"
@@ -186,6 +201,7 @@ print_usage(const char *prognm)
            "    -l         look up specified entry\n"
            "    -n INTEGER operate on entry specified by given internal key\n"
            "    -p         look up nearest entry less than given existing key\n"
+           "    -S PATH    use specified named socket\n"
            "    -s         look up nearest entry greater than given existing "
            "key\n"
            "    -u         update specified entry\n"
@@ -194,10 +210,12 @@ print_usage(const char *prognm)
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
-              struct key *key)
+parse_cmdline(int argc, char **argv, const char **sock_pathname,
+              const char **pathname, enum op *op, struct key *key)
 {
     static const enum op ops[256] = {
+        [(unsigned char)'C']    = OP_INIT_CONNECTION,
+        [(unsigned char)'c']    = OP_CONNECT,
         [(unsigned char)'d']    = OP_DELETE,
         [(unsigned char)'i']    = OP_INSERT,
         [(unsigned char)'L']    = OP_LOOK_UP_NEAREST,
@@ -210,7 +228,7 @@ parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
 
     for (;;) {
         enum op operation;
-        int opt = getopt(argc, argv, "df:hik:Lln:psuw");
+        int opt = getopt(argc, argv, "Ccdf:hik:Lln:psuw");
 
         if (opt == -1)
             break;
@@ -237,6 +255,10 @@ parse_cmdline(int argc, char **argv, const char **pathname, enum op *op,
         case 'n':
             key->id = strtoull(optarg, NULL, 10);
             key->type = KEY_INTERNAL;
+            break;
+        case 'S':
+            if (get_str_arg(sock_pathname) == -1)
+                return -1;
             break;
         default:
             return -1;
@@ -895,6 +917,287 @@ do_write_data(const char *data, size_t datalen, int fd)
     }
 
     return 0;
+}
+
+static int
+read_msg(char **msg, size_t *msglen, int sockfd)
+{
+    char *buf;
+    int err;
+    size_t len, sz;
+
+    sz = 64;
+    buf = do_malloc(sz);
+    if (buf == NULL)
+        return MINUS_ERRNO;
+    len = 0;
+
+    for (;;) {
+        ssize_t ret;
+        struct iovec iov;
+        struct msghdr msg;
+
+        iov.iov_base = buf + len;
+        iov.iov_len = sz - len;
+
+        memset(&msg, 0, sizeof(msg));
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+
+        ret = recvmsg(sockfd, &msg, 0);
+        if (ret < 1) {
+            if (ret == 0)
+                break;
+            if (errno == EINTR)
+                continue;
+            err = MINUS_ERRNO;
+            goto err;
+        }
+
+        len += ret;
+        if (len == sz) {
+            char *tmp;
+
+            sz *= 2;
+            tmp = do_realloc(buf, sz);
+            if (tmp == NULL) {
+                err = MINUS_ERRNO;
+                goto err;
+            }
+            buf = tmp;
+        }
+    }
+
+    *msg = buf;
+    *msglen = len;
+    return 0;
+
+err:
+    free(buf);
+    return err;
+}
+
+static int
+init_connection(const char *sock_pathname, const char *pathname, int pipefd)
+{
+    int err;
+    int sockfd1, sockfd2;
+    ssize_t ret;
+    struct sockaddr_un addr;
+
+    (void)pathname;
+
+    sockfd1 = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+    if (sockfd1 == -1)
+        return MINUS_ERRNO;
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strlcpy(addr.sun_path, sock_pathname, sizeof(addr.sun_path));
+    if (bind(sockfd1, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        err = MINUS_ERRNO;
+        goto err1;
+    }
+
+    if (listen(sockfd1, 1) == -1) {
+        err = MINUS_ERRNO;
+        goto err1;
+    }
+
+    for (;;) {
+        static const unsigned char msg = 1;
+
+        ret = write(pipefd, &msg, 1);
+        if (ret == 1)
+            break;
+        if ((ret == -1) && (errno != EINTR)) {
+            err = MINUS_ERRNO;
+            goto err1;
+        }
+    }
+
+    close(pipefd);
+
+    for (;;) {
+        sockfd2 = accept(sockfd1, NULL, NULL);
+        if (sockfd2 == -1) {
+            err = MINUS_ERRNO;
+            goto err1;
+        }
+
+        for (;;) {
+            char *buf;
+            size_t len;
+
+            err = read_msg(&buf, &len, sockfd2);
+            if (err)
+                goto err2;
+            if (len == 0) {
+                free(buf);
+                break;
+            }
+            if (strncmp("quit", buf, sizeof("quit") - 1) == 0) {
+                fputs("Exiting\n", stderr);
+                goto end;
+            }
+
+            fprintf(stderr, "Received message \"%s\"\n", buf);
+
+            free(buf);
+        }
+    }
+
+end:
+    close(sockfd2);
+    close(sockfd1);
+    return 0;
+
+err2:
+    close(sockfd2);
+err1:
+    close(sockfd1);
+    return err;
+}
+
+static int
+do_init_connection(const char *sock_pathname, const char *pathname)
+{
+    int err, status;
+    int pipefd[2];
+    pid_t pid;
+    unsigned char msg;
+
+    if (pipe(pipefd) == -1) {
+        err = MINUS_ERRNO;
+        error(0, -err, "Error initializing background process");
+        return err;
+    }
+
+    pid = fork();
+    if (pid == -1) {
+        err = MINUS_ERRNO;
+        error(0, -err, "Error initializing background process");
+        close(pipefd[1]);
+        goto err1;
+    }
+    if (pid == 0) {
+        close(pipefd[0]);
+        return init_connection(sock_pathname, pathname, pipefd[1]);
+    }
+
+    close(pipefd[1]);
+
+    for (;;) {
+        ssize_t ret;
+
+        ret = read(pipefd[0], &msg, 1);
+        if (ret > 0)
+            break;
+        if (ret == 0) {
+            err = -EIO;
+            goto err2;
+        }
+        if (errno != EINTR) {
+            err = MINUS_ERRNO;
+            goto err2;
+        }
+    }
+    if (msg != 1) {
+        err = -EIO;
+        goto err2;
+    }
+
+    fputs("Listening for messages\n", stderr);
+
+    close(pipefd[0]);
+
+    return 0;
+
+err2:
+    waitpid(pid, &status, 0);
+err1:
+    close(pipefd[0]);
+    return err;
+}
+
+static int
+do_connect(const char *sock_pathname)
+{
+    int err;
+    int sockfd;
+    struct sockaddr_un addr;
+
+    sockfd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+    if (sockfd == -1) {
+        err = MINUS_ERRNO;
+        error(0, -err, "Error connecting");
+        return err;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strlcpy(addr.sun_path, sock_pathname, sizeof(addr.sun_path));
+    if (connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        err = MINUS_ERRNO;
+        error(0, -err, "Error connecting");
+        goto err;
+    }
+
+    for (;;) {
+        char buf[4096];
+        int fl;
+        size_t len, sent;
+        ssize_t ret;
+
+        len = 0;
+        for (;;) {
+            ret = read(STDIN_FILENO, buf + len, sizeof(buf) - len);
+            if (ret < 1) {
+                if (ret == 0)
+                    break;
+                if (errno == EINTR)
+                    continue;
+                err = MINUS_ERRNO;
+                goto err;
+            }
+
+            len += ret;
+            if (len == sizeof(buf))
+                break;
+        }
+
+        fl = (len == 0) ? MSG_EOR : 0;
+        sent = 0;
+        for (;;) {
+            struct iovec iov;
+            struct msghdr msg;
+
+            iov.iov_base = buf + sent;
+            iov.iov_len = len - sent;
+
+            memset(&msg, 0, sizeof(msg));
+            msg.msg_iov = &iov;
+            msg.msg_iovlen = 1;
+
+            ret = sendmsg(sockfd, &msg, fl);
+            if (ret == -1) {
+                err = MINUS_ERRNO;
+                goto err;
+            }
+
+            sent += ret;
+            if (sent == len)
+                goto end;
+        }
+    }
+
+end:
+    close(sockfd);
+    return 0;
+
+err:
+    close(sockfd);
+    return err;
 }
 
 static int
@@ -1637,22 +1940,31 @@ do_dump(const char *pathname, int datafd)
 int
 main(int argc, char **argv)
 {
-    const char *pathname = NULL;
+    const char *pathname = NULL, *sock_pathname = NULL;
     enum op op = 0;
     int ret;
     struct key key = {.type = 0};
 
+    static const char default_sock_pathname[] = DEFAULT_SOCK_PATHNAME;
     static const char default_pathname[] = DEFAULT_PATHNAME;
 
     setlinebuf(stdout);
 
-    ret = parse_cmdline(argc, argv, &pathname, &op, &key);
+    ret = parse_cmdline(argc, argv, &sock_pathname, &pathname, &op, &key);
     if (ret != 0)
         return (ret == -2) ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (sock_pathname == NULL)
+        sock_pathname = default_sock_pathname;
     if (pathname == NULL)
         pathname = default_pathname;
 
     switch (op) {
+    case OP_INIT_CONNECTION:
+        ret = do_init_connection(sock_pathname, pathname);
+        break;
+    case OP_CONNECT:
+        ret = do_connect(sock_pathname);
+        break;
     case OP_INSERT:
         ret = do_insert(pathname, &key, STDIN_FILENO);
         break;
