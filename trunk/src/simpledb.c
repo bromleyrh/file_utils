@@ -32,8 +32,8 @@
 #define NBWD (sizeof(uint64_t) * NBBY)
 
 enum op {
-    OP_INIT_CONNECTION = 1,
-    OP_SEND_COMMAND,
+    OP_INIT_TRANS = 1,
+    OP_COMMIT_TRANS,
     OP_INSERT,
     OP_UPDATE,
     OP_LOOK_UP,
@@ -114,7 +114,7 @@ struct db_obj_free_id {
 } __attribute__((packed));
 
 static int parse_cmdline(int, char **, const char **, const char **, enum op *,
-                         struct key *);
+                         struct key *, int *);
 
 static int uint64_cmp(uint64_t, uint64_t);
 
@@ -159,12 +159,14 @@ static int do_read_data(const char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
 
 static int read_msg(char **, size_t *, int);
+static int read_msg_v(struct iovec *, size_t, int);
 static int write_msg(char *, size_t, int);
+static int write_msg_v(struct iovec *, size_t, int);
 
-static int init_connection(const char *, const char *, int);
-static int do_init_connection(const char *, const char *);
+static int process_trans(const char *, const char *, int);
 
-static int do_send_command(const char *);
+static int do_init_trans(const char *, const char *);
+static int do_update_trans(const char *, enum op, struct key *);
 
 static int do_insert(const char *, struct key *, int);
 static int do_update(const char *, struct key *, int);
@@ -191,8 +193,7 @@ print_usage(const char *prognm)
 {
     printf("Usage: %s [options]\n"
            "\n"
-           "    -C         create named socket and listen in background\n"
-           "    -c         send command through named socket\n"
+           "    -c         commit transaction and close named socket\n"
            "    -d         delete specified entry\n"
            "    -f PATH    perform operation in specified database file\n"
            "    -h         output help\n"
@@ -206,6 +207,8 @@ print_usage(const char *prognm)
            "    -S PATH    use specified named socket\n"
            "    -s         look up nearest entry greater than given existing "
            "key\n"
+           "    -T         create named socket and listen in background\n"
+           "    -t         send command through named socket\n"
            "    -u         update specified entry\n"
            "    -w         output contents of database\n",
            prognm);
@@ -213,24 +216,24 @@ print_usage(const char *prognm)
 
 static int
 parse_cmdline(int argc, char **argv, const char **sock_pathname,
-              const char **pathname, enum op *op, struct key *key)
+              const char **pathname, enum op *op, struct key *key, int *trans)
 {
     static const enum op ops[256] = {
-        [(unsigned char)'C']    = OP_INIT_CONNECTION,
-        [(unsigned char)'c']    = OP_SEND_COMMAND,
+        [(unsigned char)'c']    = OP_COMMIT_TRANS,
         [(unsigned char)'d']    = OP_DELETE,
         [(unsigned char)'i']    = OP_INSERT,
         [(unsigned char)'L']    = OP_LOOK_UP_NEAREST,
         [(unsigned char)'l']    = OP_LOOK_UP,
         [(unsigned char)'p']    = OP_LOOK_UP_PREV,
         [(unsigned char)'s']    = OP_LOOK_UP_NEXT,
+        [(unsigned char)'T']    = OP_INIT_TRANS,
         [(unsigned char)'u']    = OP_UPDATE,
         [(unsigned char)'w']    = OP_DUMP
     };
 
     for (;;) {
         enum op operation;
-        int opt = getopt(argc, argv, "Ccdf:hik:Lln:psuw");
+        int opt = getopt(argc, argv, "cdf:hik:Lln:psTtuw");
 
         if (opt == -1)
             break;
@@ -261,6 +264,9 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
         case 'S':
             if (get_str_arg(sock_pathname) == -1)
                 return -1;
+            break;
+        case 't':
+            *trans = 1;
             break;
         default:
             return -1;
@@ -1011,6 +1017,18 @@ err:
 }
 
 static int
+read_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
+{
+    struct msghdr msghdr;
+
+    memset(&msghdr, 0, sizeof(msghdr));
+    msghdr.msg_iov = iov;
+    msghdr.msg_iovlen = iovlen;
+
+    return (recvmsg(sockfd, &msghdr, 0) == -1) ? MINUS_ERRNO : 0;
+}
+
+static int
 write_msg(char *msg, size_t msglen, int sockfd)
 {
     int fl;
@@ -1042,8 +1060,26 @@ write_msg(char *msg, size_t msglen, int sockfd)
     return 0;
 }
 
+/*
+ * FIXME: check for short writes by sendmsg()
+ */
 static int
-init_connection(const char *sock_pathname, const char *pathname, int pipefd)
+write_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
+{
+    int fl;
+    struct msghdr msghdr;
+
+    fl = (iovlen == 0) ? MSG_EOR : 0;
+
+    memset(&msghdr, 0, sizeof(msghdr));
+    msghdr.msg_iov = iov;
+    msghdr.msg_iovlen = iovlen;
+
+    return (sendmsg(sockfd, &msghdr, fl) == -1) ? MINUS_ERRNO : 0;
+}
+
+static int
+process_trans(const char *sock_pathname, const char *pathname, int pipefd)
 {
     int err;
     int sockfd1, sockfd2;
@@ -1085,7 +1121,10 @@ init_connection(const char *sock_pathname, const char *pathname, int pipefd)
 
     for (;;) {
         char *buf, msg[64];
+        enum op op;
         size_t len;
+        struct iovec iov[2];
+        struct key key;
 
         sockfd2 = accept(sockfd1, NULL, NULL);
         if (sockfd2 == -1) {
@@ -1093,39 +1132,98 @@ init_connection(const char *sock_pathname, const char *pathname, int pipefd)
             goto err1;
         }
 
-        err = read_msg(&buf, &len, sockfd2);
+        /* receive operation and key type */
+        iov[0].iov_base = &op;
+        iov[0].iov_len = sizeof(op);
+        iov[1].iov_base = &key.type;
+        iov[1].iov_len = sizeof(key.type);
+        err = read_msg_v(iov, 2, sockfd2);
         if (err)
             goto err2;
-        if (len > 0) {
-            if (strncmp("quit", buf, sizeof("quit") - 1) == 0) {
-                free(buf);
-                goto end;
-            }
 
-            len = snprintf(msg, sizeof(msg), "Received message \"%s\"", buf);
-            free(buf);
-            if (len >= (int)sizeof(msg)) {
-                err = -ENAMETOOLONG;
-                goto err2;
-            }
-        } else {
-            len = snprintf(msg, sizeof(msg), "Received message \"\"");
-            if (len >= (int)sizeof(msg)) {
-                err = -ENAMETOOLONG;
-                goto err2;
-            }
+        len = snprintf(msg, sizeof(msg), "Key type %d", key.type);
+        if (len >= (int)sizeof(msg)) {
+            err = -ENAMETOOLONG;
+            goto err2;
         }
-
         err = write_msg(msg, len, sockfd2);
         if (err)
             goto err2;
+
+        if (op == OP_COMMIT_TRANS) {
+            if (shutdown(sockfd2, SHUT_RDWR) == -1) {
+                err = MINUS_ERRNO;
+                goto err2;
+            }
+            goto end;
+        }
+
+        /* receive key */
+        err = read_msg(&buf, &len, sockfd2);
+        if (err)
+            goto err2;
+        if (key.type == KEY_INTERNAL) {
+            if (len != sizeof(key.id)) {
+                /* FIXME: return error to client */
+                err = -EIO;
+                goto err2;
+            }
+            key.id = *(uint64_t *)buf;
+            free(buf);
+            len = snprintf(msg, sizeof(msg), "Key %" PRIu64, key.id);
+        } else {
+            key.key = buf; /* FIXME: avoid memory leak */
+            len = snprintf(msg, sizeof(msg), "Key \"%s\"", key.key);
+        }
+        if (len >= (int)sizeof(msg)) {
+            err = -ENAMETOOLONG;
+            goto err2;
+        }
+        err = write_msg(msg, len, sockfd2);
+        if (err)
+            goto err2;
+
+        switch (op) {
+        case OP_INSERT:
+        case OP_UPDATE:
+            /* receive data */
+            err = read_msg(&buf, &len, sockfd2);
+            if (err)
+                goto err2;
+            if (len > 0) {
+                len = snprintf(msg, sizeof(msg), "Data \"%s\"",
+                               buf);
+                free(buf);
+                if (len >= (int)sizeof(msg)) {
+                    err = -ENAMETOOLONG;
+                    goto err2;
+                }
+            } else {
+                len = snprintf(msg, sizeof(msg), "Data \"\"");
+                if (len >= (int)sizeof(msg)) {
+                    err = -ENAMETOOLONG;
+                    goto err2;
+                }
+            }
+        default:
+            break;
+        }
+        err = write_msg(msg, len, sockfd2);
+        if (err)
+            goto err2;
+
         err = write_msg(NULL, 0, sockfd2);
         if (err)
             goto err2;
+
+        if (shutdown(sockfd2, SHUT_RDWR) == -1) {
+            err = MINUS_ERRNO;
+            goto err2;
+        }
     }
 
 end:
-    if (shutdown(sockfd2, SHUT_RDWR) == -1) {
+    if (shutdown(sockfd1, SHUT_RDWR) == -1) {
         err = MINUS_ERRNO;
         goto err2;
     }
@@ -1141,7 +1239,7 @@ err1:
 }
 
 static int
-do_init_connection(const char *sock_pathname, const char *pathname)
+do_init_trans(const char *sock_pathname, const char *pathname)
 {
     int err, status;
     int pipefd[2];
@@ -1163,7 +1261,7 @@ do_init_connection(const char *sock_pathname, const char *pathname)
     }
     if (pid == 0) {
         close(pipefd[0]);
-        return init_connection(sock_pathname, pathname, pipefd[1]);
+        return process_trans(sock_pathname, pathname, pipefd[1]);
     }
 
     close(pipefd[1]);
@@ -1188,7 +1286,7 @@ do_init_connection(const char *sock_pathname, const char *pathname)
         goto err2;
     }
 
-    fputs("Listening for messages\n", stderr);
+    fputs("Transaction started\n", stderr);
 
     close(pipefd[0]);
 
@@ -1202,13 +1300,28 @@ err1:
 }
 
 static int
-do_send_command(const char *sock_pathname)
+do_update_trans(const char *sock_pathname, enum op op, struct key *key)
 {
     char *msg;
     int err;
     int sockfd;
-    size_t len;
+    size_t keylen, len;
+    struct iovec iov[2];
     struct sockaddr_un addr;
+
+    if (op != OP_COMMIT_TRANS) {
+        if (key->type == 0) {
+            error(0, 0, "Must specify key");
+            return -EINVAL;
+        }
+        if (key->type == KEY_EXTERNAL) {
+            keylen = strlen(key->key);
+            if (keylen > KEY_MAX) {
+                error(0, 0, "Key too long");
+                return -ENAMETOOLONG;
+            }
+        }
+    }
 
     sockfd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sockfd == -1) {
@@ -1226,28 +1339,74 @@ do_send_command(const char *sock_pathname)
         goto err;
     }
 
-    for (;;) {
-        char buf[4096];
-        ssize_t ret;
+    /* send operation and key type */
+    iov[0].iov_base = &op;
+    iov[0].iov_len = sizeof(op);
+    /* FIXME: skip sending key type for OP_COMMIT_TRANS */
+    iov[1].iov_base = &key->type;
+    iov[1].iov_len = sizeof(key->type);
+    err = write_msg_v(iov, 2, sockfd);
+    if (err)
+        goto err;
 
-        for (len = 0; len < sizeof(buf); len += ret) {
-            ret = read(STDIN_FILENO, buf + len, sizeof(buf) - len);
-            if (ret < 1) {
-                if (ret == 0)
-                    break;
-                if (errno == EINTR)
-                    continue;
-                err = MINUS_ERRNO;
-                goto err;
+    err = read_msg(&msg, &len, sockfd);
+    if (err)
+        goto err;
+    if (len > 0) {
+        fprintf(stderr, "%s\n", msg);
+        free(msg);
+    }
+
+    if (op == OP_COMMIT_TRANS)
+        goto end;
+
+    /* send key */
+    if (key->type == KEY_INTERNAL)
+        err = write_msg((char *)&key->id, sizeof(key->id), sockfd);
+    else {
+        /* FIXME: avoid cast to non-const type */
+        err = write_msg((char *)(key->key), keylen, sockfd);
+    }
+    if (err)
+        goto err;
+
+    err = read_msg(&msg, &len, sockfd);
+    if (err)
+        goto err;
+    if (len > 0) {
+        fprintf(stderr, "%s\n", msg);
+        free(msg);
+    }
+
+    switch (op) {
+    case OP_INSERT:
+    case OP_UPDATE:
+        /* send data */
+        for (;;) {
+            char buf[4096];
+            ssize_t ret;
+
+            for (len = 0; len < sizeof(buf); len += ret) {
+                ret = read(STDIN_FILENO, buf + len, sizeof(buf) - len);
+                if (ret < 1) {
+                    if (ret == 0)
+                        break;
+                    if (errno == EINTR)
+                        continue;
+                    err = MINUS_ERRNO;
+                    goto err;
+                }
             }
+
+            err = write_msg(buf, len, sockfd);
+            if (err)
+                goto err;
+
+            if (len == 0)
+                break;
         }
-
-        err = write_msg(buf, len, sockfd);
-        if (err)
-            goto err;
-
-        if (len == 0)
-            break;
+    default:
+        break;
     }
 
     err = read_msg(&msg, &len, sockfd);
@@ -1258,8 +1417,8 @@ do_send_command(const char *sock_pathname)
         free(msg);
     }
 
+end:
     close(sockfd);
-
     return 0;
 
 err:
@@ -2010,6 +2169,7 @@ main(int argc, char **argv)
     const char *pathname = NULL, *sock_pathname = NULL;
     enum op op = 0;
     int ret;
+    int trans = 0;
     struct key key = {.type = 0};
 
     static const char default_sock_pathname[] = DEFAULT_SOCK_PATHNAME;
@@ -2017,7 +2177,8 @@ main(int argc, char **argv)
 
     setlinebuf(stdout);
 
-    ret = parse_cmdline(argc, argv, &sock_pathname, &pathname, &op, &key);
+    ret = parse_cmdline(argc, argv, &sock_pathname, &pathname, &op, &key,
+                        &trans);
     if (ret != 0)
         return (ret == -2) ? EXIT_SUCCESS : EXIT_FAILURE;
     if (sock_pathname == NULL)
@@ -2025,12 +2186,15 @@ main(int argc, char **argv)
     if (pathname == NULL)
         pathname = default_pathname;
 
+    if (trans || (op == OP_COMMIT_TRANS)) {
+        ret = do_update_trans(sock_pathname, op, &key);
+        if (ret != 0)
+            goto end;
+    }
+
     switch (op) {
-    case OP_INIT_CONNECTION:
-        ret = do_init_connection(sock_pathname, pathname);
-        break;
-    case OP_SEND_COMMAND:
-        ret = do_send_command(sock_pathname);
+    case OP_INIT_TRANS:
+        ret = do_init_trans(sock_pathname, pathname);
         break;
     case OP_INSERT:
         ret = do_insert(pathname, &key, STDIN_FILENO);
@@ -2061,11 +2225,13 @@ main(int argc, char **argv)
         ret = -EIO;
     }
 
+end:
     if (pathname != default_pathname)
         free((void *)pathname);
+    if (sock_pathname != default_sock_pathname)
+        free((void *)sock_pathname);
     if (key.key != NULL)
         free((void *)(key.key));
-
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
