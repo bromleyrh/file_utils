@@ -159,6 +159,8 @@ static int do_read_data(const char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
 
 static int read_msg(char **, size_t *, int);
+static int write_msg(char *, size_t, int);
+
 static int init_connection(const char *, const char *, int);
 static int do_init_connection(const char *, const char *);
 
@@ -922,59 +924,122 @@ do_write_data(const char *data, size_t datalen, int fd)
 static int
 read_msg(char **msg, size_t *msglen, int sockfd)
 {
-    char *buf;
+    char *buf, *tmp;
     int err;
     size_t len, sz;
+    ssize_t ret;
+    struct iovec iov;
+    struct msghdr msghdr;
 
-    sz = 64;
+    sz = 4096;
     buf = do_malloc(sz);
     if (buf == NULL)
         return MINUS_ERRNO;
     len = 0;
 
     for (;;) {
-        ssize_t ret;
-        struct iovec iov;
-        struct msghdr msg;
+        for (;;) {
+            for (;;) {
+                iov.iov_base = buf + len;
+                iov.iov_len = sz - len;
 
-        iov.iov_base = buf + len;
-        iov.iov_len = sz - len;
+                memset(&msghdr, 0, sizeof(msghdr));
+                msghdr.msg_iov = &iov;
+                msghdr.msg_iovlen = 1;
 
-        memset(&msg, 0, sizeof(msg));
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
+                ret = recvmsg(sockfd, &msghdr, MSG_PEEK);
+                if (ret > 0)
+                    break;
+                if (ret == 0)
+                    goto end;
+                if (errno != EINTR) {
+                    err = MINUS_ERRNO;
+                    goto err;
+                }
+            }
 
-        ret = recvmsg(sockfd, &msg, 0);
-        if (ret < 1) {
-            if (ret == 0)
+            if ((size_t)ret == sz - len) {
+                sz *= 2;
+                tmp = do_realloc(buf, sz);
+                if (tmp == NULL) {
+                    err = MINUS_ERRNO;
+                    goto err;
+                }
+                buf = tmp;
+            }
+
+            if (!(msghdr.msg_flags & MSG_TRUNC))
                 break;
-            if (errno == EINTR)
-                continue;
-            err = MINUS_ERRNO;
-            goto err;
         }
 
-        len += ret;
-        if (len == sz) {
-            char *tmp;
+        for (;;) {
+            iov.iov_base = buf + len;
+            iov.iov_len = sz - len;
 
-            sz *= 2;
-            tmp = do_realloc(buf, sz);
-            if (tmp == NULL) {
+            memset(&msghdr, 0, sizeof(msghdr));
+            msghdr.msg_iov = &iov;
+            msghdr.msg_iovlen = 1;
+
+            ret = recvmsg(sockfd, &msghdr, 0);
+            if (ret > 0)
+                break;
+            if (ret == 0) {
+                err = -EIO;
+                goto end;
+            }
+            if (errno != EINTR) {
                 err = MINUS_ERRNO;
                 goto err;
             }
-            buf = tmp;
         }
+
+        len += ret;
     }
 
-    *msg = buf;
+end:
+    if (len == 0) {
+        free(buf);
+        *msg = NULL;
+    } else
+        *msg = buf;
     *msglen = len;
     return 0;
 
 err:
     free(buf);
     return err;
+}
+
+static int
+write_msg(char *msg, size_t msglen, int sockfd)
+{
+    int fl;
+    size_t sent;
+    ssize_t ret;
+
+    fl = (msglen == 0) ? MSG_EOR : 0;
+    sent = 0;
+    for (;;) {
+        struct iovec iov;
+        struct msghdr msghdr;
+
+        iov.iov_base = msg + sent;
+        iov.iov_len = msglen - sent;
+
+        memset(&msghdr, 0, sizeof(msghdr));
+        msghdr.msg_iov = &iov;
+        msghdr.msg_iovlen = 1;
+
+        ret = sendmsg(sockfd, &msghdr, fl);
+        if (ret == -1)
+            return MINUS_ERRNO;
+
+        sent += ret;
+        if (sent == msglen)
+            break;
+    }
+
+    return 0;
 }
 
 static int
@@ -1019,35 +1084,51 @@ init_connection(const char *sock_pathname, const char *pathname, int pipefd)
     close(pipefd);
 
     for (;;) {
+        char *buf, msg[64];
+        size_t len;
+
         sockfd2 = accept(sockfd1, NULL, NULL);
         if (sockfd2 == -1) {
             err = MINUS_ERRNO;
             goto err1;
         }
 
-        for (;;) {
-            char *buf;
-            size_t len;
-
-            err = read_msg(&buf, &len, sockfd2);
-            if (err)
-                goto err2;
-            if (len == 0) {
-                free(buf);
-                break;
-            }
+        err = read_msg(&buf, &len, sockfd2);
+        if (err)
+            goto err2;
+        if (len > 0) {
             if (strncmp("quit", buf, sizeof("quit") - 1) == 0) {
-                fputs("Exiting\n", stderr);
+                free(buf);
                 goto end;
             }
 
-            fprintf(stderr, "Received message \"%s\"\n", buf);
-
+            len = snprintf(msg, sizeof(msg), "Received message \"%s\"", buf);
             free(buf);
+            if (len >= (int)sizeof(msg)) {
+                err = -ENAMETOOLONG;
+                goto err2;
+            }
+        } else {
+            len = snprintf(msg, sizeof(msg), "Received message \"\"");
+            if (len >= (int)sizeof(msg)) {
+                err = -ENAMETOOLONG;
+                goto err2;
+            }
         }
+
+        err = write_msg(msg, len, sockfd2);
+        if (err)
+            goto err2;
+        err = write_msg(NULL, 0, sockfd2);
+        if (err)
+            goto err2;
     }
 
 end:
+    if (shutdown(sockfd2, SHUT_RDWR) == -1) {
+        err = MINUS_ERRNO;
+        goto err2;
+    }
     close(sockfd2);
     close(sockfd1);
     return 0;
@@ -1123,8 +1204,10 @@ err1:
 static int
 do_connect(const char *sock_pathname)
 {
+    char *msg;
     int err;
     int sockfd;
+    size_t len;
     struct sockaddr_un addr;
 
     sockfd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -1145,12 +1228,9 @@ do_connect(const char *sock_pathname)
 
     for (;;) {
         char buf[4096];
-        int fl;
-        size_t len, sent;
         ssize_t ret;
 
-        len = 0;
-        for (;;) {
+        for (len = 0; len < sizeof(buf); len += ret) {
             ret = read(STDIN_FILENO, buf + len, sizeof(buf) - len);
             if (ret < 1) {
                 if (ret == 0)
@@ -1160,39 +1240,26 @@ do_connect(const char *sock_pathname)
                 err = MINUS_ERRNO;
                 goto err;
             }
-
-            len += ret;
-            if (len == sizeof(buf))
-                break;
         }
 
-        fl = (len == 0) ? MSG_EOR : 0;
-        sent = 0;
-        for (;;) {
-            struct iovec iov;
-            struct msghdr msg;
+        err = write_msg(buf, len, sockfd);
+        if (err)
+            goto err;
 
-            iov.iov_base = buf + sent;
-            iov.iov_len = len - sent;
-
-            memset(&msg, 0, sizeof(msg));
-            msg.msg_iov = &iov;
-            msg.msg_iovlen = 1;
-
-            ret = sendmsg(sockfd, &msg, fl);
-            if (ret == -1) {
-                err = MINUS_ERRNO;
-                goto err;
-            }
-
-            sent += ret;
-            if (sent == len)
-                goto end;
-        }
+        if (len == 0)
+            break;
     }
 
-end:
+    err = read_msg(&msg, &len, sockfd);
+    if (err)
+        goto err;
+    if (len > 0) {
+        fprintf(stderr, "%s\n", msg);
+        free(msg);
+    }
+
     close(sockfd);
+
     return 0;
 
 err:
