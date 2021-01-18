@@ -33,7 +33,7 @@
 
 enum op {
     OP_INIT_CONNECTION = 1,
-    OP_CONNECT,
+    OP_SEND_COMMAND,
     OP_INSERT,
     OP_UPDATE,
     OP_LOOK_UP,
@@ -164,7 +164,7 @@ static int write_msg(char *, size_t, int);
 static int init_connection(const char *, const char *, int);
 static int do_init_connection(const char *, const char *);
 
-static int do_connect(const char *);
+static int do_send_command(const char *);
 
 static int do_insert(const char *, struct key *, int);
 static int do_update(const char *, struct key *, int);
@@ -192,7 +192,7 @@ print_usage(const char *prognm)
     printf("Usage: %s [options]\n"
            "\n"
            "    -C         create named socket and listen in background\n"
-           "    -c         connect through named socket\n"
+           "    -c         send command through named socket\n"
            "    -d         delete specified entry\n"
            "    -f PATH    perform operation in specified database file\n"
            "    -h         output help\n"
@@ -217,7 +217,7 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
 {
     static const enum op ops[256] = {
         [(unsigned char)'C']    = OP_INIT_CONNECTION,
-        [(unsigned char)'c']    = OP_CONNECT,
+        [(unsigned char)'c']    = OP_SEND_COMMAND,
         [(unsigned char)'d']    = OP_DELETE,
         [(unsigned char)'i']    = OP_INSERT,
         [(unsigned char)'L']    = OP_LOOK_UP_NEAREST,
@@ -1202,7 +1202,7 @@ err1:
 }
 
 static int
-do_connect(const char *sock_pathname)
+do_send_command(const char *sock_pathname)
 {
     char *msg;
     int err;
@@ -2029,8 +2029,8 @@ main(int argc, char **argv)
     case OP_INIT_CONNECTION:
         ret = do_init_connection(sock_pathname, pathname);
         break;
-    case OP_CONNECT:
-        ret = do_connect(sock_pathname);
+    case OP_SEND_COMMAND:
+        ret = do_send_command(sock_pathname);
         break;
     case OP_INSERT:
         ret = do_insert(pathname, &key, STDIN_FILENO);
