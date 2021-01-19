@@ -149,6 +149,8 @@ static int do_db_hl_trans_new(struct db_ctx *);
 static int do_db_hl_trans_abort(struct db_ctx *);
 static int do_db_hl_trans_commit(struct db_ctx *);
 
+static int open_or_create(struct db_ctx **, const char *);
+
 static void used_id_set(uint64_t *, uint64_t, uint64_t, int);
 static uint64_t free_id_find(uint64_t *, uint64_t);
 
@@ -168,14 +170,16 @@ static int process_trans(const char *, const char *, int);
 static int do_init_trans(const char *, const char *);
 static int do_update_trans(const char *, enum op, struct key *);
 
-static int do_insert(const char *, struct key *, int);
-static int do_update(const char *, struct key *, int);
-static int do_look_up(const char *, struct key *, int);
-static int do_look_up_nearest(const char *, struct key *, int);
-static int do_look_up_next(const char *, struct key *, int);
-static int do_look_up_prev(const char *, struct key *, int);
-static int do_delete(const char *, struct key *);
-static int do_dump(const char *, int);
+static int do_insert(struct db_ctx *, struct key *, int);
+static int do_update(struct db_ctx *, struct key *, int);
+static int do_look_up(struct db_ctx *, struct key *, int);
+static int do_look_up_nearest(struct db_ctx *, struct key *, int);
+static int do_look_up_next(struct db_ctx *, struct key *, int);
+static int do_look_up_prev(struct db_ctx *, struct key *, int);
+static int do_delete(struct db_ctx *, struct key *);
+static int do_dump(struct db_ctx *, int);
+
+static int do_op(struct db_ctx *, enum op, struct key *);
 
 static int
 get_str_arg(const char **str)
@@ -684,6 +688,57 @@ do_db_hl_trans_commit(struct db_ctx *dbctx)
     return db_hl_trans_commit(dbctx->dbh);
 }
 
+static int
+open_or_create(struct db_ctx **dbctx, const char *pathname)
+{
+    int err;
+    struct db_ctx *ret;
+    struct db_key k;
+    struct db_obj_free_id freeid;
+    struct db_obj_header hdr;
+
+    err = do_db_hl_open(&ret, pathname, sizeof(struct db_key), &db_key_cmp, 0);
+    if (err) {
+        if (err != -ENOENT) {
+            error(0, -err, "Error opening database file %s", pathname);
+            return err;
+        }
+
+        err = do_db_hl_create(&ret, pathname, 0666, sizeof(struct db_key),
+                              &db_key_cmp);
+        if (err) {
+            error(0, -err, "Error creating database file %s", pathname);
+            return err;
+        }
+
+        k.type = TYPE_HEADER;
+        hdr.version = FMT_VERSION;
+        hdr.numobj = 0;
+        err = do_db_hl_insert(ret, &k, &hdr, sizeof(hdr));
+        if (err) {
+            error(0, -err, "Error creating database file %s", pathname);
+            goto err;
+        }
+
+        k.type = TYPE_FREE_ID;
+        k.id = ROOT_ID;
+        memset(freeid.used_id, 0, sizeof(freeid.used_id));
+        freeid.flags = FREE_ID_LAST_USED;
+        err = do_db_hl_insert(ret, &k, &freeid, sizeof(freeid));
+        if (err) {
+            error(0, -err, "Error creating database file %s", pathname);
+            goto err;
+        }
+    }
+
+    *dbctx = ret;
+    return 0;
+
+err:
+    do_db_hl_close(ret);
+    return err;
+}
+
 static void
 used_id_set(uint64_t *used_id, uint64_t base, uint64_t id, int val)
 {
@@ -1082,9 +1137,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     int err;
     int sockfd1, sockfd2;
     ssize_t ret;
+    struct db_ctx *dbctx = NULL;
     struct sockaddr_un addr;
-
-    (void)pathname;
 
     sockfd1 = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sockfd1 == -1)
@@ -1212,6 +1266,24 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         default:
             break;
         }
+
+        if (dbctx == NULL) {
+            /* first operation determines whether database is created if it does
+               not exist */
+            if (op == OP_INSERT)
+                err = open_or_create(&dbctx, pathname);
+            else {
+                err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key),
+                                    &db_key_cmp, 0);
+            }
+            if (err)
+                goto err2;
+        }
+
+        err = do_op(dbctx, op, &key);
+        if (err)
+            goto err2;
+
         err = write_msg(msg, len + 1, sockfd2);
         if (err)
             goto err2;
@@ -1232,12 +1304,14 @@ end:
     }
     close(sockfd2);
     close(sockfd1);
-    return 0;
+    return (dbctx == NULL) ? 0 : do_db_hl_close(dbctx);
 
 err2:
     close(sockfd2);
 err1:
     close(sockfd1);
+    if (dbctx != NULL)
+        do_db_hl_close(dbctx);
     return err;
 }
 
@@ -1442,16 +1516,13 @@ err:
 }
 
 static int
-do_insert(const char *pathname, struct key *key, int datafd)
+do_insert(struct db_ctx *dbctx, struct key *key, int datafd)
 {
     const char *d = NULL;
     int alloc_id = 0;
     int err;
     size_t dlen = 0;
-    struct db_ctx *dbctx;
     struct db_key k;
-    struct db_obj_free_id freeid;
-    struct db_obj_header hdr;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -1462,51 +1533,16 @@ do_insert(const char *pathname, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        0);
-    if (err) {
-        if (err != -ENOENT) {
-            error(0, -err, "Error opening database file %s", pathname);
-            return err;
-        }
-
-        err = do_db_hl_create(&dbctx, pathname, 0666, sizeof(struct db_key),
-                              &db_key_cmp);
-        if (err) {
-            error(0, -err, "Error creating database file %s", pathname);
-            return err;
-        }
-
-        k.type = TYPE_HEADER;
-        hdr.version = FMT_VERSION;
-        hdr.numobj = 0;
-        err = do_db_hl_insert(dbctx, &k, &hdr, sizeof(hdr));
-        if (err) {
-            error(0, -err, "Error creating database file %s", pathname);
-            goto err1;
-        }
-
-        k.type = TYPE_FREE_ID;
-        k.id = ROOT_ID;
-        memset(freeid.used_id, 0, sizeof(freeid.used_id));
-        freeid.flags = FREE_ID_LAST_USED;
-        err = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
-        if (err) {
-            error(0, -err, "Error creating database file %s", pathname);
-            goto err1;
-        }
-    }
-
     err = do_read_data(&d, &dlen, datafd);
     if (err) {
         error(0, -err, "Error reading data");
-        goto err1;
+        return err;
     }
 
     err = do_db_hl_trans_new(dbctx);
     if (err) {
-        error(0, -err, "Error inserting into database file %s", pathname);
-        goto err2;
+        error(0, -err, "Error inserting into database file");
+        goto err1;
     }
 
     switch (key->type) {
@@ -1516,7 +1552,7 @@ do_insert(const char *pathname, struct key *key, int datafd)
             err = get_id(dbctx, &k.id);
             if (err) {
                 error(0, -err, "Error allocating ID");
-                goto err3;
+                goto err2;
             }
             alloc_id = 1;
         } else
@@ -1532,44 +1568,37 @@ do_insert(const char *pathname, struct key *key, int datafd)
 
     err = do_db_hl_insert(dbctx, &k, d, dlen);
     if (err) {
-        error(0, -err, "Error inserting into database file %s", pathname);
-        goto err3;
+        error(0, -err, "Error inserting into database file");
+        goto err2;
     }
 
     free((void *)d);
 
     err = do_db_hl_trans_commit(dbctx);
     if (err) {
-        error(0, -err, "Error inserting into database file %s", pathname);
+        error(0, -err, "Error inserting into database file");
         do_db_hl_trans_abort(dbctx);
-        goto err1;
+        return err;
     }
 
     if (alloc_id)
         printf("%" PRIu64 "\n", k.id);
 
-    err = do_db_hl_close(dbctx);
-    if (err)
-        error(0, -err, "Error closing database file %s", pathname);
+    return 0;
 
-    return err;
-
-err3:
-    do_db_hl_trans_abort(dbctx);
 err2:
-    free((void *)d);
+    do_db_hl_trans_abort(dbctx);
 err1:
-    do_db_hl_close(dbctx);
+    free((void *)d);
     return err;
 }
 
 static int
-do_update(const char *pathname, struct key *key, int datafd)
+do_update(struct db_ctx *dbctx, struct key *key, int datafd)
 {
     const char *d = NULL;
     int err;
     size_t dlen = 0;
-    struct db_ctx *dbctx;
     struct db_key k;
 
     if ((key->type == 0) || ((key->type == KEY_INTERNAL) && (key->id == 0))) {
@@ -1581,23 +1610,16 @@ do_update(const char *pathname, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        0);
-    if (err) {
-        error(0, -err, "Error opening database file %s", pathname);
-        return err;
-    }
-
     err = do_read_data(&d, &dlen, datafd);
     if (err) {
         error(0, -err, "Error reading data");
-        goto err1;
+        return err;
     }
 
     err = do_db_hl_trans_new(dbctx);
     if (err) {
-        error(0, -err, "Error inserting into database file %s", pathname);
-        goto err2;
+        error(0, -err, "Error inserting into database file");
+        goto err1;
     }
 
     switch (key->type) {
@@ -1615,41 +1637,34 @@ do_update(const char *pathname, struct key *key, int datafd)
 
     err = do_db_hl_replace(dbctx, &k, d, dlen);
     if (err) {
-        error(0, -err, "Error updating database file %s", pathname);
-        goto err3;
+        error(0, -err, "Error updating database file");
+        goto err2;
     }
 
     free((void *)d);
 
     err = do_db_hl_trans_commit(dbctx);
     if (err) {
-        error(0, -err, "Error updating database file %s", pathname);
+        error(0, -err, "Error updating database file");
         do_db_hl_trans_abort(dbctx);
-        goto err1;
+        return err;
     }
 
-    err = do_db_hl_close(dbctx);
-    if (err)
-        error(0, -err, "Error closing database file %s", pathname);
+    return 0;
 
-    return err;
-
-err3:
-    do_db_hl_trans_abort(dbctx);
 err2:
-    free((void *)d);
+    do_db_hl_trans_abort(dbctx);
 err1:
-    do_db_hl_close(dbctx);
+    free((void *)d);
     return err;
 }
 
 static int
-do_look_up(const char *pathname, struct key *key, int datafd)
+do_look_up(struct db_ctx *dbctx, struct key *key, int datafd)
 {
     char *d;
     int res;
     size_t dlen;
-    struct db_ctx *dbctx;
     struct db_key k;
 
     if (key->type == 0) {
@@ -1659,13 +1674,6 @@ do_look_up(const char *pathname, struct key *key, int datafd)
     if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
-    }
-
-    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        1);
-    if (res != 0) {
-        error(0, -res, "Error opening database file %s", pathname);
-        return res;
     }
 
     switch (key->type) {
@@ -1687,27 +1695,21 @@ do_look_up(const char *pathname, struct key *key, int datafd)
             error(0, 0, "Key not found");
             res = -EADDRNOTAVAIL;
         } else
-            error(0, -res, "Error looking up in database file %s", pathname);
-        goto err1;
+            error(0, -res, "Error looking up in database file");
+        goto end;
     }
 
     d = do_malloc(dlen);
     if (d == NULL) {
         res = MINUS_ERRNO;
-        goto err1;
+        goto end;
     }
 
     res = do_db_hl_look_up(dbctx, &k, NULL, d, &dlen, 0);
     if (res != 1) {
         if (res == 0)
             res = -EIO;
-        error(0, -res, "Error looking up in database file %s", pathname);
-        goto err2;
-    }
-
-    res = do_db_hl_close(dbctx);
-    if (res != 0) {
-        error(0, -res, "Error closing database file %s", pathname);
+        error(0, -res, "Error looking up in database file");
         goto end;
     }
 
@@ -1718,21 +1720,14 @@ do_look_up(const char *pathname, struct key *key, int datafd)
 end:
     free(d);
     return res;
-
-err2:
-    free(d);
-err1:
-    do_db_hl_close(dbctx);
-    return res;
 }
 
 static int
-do_look_up_nearest(const char *pathname, struct key *key, int datafd)
+do_look_up_nearest(struct db_ctx *dbctx, struct key *key, int datafd)
 {
     char *d;
     int res;
     size_t dlen;
-    struct db_ctx *dbctx;
     struct db_iter *iter;
     struct db_key k;
 
@@ -1745,17 +1740,10 @@ do_look_up_nearest(const char *pathname, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        1);
-    if (res != 0) {
-        error(0, -res, "Error opening database file %s", pathname);
-        return res;
-    }
-
     res = do_db_hl_iter_new(&iter, dbctx);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err1;
+        error(0, -res, "Error reading database file");
+        return res;
     }
 
     switch (key->type) {
@@ -1773,40 +1761,34 @@ do_look_up_nearest(const char *pathname, struct key *key, int datafd)
 
     res = do_db_hl_iter_search(iter, &k);
     if (res < 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+        error(0, -res, "Error reading database file");
+        goto err1;
     }
 
     res = do_db_hl_iter_get(iter, &k, NULL, &dlen);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+        error(0, -res, "Error reading database file");
+        goto err1;
     }
     if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
-        goto err2;
+        goto err1;
     }
 
     d = do_malloc(dlen);
     if (d == NULL) {
         res = MINUS_ERRNO;
-        goto err2;
+        goto err1;
     }
 
     res = do_db_hl_iter_get(iter, &k, d, &dlen);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err3;
+        error(0, -res, "Error reading database file");
+        goto err2;
     }
 
     do_db_hl_iter_free(iter);
-
-    res = do_db_hl_close(dbctx);
-    if (res != 0) {
-        error(0, -res, "Error closing database file %s", pathname);
-        goto end;
-    }
 
     switch (k.type) {
     case TYPE_INTERNAL:
@@ -1823,26 +1805,23 @@ do_look_up_nearest(const char *pathname, struct key *key, int datafd)
     if (res != 0)
         error(0, -res, "Error writing data");
 
-end:
     free(d);
+
     return res;
 
-err3:
-    free(d);
 err2:
-    do_db_hl_iter_free(iter);
+    free(d);
 err1:
-    do_db_hl_close(dbctx);
+    do_db_hl_iter_free(iter);
     return res;
 }
 
 static int
-do_look_up_next(const char *pathname, struct key *key, int datafd)
+do_look_up_next(struct db_ctx *dbctx, struct key *key, int datafd)
 {
     char *d;
     int res;
     size_t dlen;
-    struct db_ctx *dbctx;
     struct db_iter *iter;
     struct db_key k;
 
@@ -1855,17 +1834,10 @@ do_look_up_next(const char *pathname, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        1);
-    if (res != 0) {
-        error(0, -res, "Error opening database file %s", pathname);
-        return res;
-    }
-
     res = do_db_hl_iter_new(&iter, dbctx);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err1;
+        error(0, -res, "Error reading database file");
+        return res;
     }
 
     switch (key->type) {
@@ -1887,46 +1859,40 @@ do_look_up_next(const char *pathname, struct key *key, int datafd)
             error(0, 0, "Key not found");
             res = -EADDRNOTAVAIL;
         } else
-            error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+            error(0, -res, "Error reading database file");
+        goto err1;
     }
 
     res = do_db_hl_iter_next(iter);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+        error(0, -res, "Error reading database file");
+        goto err1;
     }
 
     res = do_db_hl_iter_get(iter, &k, NULL, &dlen);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+        error(0, -res, "Error reading database file");
+        goto err1;
     }
     if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
-        goto err2;
+        goto err1;
     }
 
     d = do_malloc(dlen);
     if (d == NULL) {
         res = MINUS_ERRNO;
-        goto err2;
+        goto err1;
     }
 
     res = do_db_hl_iter_get(iter, &k, d, &dlen);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err3;
+        error(0, -res, "Error reading database file");
+        goto err2;
     }
 
     do_db_hl_iter_free(iter);
-
-    res = do_db_hl_close(dbctx);
-    if (res != 0) {
-        error(0, -res, "Error closing database file %s", pathname);
-        goto end;
-    }
 
     switch (k.type) {
     case TYPE_INTERNAL:
@@ -1943,26 +1909,23 @@ do_look_up_next(const char *pathname, struct key *key, int datafd)
     if (res != 0)
         error(0, -res, "Error writing data");
 
-end:
     free(d);
+
     return res;
 
-err3:
-    free(d);
 err2:
-    do_db_hl_iter_free(iter);
+    free(d);
 err1:
-    do_db_hl_close(dbctx);
+    do_db_hl_iter_free(iter);
     return res;
 }
 
 static int
-do_look_up_prev(const char *pathname, struct key *key, int datafd)
+do_look_up_prev(struct db_ctx *dbctx, struct key *key, int datafd)
 {
     char *d;
     int res;
     size_t dlen;
-    struct db_ctx *dbctx;
     struct db_iter *iter;
     struct db_key k;
 
@@ -1975,17 +1938,10 @@ do_look_up_prev(const char *pathname, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    res = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        1);
-    if (res != 0) {
-        error(0, -res, "Error opening database file %s", pathname);
-        return res;
-    }
-
     res = do_db_hl_iter_new(&iter, dbctx);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err1;
+        error(0, -res, "Error reading database file");
+        return res;
     }
 
     switch (key->type) {
@@ -2007,46 +1963,40 @@ do_look_up_prev(const char *pathname, struct key *key, int datafd)
             error(0, 0, "Key not found");
             res = -EADDRNOTAVAIL;
         } else
-            error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+            error(0, -res, "Error reading database file");
+        goto err1;
     }
 
     res = do_db_hl_iter_prev(iter);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+        error(0, -res, "Error reading database file");
+        goto err1;
     }
 
     res = do_db_hl_iter_get(iter, &k, NULL, &dlen);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err2;
+        error(0, -res, "Error reading database file");
+        goto err1;
     }
     if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
-        goto err2;
+        goto err1;
     }
 
     d = do_malloc(dlen);
     if (d == NULL) {
         res = MINUS_ERRNO;
-        goto err2;
+        goto err1;
     }
 
     res = do_db_hl_iter_get(iter, &k, d, &dlen);
     if (res != 0) {
-        error(0, -res, "Error reading database file %s", pathname);
-        goto err3;
+        error(0, -res, "Error reading database file");
+        goto err2;
     }
 
     do_db_hl_iter_free(iter);
-
-    res = do_db_hl_close(dbctx);
-    if (res != 0) {
-        error(0, -res, "Error closing database file %s", pathname);
-        goto end;
-    }
 
     switch (k.type) {
     case TYPE_INTERNAL:
@@ -2063,24 +2013,21 @@ do_look_up_prev(const char *pathname, struct key *key, int datafd)
     if (res != 0)
         error(0, -res, "Error writing data");
 
-end:
     free(d);
+
     return res;
 
-err3:
-    free(d);
 err2:
-    do_db_hl_iter_free(iter);
+    free(d);
 err1:
-    do_db_hl_close(dbctx);
+    do_db_hl_iter_free(iter);
     return res;
 }
 
 static int
-do_delete(const char *pathname, struct key *key)
+do_delete(struct db_ctx *dbctx, struct key *key)
 {
     int err;
-    struct db_ctx *dbctx;
     struct db_key k;
 
     if (key->type == 0) {
@@ -2090,13 +2037,6 @@ do_delete(const char *pathname, struct key *key)
     if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
-    }
-
-    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        0);
-    if (err) {
-        error(0, -err, "Error opening database file %s", pathname);
-        return err;
     }
 
     switch (key->type) {
@@ -2114,68 +2054,74 @@ do_delete(const char *pathname, struct key *key)
 
     err = do_db_hl_trans_new(dbctx);
     if (err) {
-        error(0, -err, "Error deleting from database file %s", pathname);
-        goto err1;
+        error(0, -err, "Error deleting from database file");
+        goto err;
     }
 
     err = do_db_hl_delete(dbctx, &k);
     if (err) {
-        error(0, -err, "Error deleting from database file %s", pathname);
-        goto err2;
+        error(0, -err, "Error deleting from database file");
+        goto err;
     }
 
     if (k.type == TYPE_INTERNAL) {
         err = release_id(dbctx, ROOT_ID, k.id);
         if (err) {
-            error(0, -err, "Error deleting from database file %s", pathname);
-            goto err2;
+            error(0, -err, "Error deleting from database file");
+            goto err;
         }
     }
 
     err = do_db_hl_trans_commit(dbctx);
     if (err) {
-        error(0, -err, "Error deleting from database file %s", pathname);
-        goto err2;
+        error(0, -err, "Error deleting from database file");
+        goto err;
     }
 
-    err = do_db_hl_close(dbctx);
-    if (err)
-        error(0, -err, "Error closing database file %s", pathname);
+    return 0;
 
-    return err;
-
-err2:
+err:
     do_db_hl_trans_abort(dbctx);
-err1:
-    do_db_hl_close(dbctx);
     return err;
 }
 
 static int
-do_dump(const char *pathname, int datafd)
+do_dump(struct db_ctx *dbctx, int datafd)
 {
     int err;
-    struct db_ctx *dbctx;
-
-    err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
-                        1);
-    if (err) {
-        error(0, -err, "Error opening database file %s", pathname);
-        return err;
-    }
 
     err = do_db_hl_walk(dbctx, &db_walk_cb, (void *)(intptr_t)datafd);
-    if (err) {
-        error(0, -err, "Error reading database file %s", pathname);
-        do_db_hl_close(dbctx);
-        return err;
-    }
-
-    err = do_db_hl_close(dbctx);
     if (err)
-        error(0, -err, "Error closing database file %s", pathname);
+        error(0, -err, "Error reading database file");
 
     return err;
+}
+
+static int
+do_op(struct db_ctx *dbctx, enum op op, struct key *key)
+{
+    switch (op) {
+    case OP_INSERT:
+        return do_insert(dbctx, key, STDIN_FILENO);
+    case OP_UPDATE:
+        return do_update(dbctx, key, STDIN_FILENO);
+    case OP_LOOK_UP:
+        return do_look_up(dbctx, key, STDOUT_FILENO);
+    case OP_LOOK_UP_NEAREST:
+        return do_look_up_nearest(dbctx, key, STDOUT_FILENO);
+    case OP_LOOK_UP_NEXT:
+        return do_look_up_next(dbctx, key, STDOUT_FILENO);
+    case OP_LOOK_UP_PREV:
+        return do_look_up_prev(dbctx, key, STDOUT_FILENO);
+    case OP_DELETE:
+        return do_delete(dbctx, key);
+    case OP_DUMP:
+        return do_dump(dbctx, STDOUT_FILENO);
+    default:
+        break;
+    }
+
+    return -EIO;
 }
 
 int
@@ -2185,6 +2131,7 @@ main(int argc, char **argv)
     enum op op = 0;
     int ret;
     int trans = 0;
+    struct db_ctx *dbctx;
     struct key key = {.type = 0};
 
     static const char default_sock_pathname[] = DEFAULT_SOCK_PATHNAME;
@@ -2201,42 +2148,47 @@ main(int argc, char **argv)
     if (pathname == NULL)
         pathname = default_pathname;
 
-    if (trans || (op == OP_COMMIT_TRANS)) {
-        ret = do_update_trans(sock_pathname, op, &key);
-        goto end;
-    }
-
-    switch (op) {
-    case OP_INIT_TRANS:
+    if (op == OP_INIT_TRANS)
         ret = do_init_trans(sock_pathname, pathname);
-        break;
-    case OP_INSERT:
-        ret = do_insert(pathname, &key, STDIN_FILENO);
-        break;
-    case OP_UPDATE:
-        ret = do_update(pathname, &key, STDIN_FILENO);
-        break;
-    case OP_LOOK_UP:
-        ret = do_look_up(pathname, &key, STDOUT_FILENO);
-        break;
-    case OP_LOOK_UP_NEAREST:
-        ret = do_look_up_nearest(pathname, &key, STDOUT_FILENO);
-        break;
-    case OP_LOOK_UP_NEXT:
-        ret = do_look_up_next(pathname, &key, STDOUT_FILENO);
-        break;
-    case OP_LOOK_UP_PREV:
-        ret = do_look_up_prev(pathname, &key, STDOUT_FILENO);
-        break;
-    case OP_DELETE:
-        ret = do_delete(pathname, &key);
-        break;
-    case OP_DUMP:
-        ret = do_dump(pathname, STDOUT_FILENO);
-        break;
-    default:
-        error(0, 0, "Must specify operation");
-        ret = -EIO;
+    else if ((op == OP_COMMIT_TRANS) || (trans && (op != OP_DUMP)))
+        ret = do_update_trans(sock_pathname, op, &key);
+    else {
+        switch (op) {
+        case OP_INSERT:
+            ret = open_or_create(&dbctx, pathname);
+            break;
+        case OP_UPDATE:
+        case OP_DELETE:
+            ret = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key),
+                                &db_key_cmp, 0);
+            break;
+        case OP_LOOK_UP:
+        case OP_LOOK_UP_NEAREST:
+        case OP_LOOK_UP_NEXT:
+        case OP_LOOK_UP_PREV:
+        case OP_DUMP:
+            ret = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key),
+                                &db_key_cmp, 1);
+            break;
+        default:
+            error(0, 0, "Must specify operation");
+            ret = -EIO;
+            goto end;
+        }
+        if (ret != 0) {
+            error(0, -ret, "Error opening database %s", pathname);
+            goto end;
+        }
+
+        ret = do_op(dbctx, op, &key);
+        if (ret != 0) {
+            do_db_hl_close(dbctx);
+            goto end;
+        }
+
+        ret = do_db_hl_close(dbctx);
+        if (ret != 0)
+            error(0, -ret, "Error closing database %s", pathname);
     }
 
 end:
