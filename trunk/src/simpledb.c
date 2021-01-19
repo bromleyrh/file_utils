@@ -989,10 +989,8 @@ read_msg(char **msg, size_t *msglen, int sockfd)
             ret = recvmsg(sockfd, &msghdr, 0);
             if (ret > 0)
                 break;
-            if (ret == 0) {
-                err = -EIO;
-                goto end;
-            }
+            if (ret == 0)
+                continue;
             if (errno != EINTR) {
                 err = MINUS_ERRNO;
                 goto err;
@@ -1146,7 +1144,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             err = -ENAMETOOLONG;
             goto err2;
         }
-        err = write_msg(msg, len, sockfd2);
+        err = write_msg(msg, len + 1, sockfd2);
+        if (err)
+            goto err2;
+        err = write_msg(NULL, 0, sockfd2);
         if (err)
             goto err2;
 
@@ -1179,7 +1180,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             err = -ENAMETOOLONG;
             goto err2;
         }
-        err = write_msg(msg, len, sockfd2);
+        err = write_msg(msg, len + 1, sockfd2);
+        if (err)
+            goto err2;
+        err = write_msg(NULL, 0, sockfd2);
         if (err)
             goto err2;
 
@@ -1208,10 +1212,9 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         default:
             break;
         }
-        err = write_msg(msg, len, sockfd2);
+        err = write_msg(msg, len + 1, sockfd2);
         if (err)
             goto err2;
-
         err = write_msg(NULL, 0, sockfd2);
         if (err)
             goto err2;
@@ -1303,6 +1306,7 @@ static int
 do_update_trans(const char *sock_pathname, enum op op, struct key *key)
 {
     char *msg;
+    int eof;
     int err;
     int sockfd;
     size_t keylen, len;
@@ -1315,7 +1319,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
             return -EINVAL;
         }
         if (key->type == KEY_EXTERNAL) {
-            keylen = strlen(key->key);
+            keylen = strlen(key->key) + 1;
             if (keylen > KEY_MAX) {
                 error(0, 0, "Key too long");
                 return -ENAMETOOLONG;
@@ -1369,6 +1373,9 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     }
     if (err)
         goto err;
+    err = write_msg(NULL, 0, sockfd);
+    if (err)
+        goto err;
 
     err = read_msg(&msg, &len, sockfd);
     if (err)
@@ -1382,6 +1389,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     case OP_INSERT:
     case OP_UPDATE:
         /* send data */
+        eof = 0;
         for (;;) {
             char buf[4096];
             ssize_t ret;
@@ -1389,8 +1397,10 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
             for (len = 0; len < sizeof(buf); len += ret) {
                 ret = read(STDIN_FILENO, buf + len, sizeof(buf) - len);
                 if (ret < 1) {
-                    if (ret == 0)
+                    if (ret == 0) {
+                        eof = 1;
                         break;
+                    }
                     if (errno == EINTR)
                         continue;
                     err = MINUS_ERRNO;
@@ -1398,13 +1408,18 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
                 }
             }
 
+            if (len == 0)
+                break;
             err = write_msg(buf, len, sockfd);
             if (err)
                 goto err;
-
-            if (len == 0)
+            if (eof)
                 break;
+
         }
+        err = write_msg(NULL, 0, sockfd);
+        if (err)
+            goto err;
     default:
         break;
     }
@@ -2188,8 +2203,7 @@ main(int argc, char **argv)
 
     if (trans || (op == OP_COMMIT_TRANS)) {
         ret = do_update_trans(sock_pathname, op, &key);
-        if (ret != 0)
-            goto end;
+        goto end;
     }
 
     switch (op) {
