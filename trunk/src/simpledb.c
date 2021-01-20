@@ -170,16 +170,22 @@ static int process_trans(const char *, const char *, int);
 static int do_init_trans(const char *, const char *);
 static int do_update_trans(const char *, enum op, struct key *);
 
-static int do_insert(struct db_ctx *, struct key *, int);
-static int do_update(struct db_ctx *, struct key *, int);
-static int do_look_up(struct db_ctx *, struct key *, int);
-static int do_look_up_nearest(struct db_ctx *, struct key *, int);
-static int do_look_up_next(struct db_ctx *, struct key *, int);
-static int do_look_up_prev(struct db_ctx *, struct key *, int);
-static int do_delete(struct db_ctx *, struct key *);
+static int do_insert(struct db_ctx *, struct key *, void **, size_t *, int,
+                     int);
+static int do_update(struct db_ctx *, struct key *, void **, size_t *, int,
+                     int);
+static int do_look_up(struct db_ctx *, struct key *, void **, size_t *, int);
+static int do_look_up_nearest(struct db_ctx *, struct key *, void **, size_t *,
+                              int);
+static int do_look_up_next(struct db_ctx *, struct key *, void **, size_t *,
+                           int);
+static int do_look_up_prev(struct db_ctx *, struct key *, void **, size_t *,
+                           int);
+static int do_delete(struct db_ctx *, struct key *, int);
 static int do_dump(struct db_ctx *, int);
 
-static int do_op(struct db_ctx *, enum op, struct key *);
+static int do_op(struct db_ctx *, enum op, struct key *, void **, size_t *, int,
+                 int, int);
 
 static int
 get_str_arg(const char **str)
@@ -1134,7 +1140,8 @@ write_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
 static int
 process_trans(const char *sock_pathname, const char *pathname, int pipefd)
 {
-    int err;
+    char *databuf = NULL, *keybuf = NULL;
+    int err, tmp;
     int sockfd1, sockfd2;
     ssize_t ret;
     struct db_ctx *dbctx = NULL;
@@ -1172,7 +1179,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     close(pipefd);
 
     for (;;) {
-        char *buf, msg[64];
+        char *buf;
         enum op op;
         size_t len;
         struct iovec iov[2];
@@ -1190,18 +1197,6 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         iov[1].iov_base = &key.type;
         iov[1].iov_len = sizeof(key.type);
         err = read_msg_v(iov, 2, sockfd2);
-        if (err)
-            goto err2;
-
-        len = snprintf(msg, sizeof(msg), "Key type %d", key.type);
-        if (len >= (int)sizeof(msg)) {
-            err = -ENAMETOOLONG;
-            goto err2;
-        }
-        err = write_msg(msg, len + 1, sockfd2);
-        if (err)
-            goto err2;
-        err = write_msg(NULL, 0, sockfd2);
         if (err)
             goto err2;
 
@@ -1225,21 +1220,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             }
             key.id = *(uint64_t *)buf;
             free(buf);
-            len = snprintf(msg, sizeof(msg), "Key %" PRIu64, key.id);
-        } else {
-            key.key = buf; /* FIXME: avoid memory leak */
-            len = snprintf(msg, sizeof(msg), "Key \"%s\"", key.key);
-        }
-        if (len >= (int)sizeof(msg)) {
-            err = -ENAMETOOLONG;
-            goto err2;
-        }
-        err = write_msg(msg, len + 1, sockfd2);
-        if (err)
-            goto err2;
-        err = write_msg(NULL, 0, sockfd2);
-        if (err)
-            goto err2;
+        } else
+            key.key = keybuf = buf;
 
         switch (op) {
         case OP_INSERT:
@@ -1247,22 +1229,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             /* receive data */
             err = read_msg(&buf, &len, sockfd2);
             if (err)
-                goto err2;
-            if (len > 0) {
-                len = snprintf(msg, sizeof(msg), "Data \"%s\"",
-                               buf);
-                free(buf);
-                if (len >= (int)sizeof(msg)) {
-                    err = -ENAMETOOLONG;
-                    goto err2;
-                }
-            } else {
-                len = snprintf(msg, sizeof(msg), "Data \"\"");
-                if (len >= (int)sizeof(msg)) {
-                    err = -ENAMETOOLONG;
-                    goto err2;
-                }
-            }
+                goto err3;
+            databuf = buf;
         default:
             break;
         }
@@ -1277,19 +1245,57 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                                     &db_key_cmp, 0);
             }
             if (err)
-                goto err2;
+                goto err3;
+            err = do_db_hl_trans_new(dbctx);
+            if (err)
+                goto err3;
         }
 
-        err = do_op(dbctx, op, &key);
-        if (err)
-            goto err2;
+        err = do_op(dbctx, op, &key, (void **)&buf, &len, -1, -1, 1);
+        switch (-err) {
+        case 0:
+        case EADDRINUSE:
+        case EADDRNOTAVAIL:
+        case ENOENT:
+            break;
+        default:
+            goto err3;
+        }
 
-        err = write_msg(msg, len + 1, sockfd2);
+        if (keybuf != NULL) {
+            free(keybuf);
+            keybuf = NULL;
+        }
+
+        /* send error status */
+        err = write_msg((char *)&err, sizeof(err), sockfd2);
         if (err)
-            goto err2;
+            goto err3;
         err = write_msg(NULL, 0, sockfd2);
         if (err)
-            goto err2;
+            goto err3;
+
+        switch (op) {
+        case OP_LOOK_UP:
+        case OP_LOOK_UP_NEAREST:
+        case OP_LOOK_UP_NEXT:
+        case OP_LOOK_UP_PREV:
+            /* send data */
+            err = write_msg(buf, len, sockfd2);
+            free(buf);
+            if (err)
+                goto err3;
+            err = write_msg(NULL, 0, sockfd2);
+            if (err)
+                goto err3;
+        default:
+            break;
+        }
+
+        if (databuf != NULL) {
+            free(databuf);
+            databuf = NULL;
+        }
 
         if (shutdown(sockfd2, SHUT_RDWR) == -1) {
             err = MINUS_ERRNO;
@@ -1304,14 +1310,32 @@ end:
     }
     close(sockfd2);
     close(sockfd1);
-    return (dbctx == NULL) ? 0 : do_db_hl_close(dbctx);
+    if (dbctx != NULL) {
+        err = do_db_hl_trans_commit(dbctx);
+        tmp = do_db_hl_close(dbctx);
+        if (tmp != 0)
+            err = tmp;
+        return err;
+    }
+    return 0;
 
+err3:
+    if (keybuf != NULL) {
+        free(keybuf);
+        keybuf = NULL;
+    }
+    if (databuf != NULL) {
+        free(databuf);
+        databuf = NULL;
+    }
 err2:
     close(sockfd2);
 err1:
     close(sockfd1);
-    if (dbctx != NULL)
+    if (dbctx != NULL) {
+        do_db_hl_trans_abort(dbctx);
         do_db_hl_close(dbctx);
+    }
     return err;
 }
 
@@ -1383,7 +1407,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     int eof;
     int err;
     int sockfd;
-    size_t keylen, len;
+    size_t keylen = 0, len;
     struct iovec iov[2];
     struct sockaddr_un addr;
 
@@ -1427,14 +1451,6 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     if (err)
         goto err;
 
-    err = read_msg(&msg, &len, sockfd);
-    if (err)
-        goto err;
-    if (len > 0) {
-        fprintf(stderr, "%s\n", msg);
-        free(msg);
-    }
-
     if (op == OP_COMMIT_TRANS)
         goto end;
 
@@ -1450,14 +1466,6 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     err = write_msg(NULL, 0, sockfd);
     if (err)
         goto err;
-
-    err = read_msg(&msg, &len, sockfd);
-    if (err)
-        goto err;
-    if (len > 0) {
-        fprintf(stderr, "%s\n", msg);
-        free(msg);
-    }
 
     switch (op) {
     case OP_INSERT:
@@ -1498,12 +1506,36 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
         break;
     }
 
+    /* receive error status */
     err = read_msg(&msg, &len, sockfd);
     if (err)
         goto err;
-    if (len > 0) {
-        fprintf(stderr, "%s\n", msg);
+    if (len != sizeof(int)) {
         free(msg);
+        goto err;
+    }
+    err = *(int *)msg;
+    free(msg);
+    if (err) {
+        error(0, -err, "Operation returned error");
+        goto err;
+    }
+
+    switch (op) {
+    case OP_LOOK_UP:
+    case OP_LOOK_UP_NEAREST:
+    case OP_LOOK_UP_NEXT:
+    case OP_LOOK_UP_PREV:
+        /* receive data */
+        err = read_msg(&msg, &len, sockfd);
+        if (err)
+            goto err;
+        err = do_write_data(msg, len, STDOUT_FILENO);
+        free(msg);
+        if (err)
+            goto err;
+    default:
+        break;
     }
 
 end:
@@ -1516,7 +1548,8 @@ err:
 }
 
 static int
-do_insert(struct db_ctx *dbctx, struct key *key, int datafd)
+do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
+          int datafd, int notrans)
 {
     const char *d = NULL;
     int alloc_id = 0;
@@ -1533,16 +1566,23 @@ do_insert(struct db_ctx *dbctx, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    err = do_read_data(&d, &dlen, datafd);
-    if (err) {
-        error(0, -err, "Error reading data");
-        return err;
+    if (*data == NULL) {
+        err = do_read_data(&d, &dlen, datafd);
+        if (err) {
+            error(0, -err, "Error reading data");
+            return err;
+        }
+    } else {
+        d = *data;
+        dlen = *datalen;
     }
 
-    err = do_db_hl_trans_new(dbctx);
-    if (err) {
-        error(0, -err, "Error inserting into database file");
-        goto err1;
+    if (!notrans) {
+        err = do_db_hl_trans_new(dbctx);
+        if (err) {
+            error(0, -err, "Error inserting into database file");
+            goto err1;
+        }
     }
 
     switch (key->type) {
@@ -1572,13 +1612,16 @@ do_insert(struct db_ctx *dbctx, struct key *key, int datafd)
         goto err2;
     }
 
-    free((void *)d);
+    if (*data == NULL)
+        free((void *)d);
 
-    err = do_db_hl_trans_commit(dbctx);
-    if (err) {
-        error(0, -err, "Error inserting into database file");
-        do_db_hl_trans_abort(dbctx);
-        return err;
+    if (!notrans) {
+        err = do_db_hl_trans_commit(dbctx);
+        if (err) {
+            error(0, -err, "Error inserting into database file");
+            do_db_hl_trans_abort(dbctx);
+            return err;
+        }
     }
 
     if (alloc_id)
@@ -1587,14 +1630,17 @@ do_insert(struct db_ctx *dbctx, struct key *key, int datafd)
     return 0;
 
 err2:
-    do_db_hl_trans_abort(dbctx);
+    if (!notrans)
+        do_db_hl_trans_abort(dbctx);
 err1:
-    free((void *)d);
+    if (*data == NULL)
+        free((void *)d);
     return err;
 }
 
 static int
-do_update(struct db_ctx *dbctx, struct key *key, int datafd)
+do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
+          int datafd, int notrans)
 {
     const char *d = NULL;
     int err;
@@ -1610,16 +1656,23 @@ do_update(struct db_ctx *dbctx, struct key *key, int datafd)
         return -ENAMETOOLONG;
     }
 
-    err = do_read_data(&d, &dlen, datafd);
-    if (err) {
-        error(0, -err, "Error reading data");
-        return err;
+    if (*data == NULL) {
+        err = do_read_data(&d, &dlen, datafd);
+        if (err) {
+            error(0, -err, "Error reading data");
+            return err;
+        }
+    } else {
+        d = *data;
+        dlen = *datalen;
     }
 
-    err = do_db_hl_trans_new(dbctx);
-    if (err) {
-        error(0, -err, "Error inserting into database file");
-        goto err1;
+    if (!notrans) {
+        err = do_db_hl_trans_new(dbctx);
+        if (err) {
+            error(0, -err, "Error inserting into database file");
+            goto err1;
+        }
     }
 
     switch (key->type) {
@@ -1641,26 +1694,32 @@ do_update(struct db_ctx *dbctx, struct key *key, int datafd)
         goto err2;
     }
 
-    free((void *)d);
+    if (*data == NULL)
+        free((void *)d);
 
-    err = do_db_hl_trans_commit(dbctx);
-    if (err) {
-        error(0, -err, "Error updating database file");
-        do_db_hl_trans_abort(dbctx);
-        return err;
+    if (!notrans) {
+        err = do_db_hl_trans_commit(dbctx);
+        if (err) {
+            error(0, -err, "Error updating database file");
+            do_db_hl_trans_abort(dbctx);
+            return err;
+        }
     }
 
     return 0;
 
 err2:
-    do_db_hl_trans_abort(dbctx);
+    if (!notrans)
+        do_db_hl_trans_abort(dbctx);
 err1:
-    free((void *)d);
+    if (*data == NULL)
+        free((void *)d);
     return err;
 }
 
 static int
-do_look_up(struct db_ctx *dbctx, struct key *key, int datafd)
+do_look_up(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
+           int datafd)
 {
     char *d;
     int res;
@@ -1696,13 +1755,13 @@ do_look_up(struct db_ctx *dbctx, struct key *key, int datafd)
             res = -EADDRNOTAVAIL;
         } else
             error(0, -res, "Error looking up in database file");
-        goto end;
+        return res;
     }
 
     d = do_malloc(dlen);
     if (d == NULL) {
         res = MINUS_ERRNO;
-        goto end;
+        goto err;
     }
 
     res = do_db_hl_look_up(dbctx, &k, NULL, d, &dlen, 0);
@@ -1710,20 +1769,31 @@ do_look_up(struct db_ctx *dbctx, struct key *key, int datafd)
         if (res == 0)
             res = -EIO;
         error(0, -res, "Error looking up in database file");
-        goto end;
+        goto err;
     }
 
-    res = do_write_data(d, dlen, datafd);
-    if (res != 0)
-        error(0, -res, "Error writing data");
+    if (*data == NULL) {
+        res = do_write_data(d, dlen, datafd);
+        free(d);
+        if (res != 0) {
+            error(0, -res, "Error writing data");
+            return res;
+        }
+    } else {
+        *data = d;
+        *datalen = dlen;
+    }
 
-end:
+    return 0;
+
+err:
     free(d);
     return res;
 }
 
 static int
-do_look_up_nearest(struct db_ctx *dbctx, struct key *key, int datafd)
+do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
+                   size_t *datalen, int datafd)
 {
     char *d;
     int res;
@@ -1801,13 +1871,19 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, int datafd)
         abort();
     }
 
-    res = do_write_data(d, dlen, datafd);
-    if (res != 0)
-        error(0, -res, "Error writing data");
+    if (*data == NULL) {
+        res = do_write_data(d, dlen, datafd);
+        free(d);
+        if (res != 0) {
+            error(0, -res, "Error writing data");
+            return res;
+        }
+    } else {
+        *data = d;
+        *datalen = dlen;
+    }
 
-    free(d);
-
-    return res;
+    return 0;
 
 err2:
     free(d);
@@ -1817,7 +1893,8 @@ err1:
 }
 
 static int
-do_look_up_next(struct db_ctx *dbctx, struct key *key, int datafd)
+do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
+                size_t *datalen, int datafd)
 {
     char *d;
     int res;
@@ -1905,13 +1982,19 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, int datafd)
         abort();
     }
 
-    res = do_write_data(d, dlen, datafd);
-    if (res != 0)
-        error(0, -res, "Error writing data");
+    if (*data == NULL) {
+        res = do_write_data(d, dlen, datafd);
+        free(d);
+        if (res != 0) {
+            error(0, -res, "Error writing data");
+            return res;
+        }
+    } else {
+        *data = d;
+        *datalen = dlen;
+    }
 
-    free(d);
-
-    return res;
+    return 0;
 
 err2:
     free(d);
@@ -1921,7 +2004,8 @@ err1:
 }
 
 static int
-do_look_up_prev(struct db_ctx *dbctx, struct key *key, int datafd)
+do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
+                size_t *datalen, int datafd)
 {
     char *d;
     int res;
@@ -2009,13 +2093,19 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, int datafd)
         abort();
     }
 
-    res = do_write_data(d, dlen, datafd);
-    if (res != 0)
-        error(0, -res, "Error writing data");
+    if (*data == NULL) {
+        res = do_write_data(d, dlen, datafd);
+        free(d);
+        if (res != 0) {
+            error(0, -res, "Error writing data");
+            return res;
+        }
+    } else {
+        *data = d;
+        *datalen = dlen;
+    }
 
-    free(d);
-
-    return res;
+    return 0;
 
 err2:
     free(d);
@@ -2025,7 +2115,7 @@ err1:
 }
 
 static int
-do_delete(struct db_ctx *dbctx, struct key *key)
+do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
 {
     int err;
     struct db_key k;
@@ -2052,10 +2142,12 @@ do_delete(struct db_ctx *dbctx, struct key *key)
         abort();
     }
 
-    err = do_db_hl_trans_new(dbctx);
-    if (err) {
-        error(0, -err, "Error deleting from database file");
-        goto err;
+    if (!notrans) {
+        err = do_db_hl_trans_new(dbctx);
+        if (err) {
+            error(0, -err, "Error deleting from database file");
+            goto err;
+        }
     }
 
     err = do_db_hl_delete(dbctx, &k);
@@ -2072,16 +2164,19 @@ do_delete(struct db_ctx *dbctx, struct key *key)
         }
     }
 
-    err = do_db_hl_trans_commit(dbctx);
-    if (err) {
-        error(0, -err, "Error deleting from database file");
-        goto err;
+    if (!notrans) {
+        err = do_db_hl_trans_commit(dbctx);
+        if (err) {
+            error(0, -err, "Error deleting from database file");
+            goto err;
+        }
     }
 
     return 0;
 
 err:
-    do_db_hl_trans_abort(dbctx);
+    if (!notrans)
+        do_db_hl_trans_abort(dbctx);
     return err;
 }
 
@@ -2098,25 +2193,26 @@ do_dump(struct db_ctx *dbctx, int datafd)
 }
 
 static int
-do_op(struct db_ctx *dbctx, enum op op, struct key *key)
+do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **buf,
+      size_t *len, int infd, int outfd, int notrans)
 {
     switch (op) {
     case OP_INSERT:
-        return do_insert(dbctx, key, STDIN_FILENO);
+        return do_insert(dbctx, key, buf, len, infd, notrans);
     case OP_UPDATE:
-        return do_update(dbctx, key, STDIN_FILENO);
+        return do_update(dbctx, key, buf, len, infd, notrans);
     case OP_LOOK_UP:
-        return do_look_up(dbctx, key, STDOUT_FILENO);
+        return do_look_up(dbctx, key, buf, len, outfd);
     case OP_LOOK_UP_NEAREST:
-        return do_look_up_nearest(dbctx, key, STDOUT_FILENO);
+        return do_look_up_nearest(dbctx, key, buf, len, outfd);
     case OP_LOOK_UP_NEXT:
-        return do_look_up_next(dbctx, key, STDOUT_FILENO);
+        return do_look_up_next(dbctx, key, buf, len, outfd);
     case OP_LOOK_UP_PREV:
-        return do_look_up_prev(dbctx, key, STDOUT_FILENO);
+        return do_look_up_prev(dbctx, key, buf, len, outfd);
     case OP_DELETE:
-        return do_delete(dbctx, key);
+        return do_delete(dbctx, key, notrans);
     case OP_DUMP:
-        return do_dump(dbctx, STDOUT_FILENO);
+        return do_dump(dbctx, outfd);
     default:
         break;
     }
@@ -2180,7 +2276,7 @@ main(int argc, char **argv)
             goto end;
         }
 
-        ret = do_op(dbctx, op, &key);
+        ret = do_op(dbctx, op, &key, NULL, 0, STDIN_FILENO, STDOUT_FILENO, 0);
         if (ret != 0) {
             do_db_hl_close(dbctx);
             goto end;
