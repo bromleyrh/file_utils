@@ -35,6 +35,7 @@
 
 enum op {
     OP_INIT_TRANS = 1,
+    OP_ABORT_TRANS,
     OP_COMMIT_TRANS,
     OP_INSERT,
     OP_UPDATE,
@@ -205,6 +206,7 @@ print_usage(const char *prognm)
 {
     printf("Usage: %s [options]\n"
            "\n"
+           "    -a         abort transaction and close named socket\n"
            "    -c         commit transaction and close named socket\n"
            "    -d         delete specified entry\n"
            "    -f PATH    perform operation in specified database file\n"
@@ -231,21 +233,22 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
               const char **pathname, enum op *op, struct key *key, int *trans)
 {
     static const enum op ops[256] = {
-        [(unsigned char)'c']    = OP_COMMIT_TRANS,
-        [(unsigned char)'d']    = OP_DELETE,
-        [(unsigned char)'i']    = OP_INSERT,
-        [(unsigned char)'L']    = OP_LOOK_UP_NEAREST,
-        [(unsigned char)'l']    = OP_LOOK_UP,
-        [(unsigned char)'p']    = OP_LOOK_UP_PREV,
-        [(unsigned char)'s']    = OP_LOOK_UP_NEXT,
-        [(unsigned char)'T']    = OP_INIT_TRANS,
-        [(unsigned char)'u']    = OP_UPDATE,
-        [(unsigned char)'w']    = OP_DUMP
+        [(unsigned char)'a'] = OP_ABORT_TRANS,
+        [(unsigned char)'c'] = OP_COMMIT_TRANS,
+        [(unsigned char)'d'] = OP_DELETE,
+        [(unsigned char)'i'] = OP_INSERT,
+        [(unsigned char)'L'] = OP_LOOK_UP_NEAREST,
+        [(unsigned char)'l'] = OP_LOOK_UP,
+        [(unsigned char)'p'] = OP_LOOK_UP_PREV,
+        [(unsigned char)'s'] = OP_LOOK_UP_NEXT,
+        [(unsigned char)'T'] = OP_INIT_TRANS,
+        [(unsigned char)'u'] = OP_UPDATE,
+        [(unsigned char)'w'] = OP_DUMP
     };
 
     for (;;) {
         enum op operation;
-        int opt = getopt(argc, argv, "cdf:hik:Lln:psTtuw");
+        int opt = getopt(argc, argv, "acdf:hik:Lln:psTtuw");
 
         if (opt == -1)
             break;
@@ -1210,9 +1213,13 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         if (err)
             goto err4;
 
-        if (op == OP_COMMIT_TRANS) {
+        if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)) {
             if (shutdown(sockfd2, SHUT_RDWR) == -1) {
                 err = MINUS_ERRNO;
+                goto err4;
+            }
+            if (op == OP_ABORT_TRANS) {
+                err = -ECANCELED;
                 goto err4;
             }
             goto end;
@@ -1461,7 +1468,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     struct iovec iov[2];
     struct sockaddr_un addr;
 
-    if (op != OP_COMMIT_TRANS) {
+    if ((op != OP_ABORT_TRANS) && (op != OP_COMMIT_TRANS)) {
         if (key->type == 0) {
             error(0, 0, "Must specify key");
             return -EINVAL;
@@ -1494,14 +1501,14 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     /* send operation and key type */
     iov[0].iov_base = &op;
     iov[0].iov_len = sizeof(op);
-    /* FIXME: skip sending key type for OP_COMMIT_TRANS */
+    /* FIXME: skip sending key type for OP_ABORT_TRANS and OP_COMMIT_TRANS */
     iov[1].iov_base = &key->type;
     iov[1].iov_len = sizeof(key->type);
     err = write_msg_v(iov, 2, sockfd);
     if (err)
         goto err;
 
-    if (op == OP_COMMIT_TRANS)
+    if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS))
         goto end;
 
     /* send key */
@@ -2315,7 +2322,8 @@ main(int argc, char **argv)
 
     if (op == OP_INIT_TRANS)
         ret = do_init_trans(sock_pathname, pathname);
-    else if ((op == OP_COMMIT_TRANS) || (trans && (op != OP_DUMP)))
+    else if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)
+             || (trans && (op != OP_DUMP)))
         ret = do_update_trans(sock_pathname, op, &key);
     else {
         switch (op) {
