@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <error.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stddef.h>
@@ -25,6 +26,7 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -1378,7 +1380,26 @@ do_init_trans(const char *sock_pathname, const char *pathname)
         goto err1;
     }
     if (pid == 0) {
+        int fd;
+
         close(pipefd[0]);
+
+        fd = open("/dev/null", O_RDWR);
+        if (fd == -1) {
+            err = MINUS_ERRNO;
+            goto err3;
+        }
+
+        if ((dup2(fd, STDIN_FILENO) == -1)
+            || (dup2(fd, STDOUT_FILENO) == -1)
+            || (dup2(fd, STDERR_FILENO) == -1)) {
+            err = MINUS_ERRNO;
+            close(fd);
+            goto err3;
+        }
+
+        close(fd);
+
         return process_trans(sock_pathname, pathname, pipefd[1]);
     }
 
@@ -1409,6 +1430,10 @@ do_init_trans(const char *sock_pathname, const char *pathname)
     close(pipefd[0]);
 
     return 0;
+
+err3:
+    close(pipefd[1]);
+    return err;
 
 err2:
     waitpid(pid, &status, 0);
