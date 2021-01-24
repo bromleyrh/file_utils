@@ -954,12 +954,17 @@ do_read_data(const char **data, size_t *datalen, int fd)
         }
     }
 
-    tmp = do_realloc(ret, len);
-    if (tmp == NULL)
-        goto err;
-
-    *data = (const char *)tmp;
+    if (len > 0) {
+        tmp = do_realloc(ret, len);
+        if (tmp == NULL)
+            goto err;
+        *data = (const char *)tmp;
+    } else {
+        free(ret);
+        *data = NULL;
+    }
     *datalen = len;
+
     return 0;
 
 err:
