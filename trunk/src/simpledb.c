@@ -1597,7 +1597,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         return -ENAMETOOLONG;
     }
 
-    if (*data == NULL) {
+    if ((*data == NULL) && (datafd >= 0)) {
         err = do_read_data(&d, &dlen, datafd);
         if (err) {
             error(0, -err, "Error reading data");
@@ -1643,7 +1643,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         goto err2;
     }
 
-    if (*data == NULL)
+    if ((*data == NULL) && (datafd >= 0))
         free((void *)d);
 
     if (!notrans) {
@@ -1668,7 +1668,7 @@ err2:
     if (!notrans)
         do_db_hl_trans_abort(dbctx);
 err1:
-    if (*data == NULL)
+    if ((*data == NULL) && (datafd >= 0))
         free((void *)d);
     return err;
 }
@@ -1691,7 +1691,7 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         return -ENAMETOOLONG;
     }
 
-    if (*data == NULL) {
+    if ((*data == NULL) && (datafd >= 0)) {
         err = do_read_data(&d, &dlen, datafd);
         if (err) {
             error(0, -err, "Error reading data");
@@ -1729,7 +1729,7 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         goto err2;
     }
 
-    if (*data == NULL)
+    if ((*data == NULL) && (datafd >= 0))
         free((void *)d);
 
     if (!notrans) {
@@ -1747,7 +1747,7 @@ err2:
     if (!notrans)
         do_db_hl_trans_abort(dbctx);
 err1:
-    if (*data == NULL)
+    if ((*data == NULL) && (datafd >= 0))
         free((void *)d);
     return err;
 }
