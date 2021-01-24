@@ -170,8 +170,8 @@ static int process_trans(const char *, const char *, int);
 static int do_init_trans(const char *, const char *);
 static int do_update_trans(const char *, enum op, struct key *);
 
-static int do_insert(struct db_ctx *, struct key *, void **, size_t *, int,
-                     int);
+static int do_insert(struct db_ctx *, struct key *, void **, size_t *,
+                     uint64_t *, int, int);
 static int do_update(struct db_ctx *, struct key *, void **, size_t *, int,
                      int);
 static int do_look_up(struct db_ctx *, struct key *, void **, size_t *, int);
@@ -184,8 +184,8 @@ static int do_look_up_prev(struct db_ctx *, struct key *, void **, size_t *,
 static int do_delete(struct db_ctx *, struct key *, int);
 static int do_dump(struct db_ctx *, int);
 
-static int do_op(struct db_ctx *, enum op, struct key *, void **, size_t *, int,
-                 int, int);
+static int do_op(struct db_ctx *, enum op, struct key *, void **, size_t *,
+                 uint64_t *, int, int, int);
 
 static int
 get_str_arg(const char **str)
@@ -1189,6 +1189,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         size_t len;
         struct iovec iov[2];
         struct key key;
+        uint64_t id;
 
         sockfd2 = accept(sockfd1, NULL, NULL);
         if (sockfd2 == -1) {
@@ -1256,7 +1257,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                 goto err3;
         }
 
-        err = do_op(dbctx, op, &key, (void **)&buf, &len, -1, -1, 1);
+        err = do_op(dbctx, op, &key, (void **)&buf, &len, &id, -1, -1, 1);
         switch (-err) {
         case 0:
         case EADDRINUSE:
@@ -1281,6 +1282,17 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             goto err3;
 
         switch (op) {
+        case OP_INSERT:
+            if (key.type == KEY_INTERNAL) {
+                /* send allocated key */
+                err = write_msg((char *)&id, sizeof(id), sockfd2);
+                if (err)
+                    goto err3;
+                err = write_msg(NULL, 0, sockfd2);
+                if (err)
+                    goto err3;
+            }
+            break;
         case OP_LOOK_UP:
         case OP_LOOK_UP_NEAREST:
         case OP_LOOK_UP_NEXT:
@@ -1527,6 +1539,20 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     }
 
     switch (op) {
+    case OP_INSERT:
+        if (key->type == KEY_INTERNAL) {
+            /* receive allocated key */
+            err = read_msg(&msg, &len, sockfd);
+            if (err)
+                goto err;
+            if (len != sizeof(uint64_t)) {
+                free(msg);
+                goto err;
+            }
+            printf("%" PRIu64 "\n", *(uint64_t *)msg);
+            free(msg);
+        }
+        break;
     case OP_LOOK_UP:
     case OP_LOOK_UP_NEAREST:
     case OP_LOOK_UP_NEXT:
@@ -1554,7 +1580,7 @@ err:
 
 static int
 do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
-          int datafd, int notrans)
+          uint64_t *id, int datafd, int notrans)
 {
     const char *d = NULL;
     int alloc_id = 0;
@@ -1629,8 +1655,12 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         }
     }
 
-    if (alloc_id)
-        printf("%" PRIu64 "\n", k.id);
+    if (alloc_id) {
+        if (id == NULL)
+            printf("%" PRIu64 "\n", k.id);
+        else
+            *id = k.id;
+    }
 
     return 0;
 
@@ -2199,11 +2229,11 @@ do_dump(struct db_ctx *dbctx, int datafd)
 
 static int
 do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **data,
-      size_t *len, int infd, int outfd, int notrans)
+      size_t *len, uint64_t *id, int infd, int outfd, int notrans)
 {
     switch (op) {
     case OP_INSERT:
-        return do_insert(dbctx, key, data, len, infd, notrans);
+        return do_insert(dbctx, key, data, len, id, infd, notrans);
     case OP_UPDATE:
         return do_update(dbctx, key, data, len, infd, notrans);
     case OP_LOOK_UP:
@@ -2282,7 +2312,7 @@ main(int argc, char **argv)
             goto end;
         }
 
-        ret = do_op(dbctx, op, &key, (void **)&data, NULL, STDIN_FILENO,
+        ret = do_op(dbctx, op, &key, (void **)&data, NULL, NULL, STDIN_FILENO,
                     STDOUT_FILENO, 0);
         if (ret != 0) {
             do_db_hl_close(dbctx);
