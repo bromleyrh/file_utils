@@ -2198,22 +2198,22 @@ do_dump(struct db_ctx *dbctx, int datafd)
 }
 
 static int
-do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **buf,
+do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **data,
       size_t *len, int infd, int outfd, int notrans)
 {
     switch (op) {
     case OP_INSERT:
-        return do_insert(dbctx, key, buf, len, infd, notrans);
+        return do_insert(dbctx, key, data, len, infd, notrans);
     case OP_UPDATE:
-        return do_update(dbctx, key, buf, len, infd, notrans);
+        return do_update(dbctx, key, data, len, infd, notrans);
     case OP_LOOK_UP:
-        return do_look_up(dbctx, key, buf, len, outfd);
+        return do_look_up(dbctx, key, data, len, outfd);
     case OP_LOOK_UP_NEAREST:
-        return do_look_up_nearest(dbctx, key, buf, len, outfd);
+        return do_look_up_nearest(dbctx, key, data, len, outfd);
     case OP_LOOK_UP_NEXT:
-        return do_look_up_next(dbctx, key, buf, len, outfd);
+        return do_look_up_next(dbctx, key, data, len, outfd);
     case OP_LOOK_UP_PREV:
-        return do_look_up_prev(dbctx, key, buf, len, outfd);
+        return do_look_up_prev(dbctx, key, data, len, outfd);
     case OP_DELETE:
         return do_delete(dbctx, key, notrans);
     case OP_DUMP:
@@ -2228,7 +2228,7 @@ do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **buf,
 int
 main(int argc, char **argv)
 {
-    char *buf = NULL;
+    char *data = NULL;
     const char *pathname = NULL, *sock_pathname = NULL;
     enum op op = 0;
     int ret;
@@ -2282,7 +2282,7 @@ main(int argc, char **argv)
             goto end;
         }
 
-        ret = do_op(dbctx, op, &key, (void **)&buf, NULL, STDIN_FILENO,
+        ret = do_op(dbctx, op, &key, (void **)&data, NULL, STDIN_FILENO,
                     STDOUT_FILENO, 0);
         if (ret != 0) {
             do_db_hl_close(dbctx);
