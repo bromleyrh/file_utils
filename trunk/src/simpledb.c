@@ -1155,20 +1155,22 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     struct sockaddr_un addr;
 
     sockfd1 = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (sockfd1 == -1)
-        return MINUS_ERRNO;
+    if (sockfd1 == -1) {
+        err = MINUS_ERRNO;
+        goto err1;
+    }
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strlcpy(addr.sun_path, sock_pathname, sizeof(addr.sun_path));
     if (bind(sockfd1, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
         err = MINUS_ERRNO;
-        goto err1;
+        goto err2;
     }
 
     if (listen(sockfd1, 1) == -1) {
         err = MINUS_ERRNO;
-        goto err1;
+        goto err2;
     }
 
     for (;;) {
@@ -1179,7 +1181,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             break;
         if ((ret == -1) && (errno != EINTR)) {
             err = MINUS_ERRNO;
-            goto err1;
+            goto err2;
         }
     }
 
@@ -1196,7 +1198,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         sockfd2 = accept(sockfd1, NULL, NULL);
         if (sockfd2 == -1) {
             err = MINUS_ERRNO;
-            goto err1;
+            goto err3;
         }
 
         /* receive operation and key type */
@@ -1206,12 +1208,12 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         iov[1].iov_len = sizeof(key.type);
         err = read_msg_v(iov, 2, sockfd2);
         if (err)
-            goto err2;
+            goto err4;
 
         if (op == OP_COMMIT_TRANS) {
             if (shutdown(sockfd2, SHUT_RDWR) == -1) {
                 err = MINUS_ERRNO;
-                goto err2;
+                goto err4;
             }
             goto end;
         }
@@ -1219,12 +1221,12 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         /* receive key */
         err = read_msg(&buf, &len, sockfd2);
         if (err)
-            goto err2;
+            goto err3;
         if (key.type == KEY_INTERNAL) {
             if (len != sizeof(key.id)) {
                 /* FIXME: return error to client */
                 err = -EIO;
-                goto err2;
+                goto err4;
             }
             key.id = *(uint64_t *)buf;
             free(buf);
@@ -1237,7 +1239,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             /* receive data */
             err = read_msg(&buf, &len, sockfd2);
             if (err)
-                goto err3;
+                goto err5;
             databuf = buf;
         default:
             break;
@@ -1253,10 +1255,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                                     &db_key_cmp, 0);
             }
             if (err)
-                goto err3;
+                goto err5;
             err = do_db_hl_trans_new(dbctx);
             if (err)
-                goto err3;
+                goto err5;
         }
 
         err = do_op(dbctx, op, &key, (void **)&buf, &len, &id, -1, -1, 1);
@@ -1267,7 +1269,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         case ENOENT:
             break;
         default:
-            goto err3;
+            goto err5;
         }
 
         if (keybuf != NULL) {
@@ -1278,10 +1280,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         /* send error status */
         err = write_msg((char *)&err, sizeof(err), sockfd2);
         if (err)
-            goto err3;
+            goto err5;
         err = write_msg(NULL, 0, sockfd2);
         if (err)
-            goto err3;
+            goto err5;
 
         switch (op) {
         case OP_INSERT:
@@ -1289,10 +1291,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                 /* send allocated key */
                 err = write_msg((char *)&id, sizeof(id), sockfd2);
                 if (err)
-                    goto err3;
+                    goto err5;
                 err = write_msg(NULL, 0, sockfd2);
                 if (err)
-                    goto err3;
+                    goto err5;
             }
             break;
         case OP_LOOK_UP:
@@ -1303,10 +1305,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             err = write_msg(buf, len, sockfd2);
             free(buf);
             if (err)
-                goto err3;
+                goto err5;
             err = write_msg(NULL, 0, sockfd2);
             if (err)
-                goto err3;
+                goto err5;
         default:
             break;
         }
@@ -1318,14 +1320,14 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
 
         if (shutdown(sockfd2, SHUT_RDWR) == -1) {
             err = MINUS_ERRNO;
-            goto err2;
+            goto err4;
         }
     }
 
 end:
     if (shutdown(sockfd1, SHUT_RDWR) == -1) {
         err = MINUS_ERRNO;
-        goto err2;
+        goto err4;
     }
     close(sockfd2);
     close(sockfd1);
@@ -1338,7 +1340,7 @@ end:
     }
     return 0;
 
-err3:
+err5:
     if (keybuf != NULL) {
         free(keybuf);
         keybuf = NULL;
@@ -1347,14 +1349,20 @@ err3:
         free(databuf);
         databuf = NULL;
     }
-err2:
+err4:
     close(sockfd2);
-err1:
+err3:
     close(sockfd1);
     if (dbctx != NULL) {
         do_db_hl_trans_abort(dbctx);
         do_db_hl_close(dbctx);
     }
+    return err;
+
+err2:
+    close(sockfd1);
+err1:
+    close(pipefd);
     return err;
 }
 
