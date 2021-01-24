@@ -2223,6 +2223,7 @@ do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **buf,
 int
 main(int argc, char **argv)
 {
+    char *buf = NULL;
     const char *pathname = NULL, *sock_pathname = NULL;
     enum op op = 0;
     int ret;
@@ -2276,7 +2277,8 @@ main(int argc, char **argv)
             goto end;
         }
 
-        ret = do_op(dbctx, op, &key, NULL, 0, STDIN_FILENO, STDOUT_FILENO, 0);
+        ret = do_op(dbctx, op, &key, (void **)&buf, NULL, STDIN_FILENO,
+                    STDOUT_FILENO, 0);
         if (ret != 0) {
             do_db_hl_close(dbctx);
             goto end;
