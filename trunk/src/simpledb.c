@@ -89,9 +89,9 @@ enum db_obj_type {
 };
 
 struct db_key {
-    enum db_obj_type    type;
-    uint64_t            id;
-    char                key[KEY_MAX+1];
+    uint32_t    type;
+    uint64_t    id;
+    uint8_t     key[KEY_MAX+1];
 } __attribute__((packed));
 
 #define FMT_VERSION 1
@@ -321,7 +321,7 @@ db_key_cmp(const void *k1, const void *k2, void *key_ctx)
         return cmp;
 
     return (key1->type == TYPE_EXTERNAL)
-           ? strcmp(key1->key, key2->key)
+           ? strcmp((const char *)(key1->key), (const char *)(key2->key))
            : uint64_cmp(key1->id, key2->id);
 }
 
@@ -1671,7 +1671,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy(k.key, key->key, sizeof(k.key));
+        strlcpy((char *)(k.key), key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -1757,7 +1757,7 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy(k.key, key->key, sizeof(k.key));
+        strlcpy((char *)(k.key), key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -1817,7 +1817,7 @@ do_look_up(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy(k.key, key->key, sizeof(k.key));
+        strlcpy((char *)(k.key), key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -1898,7 +1898,7 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy(k.key, key->key, sizeof(k.key));
+        strlcpy((char *)(k.key), key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -1999,7 +1999,7 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy(k.key, key->key, sizeof(k.key));
+        strlcpy((char *)(k.key), key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -2110,7 +2110,7 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy(k.key, key->key, sizeof(k.key));
+        strlcpy((char *)(k.key), key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -2211,7 +2211,7 @@ do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy(k.key, key->key, sizeof(k.key));
+        strlcpy((char *)(k.key), key->key, sizeof(k.key));
         break;
     default:
         abort();
