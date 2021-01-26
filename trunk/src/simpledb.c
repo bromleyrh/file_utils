@@ -92,7 +92,7 @@ struct db_key {
     enum db_obj_type    type;
     uint64_t            id;
     char                key[KEY_MAX+1];
-};
+} __attribute__((packed));
 
 #define FMT_VERSION 1
 
