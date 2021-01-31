@@ -434,6 +434,9 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     return quit ? -EINTR : 0;
 }
 
+/*
+ * FIXME: use MINUS_ERRNO macro where appropriate
+ */
 static int
 verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
               EVP_MD_CTX *initsumctx, EVP_MD_CTX *sumctx,
@@ -575,7 +578,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     struct verif_record record_in, *p_record_in;
     struct verif_record_output record;
     struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
-    unsigned sumlen;
+    unsigned sumlen = 0;
 
     (void)dirfd;
     (void)name;
