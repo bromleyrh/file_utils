@@ -1193,6 +1193,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     for (;;) {
         char *buf = NULL;
         enum op op;
+        int nodata = 0;
         size_t len;
         struct iovec iov[2];
         struct key key;
@@ -1283,6 +1284,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             keybuf = (char *)(key.key);
 
         /* send error status */
+        if (err)
+            nodata = 1;
         err = write_msg((char *)&err, sizeof(err), sockfd2);
         if (err)
             goto err5;
@@ -1290,46 +1293,48 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         if (err)
             goto err5;
 
-        switch (op) {
-        case OP_INSERT:
-            if (key.type == KEY_INTERNAL) {
-                /* send allocated key */
-                err = write_msg((char *)&id, sizeof(id), sockfd2);
+        if (!nodata) {
+            switch (op) {
+            case OP_INSERT:
+                if (key.type == KEY_INTERNAL) {
+                    /* send allocated key */
+                    err = write_msg((char *)&id, sizeof(id), sockfd2);
+                    if (err)
+                        goto err5;
+                    err = write_msg(NULL, 0, sockfd2);
+                    if (err)
+                        goto err5;
+                }
+                break;
+            case OP_LOOK_UP_NEAREST:
+            case OP_LOOK_UP_NEXT:
+            case OP_LOOK_UP_PREV:
+                /* send neighbor key */
+                if (key.type == KEY_INTERNAL)
+                    err = write_msg((char *)&key.id, sizeof(key.id), sockfd2);
+                else
+                    err = write_msg((char *)(key.key), strlen(key.key) + 1,
+                                    sockfd2);
                 if (err)
                     goto err5;
                 err = write_msg(NULL, 0, sockfd2);
                 if (err)
                     goto err5;
-            }
-            break;
-        case OP_LOOK_UP_NEAREST:
-        case OP_LOOK_UP_NEXT:
-        case OP_LOOK_UP_PREV:
-            /* send neighbor key */
-            if (key.type == KEY_INTERNAL)
-                err = write_msg((char *)&key.id, sizeof(key.id), sockfd2);
-            else
-                err = write_msg((char *)(key.key), strlen(key.key) + 1,
-                                sockfd2);
-            if (err)
-                goto err5;
-            err = write_msg(NULL, 0, sockfd2);
-            if (err)
-                goto err5;
-            /* fallthrough */
-        case OP_LOOK_UP:
-            /* send data */
-            if (len > 0) {
-                err = write_msg(buf, len, sockfd2);
-                free(buf);
+                /* fallthrough */
+            case OP_LOOK_UP:
+                /* send data */
+                if (len > 0) {
+                    err = write_msg(buf, len, sockfd2);
+                    free(buf);
+                    if (err)
+                        goto err5;
+                }
+                err = write_msg(NULL, 0, sockfd2);
                 if (err)
                     goto err5;
+            default:
+                break;
             }
-            err = write_msg(NULL, 0, sockfd2);
-            if (err)
-                goto err5;
-        default:
-            break;
         }
 
         if (keybuf != NULL) {
