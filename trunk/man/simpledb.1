@@ -1,0 +1,133 @@
+.\" simpledb.1
+.TH SIMPLEDB 1 2021-01-30 ""
+.SH NAME
+simpledb \- access or update libutil key-value database file
+.SH SYNOPSIS
+.B simpledb
+[\fIOPTION\fR]... OPERATION_WITH_OPERANDS
+.SH DESCRIPTION
+Access or update a libutil key-value database file. The allowed keys are
+arbitrary byte strings up to 255 characters in length, called external keys, and
+unsigned integer values, called internal keys, which may be automatically
+allocated. Arbitrary data of any length (including zero) are permitted. The key
+argument of an operation is specified as a command-line argument, while data are
+read from standard input or written to standard output.
+.PP
+The supported operations and their arguments are the following:
+.TP
+\fB\-a\fR [-S PATH]
+abort the transaction associated with the connection identified by the specified
+named socket, or db.socket if none is specified
+.TP
+\fB\-c\fR [-S PATH]
+commit the transaction associated with the connection identified by the
+specified named socket, or db.socket if none is specified
+.TP
+\fB\-d\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
+delete the specified entry from the database file
+.TP
+\fB\-i\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
+insert the specified key into the database file and associate the data read from
+standard input with the key, returning an error if the key is already present
+.TP
+\fB\-L\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
+look up the nearest key in the database file greater than or equal to the
+specified key, writing the associated data to standard output, and returning an
+error if no key greater than or equal to the given key is present
+.TP
+\fB\-l\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
+look up the key in the database file equal to the specified key, writing the
+associated data to standard output, and returning an error if no such key is
+present
+.TP
+\fB\-p\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
+look up the nearest key in the database file less than the specified key,
+writing the associated data to standard output, and returning an error if either
+the specified key or a key less than the specified key is not present
+.TP
+\fB\-s\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
+look up the nearest key in the database file greater than the specified key,
+writing the associated data to standard output, and returning an error if either
+the specified key or a key greater than the specified key is not present
+.TP
+\fB\-T\fR [-S PATH]
+begin a transaction and create a new connection associated with the transaction
+identified by the specified named socket, or db.socket if none is specified (the
+named socket must not exist prior to the operation)
+.TP
+\fB\-u\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
+replace the data associated with the specified key in the database file with
+the data read from standard input, returning an error if no such key is present
+.TP
+\fB\-w\fR
+output the contents of the specified database file, with each key delimited by
+a newline character and the associated data output immediately following it,
+also delimited by a newline character
+.PP
+The following options are supported:
+.TP
+\fB\-f\fR \fIPATH\fR
+access the specified database file
+.TP
+\fB\-h\fR
+output help
+.TP
+\fB\-k\fR EXTERNAL_KEY
+access the entry specified by the given external key, which is a text string up
+to 255 characters in length
+.TP
+\fB\-n\fR INTERNAL_KEY
+access the entry specified by the given internal key, which is an unsigned
+integer value, with 0 indicating that the key is to be automatically allocated
+and written to standard output after success of the operation (which must be
+insertion)
+.TP
+\fB\-S\fR PATH
+operate on the transaction associated with the connection given by the specified
+named socket, or associate a newly-created transaction with a new connection
+identified by the given named socket pathname
+.TP
+\fB\-t\fR
+perform the specified operation in the transaction identified by the specified
+named socket, or db.socket if none is specified
+.SH EXIT STATUS
+0 on success, nonzero on error
+.SH FILES
+.TP
+\fIdb.db\fR
+default database file created or accessed when \fB\-f\fR not used
+.TP
+\fIdb.socket\fR
+default named socket created or accessed when \fB\-T\fR, \fB\-t\fR, \fB\-c\fR,
+or \fB\-a\fR used and \fB\-S\fR not used
+.SH NOTES
+In order to create a new database file, an insertion operation (\fB\-i\fR) must
+be invoked to create the first entry in the database.
+.sp
+When the \fB\-T\fR operation is used, a background process in the same process
+group as the invoking process is created to handle the newly-created
+transaction, manipulated through the specified named socket (or db.socket if
+none is given). The process persists until \fB\-c\fR or \fB\-a\fR is used to
+commit or abort the transaction, respectively, or the process is terminated by a
+signal.
+.sp
+If a transaction is currently active in a specified database file, operations on
+the database file without the \fB\-t\fR option, other than \fB\-c\fR or
+\fB\-a\fR, will return an error.
+.sp
+When a new database file is created, a journal file whose name is formed by
+adding the suffix "_journal" to the pathname of the database is created in the
+same directory and with the same permissions as the database file. The purpose
+of the journal file is to help maintain the integrity of data and metadata in
+the associated database when software or hardware failures occur.
+.sp
+If a database or journal file is renamed or copied to another file system, the
+corresponding journal or database file must be moved to reside in the same
+directory, and the journal file must be given the same name as the database file
+with an "_journal" suffix added, before the database can be accessed again.
+Similarly, if a symbolic or hard link to a database file is created, then a link
+to the corresponding journal file must be created in the same directory and with
+the same name as the database file link but with "_journal" appended, before
+the database can be accessed via the new database file link.
+.SH SEE ALSO
+.BR db (3)
