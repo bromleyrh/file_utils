@@ -1191,7 +1191,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     close(pipefd);
 
     for (;;) {
-        char *buf;
+        char *buf = NULL;
         enum op op;
         size_t len;
         struct iovec iov[2];
@@ -1226,7 +1226,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         }
 
         /* receive key */
-        err = read_msg(&buf, &len, sockfd2);
+        err = read_msg(&keybuf, &len, sockfd2);
         if (err)
             goto err3;
         if (key.type == KEY_INTERNAL) {
@@ -1235,19 +1235,20 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                 err = -EIO;
                 goto err4;
             }
-            key.id = *(uint64_t *)buf;
-            free(buf);
+            key.id = *(uint64_t *)keybuf;
+            free(keybuf);
+            keybuf = NULL;
         } else
-            key.key = keybuf = buf;
+            key.key = keybuf;
 
         switch (op) {
         case OP_INSERT:
         case OP_UPDATE:
             /* receive data */
-            err = read_msg(&buf, &len, sockfd2);
+            err = read_msg(&databuf, &len, sockfd2);
             if (err)
                 goto err5;
-            databuf = buf;
+            buf = databuf;
         default:
             break;
         }
