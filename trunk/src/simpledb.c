@@ -1310,10 +1310,12 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         case OP_LOOK_UP_NEXT:
         case OP_LOOK_UP_PREV:
             /* send data */
-            err = write_msg(buf, len, sockfd2);
-            free(buf);
-            if (err)
-                goto err5;
+            if (len > 0) {
+                err = write_msg(buf, len, sockfd2);
+                free(buf);
+                if (err)
+                    goto err5;
+            }
             err = write_msg(NULL, 0, sockfd2);
             if (err)
                 goto err5;
