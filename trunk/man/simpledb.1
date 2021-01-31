@@ -112,7 +112,10 @@ group as the invoking process is created to handle the newly-created
 transaction, manipulated through the specified named socket (or db.socket if
 none is given). The process persists until \fB\-c\fR or \fB\-a\fR is used to
 commit or abort the transaction, respectively, or the process is terminated by a
-signal.
+signal. Note that if a signal is used to terminate the process, the associated
+transaction is aborted. Also note that after a transaction is committed or
+aborted, the associated named socket is shut down and cannot be reused, but is
+not unlinked (it is the responsibility of the user to remove the named socket).
 .sp
 If a transaction is currently active in a specified database file, operations on
 the database file without the \fB\-t\fR option, other than \fB\-c\fR or
