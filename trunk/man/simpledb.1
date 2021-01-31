@@ -1,5 +1,5 @@
 .\" simpledb.1
-.TH SIMPLEDB 1 2021-01-30 ""
+.TH SIMPLEDB 1 2021-01-31 ""
 .SH NAME
 simpledb \- access or update libutil key-value database file
 .SH SYNOPSIS
@@ -32,8 +32,9 @@ standard input with the key, returning an error if the key is already present
 .TP
 \fB\-L\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
 look up the nearest key in the database file greater than or equal to the
-specified key, writing the associated data to standard output, and returning an
-error if no key greater than or equal to the given key is present
+specified key, writing the nearest key delimited by a newline followed by the
+associated data to standard output, and returning an error if no key greater
+than or equal to the given key is present
 .TP
 \fB\-l\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
 look up the key in the database file equal to the specified key, writing the
@@ -42,13 +43,15 @@ present
 .TP
 \fB\-p\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
 look up the nearest key in the database file less than the specified key,
-writing the associated data to standard output, and returning an error if either
-the specified key or a key less than the specified key is not present
+writing the nearest key delimited by a newline followed by the associated data
+to standard output, and returning an error if either the specified key or a key
+less than the specified key is not present
 .TP
 \fB\-s\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
 look up the nearest key in the database file greater than the specified key,
-writing the associated data to standard output, and returning an error if either
-the specified key or a key greater than the specified key is not present
+writing the nearest key delimited by a newline followed by the associated data
+to standard output, and returning an error if either the specified key or a key
+greater than the specified key is not present
 .TP
 \fB\-T\fR [-S PATH]
 begin a transaction and create a new connection associated with the transaction

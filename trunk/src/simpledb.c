@@ -1279,11 +1279,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         default:
             goto err5;
         }
-
-        if (keybuf != NULL) {
-            free(keybuf);
-            keybuf = NULL;
-        }
+        if (key.type == KEY_EXTERNAL)
+            keybuf = (char *)(key.key);
 
         /* send error status */
         err = write_msg((char *)&err, sizeof(err), sockfd2);
@@ -1305,10 +1302,22 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                     goto err5;
             }
             break;
-        case OP_LOOK_UP:
         case OP_LOOK_UP_NEAREST:
         case OP_LOOK_UP_NEXT:
         case OP_LOOK_UP_PREV:
+            /* send neighbor key */
+            if (key.type == KEY_INTERNAL)
+                err = write_msg((char *)&key.id, sizeof(key.id), sockfd2);
+            else
+                err = write_msg((char *)(key.key), strlen(key.key) + 1,
+                                sockfd2);
+            if (err)
+                goto err5;
+            err = write_msg(NULL, 0, sockfd2);
+            if (err)
+                goto err5;
+            /* fallthrough */
+        case OP_LOOK_UP:
             /* send data */
             if (len > 0) {
                 err = write_msg(buf, len, sockfd2);
@@ -1323,6 +1332,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             break;
         }
 
+        if (keybuf != NULL) {
+            free(keybuf);
+            keybuf = NULL;
+        }
         if (databuf != NULL) {
             free(databuf);
             databuf = NULL;
@@ -1596,14 +1609,33 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
             free(msg);
         }
         break;
-    case OP_LOOK_UP:
     case OP_LOOK_UP_NEAREST:
     case OP_LOOK_UP_NEXT:
     case OP_LOOK_UP_PREV:
+        /* receive neighbor key */
+        err = read_msg(&msg, &len, sockfd);
+        if (err)
+            goto err;
+        if (key->type == KEY_INTERNAL) {
+            key->id = *(uint64_t *)msg;
+            free(msg);
+        } else {
+            free((void *)(key->key));
+            key->key = msg;
+        }
+        /* fallthrough */
+    case OP_LOOK_UP:
         /* receive data */
         err = read_msg(&msg, &len, sockfd);
         if (err)
             goto err;
+
+        if (op != OP_LOOK_UP) {
+            if (key->type == KEY_INTERNAL)
+                printf("%" PRIu64 "\n", key->id);
+            else
+                printf("%s\n", key->key);
+        }
         err = do_write_data(msg, len, STDOUT_FILENO);
         free(msg);
         if (err)
@@ -1938,18 +1970,18 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
 
     do_db_hl_iter_free(iter);
 
-    switch (k.type) {
-    case TYPE_INTERNAL:
-        printf("%" PRIu64 "\n", k.id);
-        break;
-    case TYPE_EXTERNAL:
-        printf("%s\n", k.key);
-        break;
-    default:
-        abort();
-    }
+    if ((data == NULL) && (datafd >= 0)) {
+        switch (k.type) {
+        case TYPE_INTERNAL:
+            printf("%" PRIu64 "\n", k.id);
+            break;
+        case TYPE_EXTERNAL:
+            printf("%s\n", k.key);
+            break;
+        default:
+            abort();
+        }
 
-    if (data == NULL) {
         res = do_write_data(d, dlen, datafd);
         free(d);
         if (res != 0) {
@@ -1957,6 +1989,13 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
             return res;
         }
     } else {
+        if (key->type == KEY_INTERNAL)
+            key->id = k.id;
+        else {
+            key->key = strdup((const char *)(k.key));
+            if (key->key == NULL)
+                return MINUS_ERRNO;
+        }
         *data = d;
         *datalen = dlen;
     }
@@ -2049,18 +2088,18 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
 
     do_db_hl_iter_free(iter);
 
-    switch (k.type) {
-    case TYPE_INTERNAL:
-        printf("%" PRIu64 "\n", k.id);
-        break;
-    case TYPE_EXTERNAL:
-        printf("%s\n", k.key);
-        break;
-    default:
-        abort();
-    }
+    if ((data == NULL) && (datafd >= 0)) {
+        switch (k.type) {
+        case TYPE_INTERNAL:
+            printf("%" PRIu64 "\n", k.id);
+            break;
+        case TYPE_EXTERNAL:
+            printf("%s\n", k.key);
+            break;
+        default:
+            abort();
+        }
 
-    if (data == NULL) {
         res = do_write_data(d, dlen, datafd);
         free(d);
         if (res != 0) {
@@ -2068,6 +2107,13 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
             return res;
         }
     } else {
+        if (key->type == KEY_INTERNAL)
+            key->id = k.id;
+        else {
+            key->key = strdup((const char *)(k.key));
+            if (key->key == NULL)
+                return MINUS_ERRNO;
+        }
         *data = d;
         *datalen = dlen;
     }
@@ -2160,18 +2206,18 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
 
     do_db_hl_iter_free(iter);
 
-    switch (k.type) {
-    case TYPE_INTERNAL:
-        printf("%" PRIu64 "\n", k.id);
-        break;
-    case TYPE_EXTERNAL:
-        printf("%s\n", k.key);
-        break;
-    default:
-        abort();
-    }
+    if ((data == NULL) && (datafd >= 0)) {
+        switch (k.type) {
+        case TYPE_INTERNAL:
+            printf("%" PRIu64 "\n", k.id);
+            break;
+        case TYPE_EXTERNAL:
+            printf("%s\n", k.key);
+            break;
+        default:
+            abort();
+        }
 
-    if (data == NULL) {
         res = do_write_data(d, dlen, datafd);
         free(d);
         if (res != 0) {
@@ -2179,6 +2225,13 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
             return res;
         }
     } else {
+        if (key->type == KEY_INTERNAL)
+            key->id = k.id;
+        else {
+            key->key = strdup((const char *)(k.key));
+            if (key->key == NULL)
+                return MINUS_ERRNO;
+        }
         *data = d;
         *datalen = dlen;
     }
