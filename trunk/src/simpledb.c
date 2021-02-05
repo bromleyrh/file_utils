@@ -1263,25 +1263,27 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                 err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key),
                                     &db_key_cmp, 0);
             }
-            if (err)
-                goto err5;
-            err = do_db_hl_trans_new(dbctx);
-            if (err)
-                goto err5;
+            if (!err) {
+                err = do_db_hl_trans_new(dbctx);
+                if (err)
+                    goto err5;
+            }
         }
 
-        err = do_op(dbctx, op, &key, (void **)&buf, &len, &id, -1, -1, 1);
-        switch (-err) {
-        case 0:
-        case EADDRINUSE:
-        case EADDRNOTAVAIL:
-        case ENOENT:
-            break;
-        default:
-            goto err5;
+        if (!err) {
+            err = do_op(dbctx, op, &key, (void **)&buf, &len, &id, -1, -1, 1);
+            switch (-err) {
+            case 0:
+            case EADDRINUSE:
+            case EADDRNOTAVAIL:
+            case ENOENT:
+                break;
+            default:
+                goto err5;
+            }
+            if (key.type == KEY_EXTERNAL)
+                keybuf = (char *)(key.key);
         }
-        if (key.type == KEY_EXTERNAL)
-            keybuf = (char *)(key.key);
 
         /* send error status */
         if (err)
