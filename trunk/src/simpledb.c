@@ -248,7 +248,7 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
 
     for (;;) {
         enum op operation;
-        int opt = getopt(argc, argv, "acdf:hik:Lln:psTtuw");
+        int opt = getopt(argc, argv, "acdf:hik:Lln:pS:sTtuw");
 
         if (opt == -1)
             break;
