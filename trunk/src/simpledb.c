@@ -1464,8 +1464,6 @@ do_init_trans(const char *sock_pathname, const char *pathname)
         goto err2;
     }
 
-    fputs("Transaction started\n", stderr);
-
     close(pipefd[0]);
 
     return 0;
@@ -2383,9 +2381,11 @@ main(int argc, char **argv)
     if (pathname == NULL)
         pathname = default_pathname;
 
-    if (op == OP_INIT_TRANS)
+    if (op == OP_INIT_TRANS) {
         ret = do_init_trans(sock_pathname, pathname);
-    else if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)
+        if (ret == 0)
+            fprintf(stderr, "%s: Transaction started\n", argv[0]);
+    } else if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)
              || (trans && (op != OP_DUMP)))
         ret = do_update_trans(sock_pathname, op, &key);
     else {
