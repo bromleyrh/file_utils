@@ -289,7 +289,7 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
     }
 
     if (optind != argc) {
-        fputs("Unrecognized arguments\n", stderr);
+        error(0, 0, "Unrecognized arguments");
         return -1;
     }
 
