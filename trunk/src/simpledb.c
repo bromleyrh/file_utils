@@ -1451,6 +1451,7 @@ do_init_trans(const char *sock_pathname, const char *pathname)
             break;
         if (ret == 0) {
             err = -EIO;
+            error(0, 0, "Error creating named socket %s", sock_pathname);
             goto err2;
         }
         if (errno != EINTR) {
