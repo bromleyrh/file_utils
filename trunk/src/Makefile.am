@@ -4,6 +4,8 @@
 
 ## Process this file with automake to produce Makefile.in
 
+if LINUX
+
 EXTRA_DIST += src/replicate.conf.sample src/replicate.spec \
 	src/verify.conf.sample src/verify.spec
 
@@ -119,5 +121,16 @@ src_verify_LDADD = src/libfileutil.a -lcap -lm -lmount -lrt $(backup_link) \
 	$(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ \
 	@openssl_link_dep@
 src_verify_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la
+
+else
+
+bin_PROGRAMS += src/simpledb
+
+src_simpledb_SOURCES = src/simpledb.c
+src_simpledb_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
+src_simpledb_CFLAGS = $(AM_CFLAGS)
+src_simpledb_LDADD = @libutil_link_dep@
+
+endif
 
 ## vi: set noexpandtab sw=4 ts=4:

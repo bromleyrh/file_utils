@@ -2,6 +2,8 @@
  * simpledb.c
  */
 
+#define _WITH_DPRINTF
+
 #include "util.h"
 
 #define ASSERT_MACROS
@@ -13,7 +15,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>

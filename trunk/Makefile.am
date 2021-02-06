@@ -68,6 +68,7 @@ CLEANFILES =
 include scripts/Makefile.am
 include src/Makefile.am
 
+if LINUX
 install-exec-hook:
 	ln -fs open $(bindir)/delete_input
 	chmod u+s $(bindir)/replicate $(bindir)/verify
@@ -79,5 +80,6 @@ install-exec-hook:
 	@echo "Note: The path \"$(pkgconfigdir)\" must be added to"
 	@echo "PKG_CONFIG_PATH in order to build dependent modules"
 	@echo
+endif
 
 ## vi: set noexpandtab sw=4 ts=4:

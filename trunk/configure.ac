@@ -24,10 +24,13 @@ LT_INIT([disable-static])
 
 AS_CASE(
     [$target_os],
+        [*freebsd*],
+            [platform=freebsd],
         [*linux*],
             [platform=linux],
         [AC_MSG_ERROR([unsupported platform], [1])]
 )
+AM_CONDITIONAL([LINUX], [test "x$platform" = xlinux])
 
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -113,58 +116,66 @@ AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
 )
 AC_SUBST([stack_protector])
 
-AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [libxfs=false], [
+AX_FUNC_ERROR
+
+AS_IF(
+    [test "x$platform" = xlinux],
+    [AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [libxfs=false], [
 #include <stdint.h>
 typedef int64_t off64_t;
 ])
+
+     AC_CHECK_FUNCS([syncfs])
+
+     AC_CHECK_LIB([mount], [mnt_table_uniq_fs],
+         [AC_DEFINE(
+             [HAVE_MNT_TABLE_UNIQ_FS], [1],
+             [Define if you have the 'mnt_table_uniq_fs' function.]
+          )
+         ]
+     )
+
+     AC_CHECK_LIB([crypto], [EVP_MD_CTX_new],
+         [AC_DEFINE(
+             [HAVE_EVP_MD_CTX_NEW], [1],
+             [Define if you have the 'EVP_MD_CTX_new' function.]
+          )
+         ]
+     )
+
+     AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
+
+     PKG_CHECK_MODULES([dbus], [dbus-1],
+         [dbus_cppflags=$dbus_CFLAGS
+          dbus_link_dep=$dbus_LIBS]
+     )
+     PKG_CHECK_MODULES([libjson], [libjson],
+         [libjson_cppflags=$libjson_CFLAGS
+          libjson_link_dep=$libjson_LIBS]
+     )
+     PKG_CHECK_MODULES([openssl], [openssl],
+         [openssl_cppflags=$openssl_CFLAGS
+          openssl_link_dep=$openssl_LIBS]
+     )
+
+     AC_SUBST([dbus_cppflags])
+     AC_SUBST([libjson_cppflags])
+     AC_SUBST([openssl_cppflags])
+
+     AC_SUBST([dbus_link_dep])
+     AC_SUBST([libjson_link_dep])
+     AC_SUBST([openssl_link_dep])
+    ]
+)
+
 AM_CONDITIONAL([HAVE_LIBXFS], [test x$libxfs = xtrue])
 
-AC_CHECK_FUNCS([syncfs])
-
-AC_CHECK_LIB([mount], [mnt_table_uniq_fs],
-    [AC_DEFINE(
-        [HAVE_MNT_TABLE_UNIQ_FS], [1],
-        [Define if you have the 'mnt_table_uniq_fs' function.]
-     )
-    ]
-)
-
-AC_CHECK_LIB([crypto], [EVP_MD_CTX_new],
-    [AC_DEFINE(
-        [HAVE_EVP_MD_CTX_NEW], [1],
-        [Define if you have the 'EVP_MD_CTX_new' function.]
-     )
-    ]
-)
-
-AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
-
-PKG_CHECK_MODULES([dbus], [dbus-1],
-    [dbus_cppflags=$dbus_CFLAGS
-     dbus_link_dep=$dbus_LIBS]
-)
-PKG_CHECK_MODULES([libjson], [libjson],
-    [libjson_cppflags=$libjson_CFLAGS
-     libjson_link_dep=$libjson_LIBS]
-)
 PKG_CHECK_MODULES([libutil], [libutil],
     [libutil_cppflags=$libutil_CFLAGS
      libutil_link_dep=$libutil_LIBS]
 )
-PKG_CHECK_MODULES([openssl], [openssl],
-    [openssl_cppflags=$openssl_CFLAGS
-     openssl_link_dep=$openssl_LIBS]
-)
-
-AC_SUBST([dbus_cppflags])
-AC_SUBST([libjson_cppflags])
 AC_SUBST([libutil_cppflags])
-AC_SUBST([openssl_cppflags])
-
-AC_SUBST([dbus_link_dep])
-AC_SUBST([libjson_link_dep])
 AC_SUBST([libutil_link_dep])
-AC_SUBST([openssl_link_dep])
 
 AS_IF(
     [test x$debug = xtrue],
