@@ -1701,14 +1701,14 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
     case KEY_INTERNAL:
         k.type = TYPE_INTERNAL;
         if (key->id == 0) {
-            err = get_id(dbctx, &k.id);
+            err = get_id(dbctx, &key->id);
             if (err) {
                 error(0, -err, "Error allocating ID");
                 goto err2;
             }
             alloc_id = 1;
-        } else
-            k.id = key->id;
+        }
+        k.id = key->id;
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
