@@ -1218,10 +1218,6 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             goto err4;
 
         if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)) {
-            if (shutdown(sockfd2, SHUT_RDWR) == -1) {
-                err = MINUS_ERRNO;
-                goto err4;
-            }
             if (op == OP_ABORT_TRANS) {
                 err = -ECANCELED;
                 goto err4;
@@ -1370,7 +1366,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     }
 
 end:
-    if (shutdown(sockfd1, SHUT_RDWR) == -1) {
+    if ((shutdown(sockfd2, SHUT_RDWR) == -1)
+        || (shutdown(sockfd1, SHUT_RDWR) == -1)) {
         err = MINUS_ERRNO;
         goto err4;
     }
