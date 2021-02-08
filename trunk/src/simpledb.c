@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <poll.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -1156,6 +1157,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     int sockfd1, sockfd2;
     ssize_t ret;
     struct db_ctx *dbctx = NULL;
+    struct pollfd pfd;
     struct sockaddr_un addr;
 
     sockfd1 = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -1349,10 +1351,22 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             databuf = NULL;
         }
 
+        memset(&pfd, 0, sizeof(pfd));
+        pfd.fd = sockfd2;
+        for (;;) {
+            while (poll(&pfd, 1, 0) == -1) {
+                if (errno != EINTR)
+                    goto err4;
+            }
+            if (pfd.revents & POLLHUP)
+                break;
+        }
+
         if (shutdown(sockfd2, SHUT_RDWR) == -1) {
             err = MINUS_ERRNO;
             goto err4;
         }
+        close(sockfd2);
     }
 
 end:
