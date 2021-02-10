@@ -1,5 +1,5 @@
 .\" simpledb.1
-.TH SIMPLEDB 1 2021-01-31 ""
+.TH SIMPLEDB 1 2021-02-09 ""
 .SH NAME
 simpledb \- access or update libutil key-value database file
 .SH SYNOPSIS
@@ -40,6 +40,11 @@ than or equal to the given key is present
 look up the key in the database file equal to the specified key, writing the
 associated data to standard output, and returning an error if no such key is
 present
+.TP
+\fB\-P\fR <-k EXTERNAL_KEY_PREFIX>
+output all entries with external keys having the specified prefix, with each key
+delimited by a newline character and the associated data output immediately
+following it, also delimited by a newline character
 .TP
 \fB\-p\fR <-k EXTERNAL_KEY>|<-n INTERNAL_KEY>
 look up the nearest key in the database file less than the specified key,

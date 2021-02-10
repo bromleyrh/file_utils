@@ -44,6 +44,7 @@ enum op {
     OP_LOOK_UP,
     OP_LOOK_UP_NEAREST,
     OP_LOOK_UP_NEXT,
+    OP_LOOK_UP_PREFIX,
     OP_LOOK_UP_PREV,
     OP_DELETE,
     OP_DUMP
@@ -184,6 +185,7 @@ static int do_look_up_nearest(struct db_ctx *, struct key *, void **, size_t *,
                               int);
 static int do_look_up_next(struct db_ctx *, struct key *, void **, size_t *,
                            int);
+static int do_look_up_prefix(struct db_ctx *, struct key *, int);
 static int do_look_up_prev(struct db_ctx *, struct key *, void **, size_t *,
                            int);
 static int do_delete(struct db_ctx *, struct key *, int);
@@ -219,6 +221,8 @@ print_usage(const char *prognm)
            "given key\n"
            "    -l         look up specified entry\n"
            "    -n INTEGER operate on entry specified by given internal key\n"
+           "    -P         output all entries with external keys having the "
+           "specified prefix\n"
            "    -p         look up nearest entry less than given existing key\n"
            "    -S PATH    use specified named socket\n"
            "    -s         look up nearest entry greater than given existing "
@@ -241,6 +245,7 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
         [(unsigned char)'i'] = OP_INSERT,
         [(unsigned char)'L'] = OP_LOOK_UP_NEAREST,
         [(unsigned char)'l'] = OP_LOOK_UP,
+        [(unsigned char)'P'] = OP_LOOK_UP_PREFIX,
         [(unsigned char)'p'] = OP_LOOK_UP_PREV,
         [(unsigned char)'s'] = OP_LOOK_UP_NEXT,
         [(unsigned char)'T'] = OP_INIT_TRANS,
@@ -250,7 +255,7 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
 
     for (;;) {
         enum op operation;
-        int opt = getopt(argc, argv, "acdf:hik:Lln:pS:sTtuw");
+        int opt = getopt(argc, argv, "acdf:hik:Lln:PpS:sTtuw");
 
         if (opt == -1)
             break;
@@ -2146,6 +2151,84 @@ err1:
 }
 
 static int
+do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
+{
+    char *d;
+    int res;
+    size_t dlen;
+    size_t keylen;
+    struct db_iter *iter;
+    struct db_key k;
+
+    if (key->type != KEY_EXTERNAL) {
+        error(0, 0, "Must specify external key prefix");
+        return -EINVAL;
+    }
+
+    res = do_db_hl_iter_new(&iter, dbctx);
+    if (res != 0) {
+        error(0, -res, "Error reading database file");
+        return res;
+    }
+
+    k.type = TYPE_EXTERNAL;
+    strlcpy((char *)(k.key), key->key, sizeof(k.key));
+    res = do_db_hl_iter_search(iter, &k);
+    if (res < 0) {
+        error(0, -res, "Error reading database file");
+        goto err1;
+    }
+
+    keylen = strlen(key->key);
+    for (;;) {
+        res = do_db_hl_iter_get(iter, &k, NULL, &dlen);
+        if (res != 0)
+            goto err1;
+
+        if (strncmp(key->key, (const char *)(k.key), keylen) != 0)
+            break;
+
+        d = do_malloc(dlen);
+        if (d == NULL) {
+            res = MINUS_ERRNO;
+            goto err1;
+        }
+
+        res = do_db_hl_iter_get(iter, &k, d, &dlen);
+        if (res != 0)
+            goto err1;
+
+        res = dprintf(datafd, "%s\n", k.key);
+        if (res == -1) {
+            res = MINUS_ERRNO;
+            goto err2;
+        }
+
+        res = do_write_data(d, dlen, datafd);
+        free(d);
+        if (res != 0)
+            goto err1;
+
+        res = do_db_hl_iter_next(iter);
+        if (res != 0) {
+            if (res != -ENOENT)
+                goto err1;
+            break;
+        }
+    }
+
+    do_db_hl_iter_free(iter);
+
+    return 0;
+
+err2:
+    free(d);
+err1:
+    do_db_hl_iter_free(iter);
+    return res;
+}
+
+static int
 do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
                 size_t *datalen, int datafd)
 {
@@ -2356,6 +2439,8 @@ do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **data,
         return do_look_up_nearest(dbctx, key, data, len, outfd);
     case OP_LOOK_UP_NEXT:
         return do_look_up_next(dbctx, key, data, len, outfd);
+    case OP_LOOK_UP_PREFIX:
+        return do_look_up_prefix(dbctx, key, outfd);
     case OP_LOOK_UP_PREV:
         return do_look_up_prev(dbctx, key, data, len, outfd);
     case OP_DELETE:
@@ -2398,7 +2483,7 @@ main(int argc, char **argv)
         if (ret == 0)
             fprintf(stderr, "%s: Transaction started\n", argv[0]);
     } else if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)
-             || (trans && (op != OP_DUMP)))
+             || (trans && (op != OP_LOOK_UP_PREFIX) && (op != OP_DUMP)))
         ret = do_update_trans(sock_pathname, op, &key);
     else {
         switch (op) {
@@ -2413,6 +2498,7 @@ main(int argc, char **argv)
         case OP_LOOK_UP:
         case OP_LOOK_UP_NEAREST:
         case OP_LOOK_UP_NEXT:
+        case OP_LOOK_UP_PREFIX:
         case OP_LOOK_UP_PREV:
         case OP_DUMP:
             ret = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key),
