@@ -18,5 +18,5 @@ for f in $excl; do
     fi
 done
 
-find "$rootdir" \( \( "$exclexpr" \) -prune \) \
+exec find "$rootdir" \( \( "$exclexpr" \) -prune \) \
     -o \( -type f -exec chmod -w '{}' \; \)
