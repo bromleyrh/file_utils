@@ -15,7 +15,7 @@ set -e
 get_branches
 
 for b in $branches; do
-    [ "$b" = "master" ] && continue
+    test "$b" = "master" && continue
     git rebase --force master "$b"
 done
 

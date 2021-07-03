@@ -33,7 +33,7 @@ vfile=$trunkdir/.version
 
 version=$(cat "$vfile")
 
-[ $ignore_errors -eq 1 ] && set +e
+test $ignore_errors -eq 1 && set +e
 
 if [ $force -eq 1 ]; then
 	git push "$remote" ":v$version"

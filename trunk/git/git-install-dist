@@ -112,7 +112,7 @@ cmd=$(echo "$0" | cut -d '-' -f 4-)
 if [ "$cmd" = "cmdpre" ] || [ "$cmd" = "cmdpost" ]; then
     command=
     eval command="\$$cmd"
-    [ -z "$command" ] && exit 0
+    test -z "$command" && exit 0
     echo "Running \"$command\""
     sh -c "$command"
     exit $?

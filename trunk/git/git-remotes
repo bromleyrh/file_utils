@@ -29,5 +29,5 @@ for rmt in $remotes_excl; do
 done
 
 for rmt in $remotes; do
-    [[ ${remote_set[$rmt]} -eq 1 ]] && echo "$rmt"
+    test ${remote_set[$rmt]} -eq 1 && echo "$rmt"
 done

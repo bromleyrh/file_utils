@@ -3,7 +3,7 @@
 parse_cmdline()
 {
     all_branches=0
-    [[ $(basename "$0") = "git-make-bundles" ]] && all_branches=1
+    test $(basename "$0") = "git-make-bundles" && all_branches=1
 
     if [[ -z $1 ]]; then
         echo "Must specify commit ID" 1>&2
@@ -80,7 +80,7 @@ ret=0
 for b in $branches; do
     if [[ ${branch_excl_set[$b]} -ne 1 ]]; then
         bname="$reponame"
-        [[ $b != "master" ]] && bname+=".$b"
+        test $b != "master" && bname+=".$b"
         git bundle create "$bundle_path/$bname.bundle" "$commit..$b" || ret=1
     fi
 done

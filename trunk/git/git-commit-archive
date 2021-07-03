@@ -65,7 +65,7 @@ archive=$dstdir$reponame.tar.xz
 if [ $undo -eq 1 ]; then
     if [ $amend -eq 1 ]; then
         git reset HEAD^ "$archive"
-        [ $sign -eq 1 ] && git reset HEAD^ "$archive.asc"
+        test $sign -eq 1 && git reset HEAD^ "$archive.asc"
         git commit --amend --no-edit
         git checkout "$archive" "$archive.asc"
     else

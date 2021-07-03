@@ -2,7 +2,7 @@
 
 do_exit()
 {
-    [ "$sign" -ne 1 ] || [ "$agent" -ne 1 ] || killall gpg-agent
+    test "$sign" -ne 1 || test "$agent" -ne 1 || killall gpg-agent
     exit "$1"
 }
 
@@ -54,7 +54,7 @@ done
 
 vfile=$trunkdir/.version
 
-[ $sign -eq 1 ] && commitarchopts="-s"
+test $sign -eq 1 && commitarchopts="-s"
 
 if [ $undo -eq 1 ]; then
     git set-version -d "$trunkdir" -tu
@@ -65,17 +65,17 @@ if [ $undo -eq 1 ]; then
     exit
 fi
 
-[ $automake -eq 1 ] && commitarchopts="$commitarchopts -m"
+test $automake -eq 1 && commitarchopts="$commitarchopts -m"
 
 if [ $sign -eq 1 ]; then
     setversopts="-s"
-    [ $agent -eq 1 ] && gpg-agent --daemon --use-standard-socket
+    test $agent -eq 1 && gpg-agent --daemon --use-standard-socket
 fi
 
 version=$(cat "$vfile")
 ret=$?
 if [ $inc -eq 1 ]; then
-    [ $ret -eq 0 ] || exit 1
+    test $ret -eq 0 || exit 1
     maj=$(echo "$version" | cut -d . -f 1)
     min=$(echo "$version" | cut -d . -f 2)
     version=$maj.$((min+1))

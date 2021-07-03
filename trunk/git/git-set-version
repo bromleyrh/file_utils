@@ -65,7 +65,7 @@ if [ -z "$version" ]; then
 fi
 
 args="\"-m\" \"Version $version\""
-[ $sign -eq 1 ] && args="$args -s"
+test $sign -eq 1 && args="$args -s"
 eval "set -- $args"
 
 if [ $tagonly -eq 0 ]; then
