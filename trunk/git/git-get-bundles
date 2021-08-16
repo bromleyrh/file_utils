@@ -34,15 +34,15 @@ get_bundles "$bundle_path"
 for b in $bundles; do
     f=$(basename "$b")
     if [ "$f" = "$reponame.bundle" ]; then
-        echo "Importing bundle $f" 1>&2
+        echo "Importing bundle $f" >&2
         mv "$b" "$rootdir/../.$f"
         git fetch bundle
     else
-        echo "Importing branch bundle $f" 1>&2
+        echo "Importing branch bundle $f" >&2
         mv "$b" "$rootdir/.."
         bname=$(echo "$f" | cut -d '.' -f 2)
         test -n "$bname"
-        echo "Creating remote bundle_$bname" 1>&2
+        echo "Creating remote bundle_$bname" >&2
         git remote add "bundle_$bname" "../$f"
         git fetch "bundle_$bname"
     fi

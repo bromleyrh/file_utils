@@ -22,7 +22,7 @@ while true; do
 done
 
 if [ -z "$1" ]; then
-	echo "Must specify remote" 1>&2
+	echo "Must specify remote" >&2
 	exit 1
 fi
 remote="$1"

@@ -4,18 +4,18 @@ do_make_dist()
 {
     cd "$1"
 
-    echo "Generating \"configure\" script" 1>&2
+    echo "Generating \"configure\" script" >&2
     autoreconf -v
 
     echo "Generating temporary makefiles containing archive creation recipe" \
-        1>&2
+        >&2
     ./configure --disable-dependency-tracking
 
-    echo "Generating archive" 1>&2
+    echo "Generating archive" >&2
     make dist-xz
     mv -- *.xz "../$archive"
 
-    echo "Cleaning temporary files" 1>&2
+    echo "Cleaning temporary files" >&2
     make distclean
     git clean -fx
     rm -frv autom4te.cache
@@ -26,7 +26,7 @@ do_make_dist()
 set -e
 
 if [ ! -d .git ] && [ ! -f .git ]; then
-    echo "Current directory is not root of a Git repository" 1>&2
+    echo "Current directory is not root of a Git repository" >&2
     exit 1
 fi
 reponame=$(basename "$(pwd)")

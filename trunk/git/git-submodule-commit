@@ -34,7 +34,7 @@ get_commit_message()
 }
 
 if ! declare -A excluded_submodules 2>/dev/null; then
-    echo "bash version 4.0 or greater is required" 1>&2
+    echo "bash version 4.0 or greater is required" >&2
     exit 1
 fi
 declare -a submodules

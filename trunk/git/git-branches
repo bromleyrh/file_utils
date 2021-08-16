@@ -33,13 +33,13 @@ do_sync_branch()
         cmd="git branch -f --no-track $1 $2"
     fi
 
-    eval echo "\"Running \\\"$cmd\\\"\"" 1>&2
+    eval echo "\"Running \\\"$cmd\\\"\"" >&2
 
     if [[ $force -ne 1 ]]; then
         confirm_cmd
         res=$?
         if [[ $res -ne 1 ]]; then
-            echo "Branch $b not reset" 1>&2
+            echo "Branch $b not reset" >&2
             test $res -eq 2 && return 1
             return 0
         fi
@@ -75,7 +75,7 @@ sync_with_bundles()
 }
 
 if ! declare -A branch_excl_set 2>/dev/null; then
-    echo "bash version 4.0 or greater is required" 1>&2
+    echo "bash version 4.0 or greater is required" >&2
     exit 1
 fi
 

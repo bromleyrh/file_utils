@@ -53,7 +53,7 @@ apply_patches()
 
         if [ -d "$patchdir" ]; then
             for i in "$patchdir"/*; do
-                echo "Applying patch $i to $1" 1>&2
+                echo "Applying patch $i to $1" >&2
                 patch -p 2 <"$i"
             done
             autoreconf -fv

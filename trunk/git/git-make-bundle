@@ -6,7 +6,7 @@ parse_cmdline()
     test $(basename "$0") = "git-make-bundles" && all_branches=1
 
     if [[ -z $1 ]]; then
-        echo "Must specify commit ID" 1>&2
+        echo "Must specify commit ID" >&2
         return 1
     fi
     commit=$1
@@ -55,7 +55,7 @@ get_bundle_path()
 }
 
 if ! declare -A branch_excl_set 2>/dev/null; then
-    echo "bash version 4.0 or greater is required" 1>&2
+    echo "bash version 4.0 or greater is required" >&2
     exit 1
 fi
 
