@@ -57,4 +57,4 @@ touch "$distdir/${reponame}.tar.xz"
 touch "$distdir/${reponame}.tar.xz.asc"
 
 eval "set -- $args"
-git prepare "$@"
+exec git prepare "$@"
