@@ -373,6 +373,8 @@ read_transfers_opt(json_val_t opt, void *data)
          NULL, TRANSFER_PARAM(format_cmd)},
         {L"force_write", JSON_TYPE_BOOLEAN, 0, 0, 1, NULL, NULL, NULL,
          TRANSFER_PARAM(force_write)},
+        {L"hook", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
+         TRANSFER_PARAM(hook)},
         {L"setro", JSON_TYPE_BOOLEAN, 0, 0, 1, NULL, NULL, NULL,
          TRANSFER_PARAM(setro)}
     };

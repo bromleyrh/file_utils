@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <fenv.h>
 #include <grp.h>
+#include <limits.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -30,6 +31,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/vfs.h>
+#include <sys/wait.h>
 
 struct copy_ctx {
     struct timespec starttm;
@@ -41,6 +43,9 @@ struct copy_ctx {
     ino_t           lastino;
     uint64_t        filesprocessed;
     const char      *lastpath;
+    const char      *hookbin;
+    int             hookfd;
+    mode_t          hookumask;
 };
 
 volatile sig_atomic_t quit;
@@ -51,6 +56,11 @@ static int getsgids(gid_t **);
 static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
 static int broadcast_progress(DBusConnection *, double);
+
+static int execute_hook(int, const char *, const char *, mode_t);
+
+static int do_execute_hook(struct copy_ctx *, const char *);
+
 static int copy_cb(int, int, const char *, const char *, struct stat *, int,
                    void *);
 
@@ -159,10 +169,63 @@ err1:
 }
 
 static int
+execute_hook(int fd, const char *bin, const char *path, mode_t mask)
+{
+    int err, status;
+    pid_t pid;
+
+    pid = fork();
+    if (pid == 0) {
+        char arg0[PATH_MAX], arg1[PATH_MAX];
+        char *argv[3];
+        extern char **environ;
+
+        umask(mask);
+
+        strlcpy(arg0, bin, sizeof(arg0));
+        strlcpy(arg1, path, sizeof(arg1));
+        argv[0] = arg0;
+        argv[1] = arg1;
+        argv[2] = NULL;
+
+        fexecve(fd, argv, environ);
+        error(0, errno, "Error executing %s", bin);
+        exit(EXIT_FAILURE);
+        return -EIO;
+    }
+    if (pid == -1)
+        return -errno;
+
+    if (waitpid(pid, &status, 0) == -1) {
+        err = -errno;
+        goto err;
+    }
+    if (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
+        err = -EIO;
+        goto err;
+    }
+
+    return 0;
+
+err:
+    error(0, -err, "Error executing %s", bin);
+    return err;
+}
+
+static int
+do_execute_hook(struct copy_ctx *cctx, const char *path)
+{
+    return (cctx->hookfd == -1)
+           ? 0
+           : execute_hook(cctx->hookfd, cctx->hookbin, path, cctx->hookumask);
+}
+
+static int
 copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         int flags, void *ctx)
 {
     double pcnt;
+    int ret;
     int new_file;
     struct copy_ctx *cctx;
     struct dir_copy_ctx *dcpctx = (struct dir_copy_ctx *)ctx;
@@ -178,37 +241,46 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
     if (new_file)
         ++(cctx->filesprocessed);
 
-    if (dcpctx->off >= 0) {
-        if (new_file) {
-            if (cctx->lastpath != NULL) {
-                if (debug)
-                    fprintf(stderr, " (copied %s)\n", cctx->lastpath);
-                free((void *)(cctx->lastpath));
-            }
-            cctx->bytescopied += dcpctx->off;
-            cctx->lastdev = s->st_dev;
-            cctx->lastino = s->st_ino;
-            cctx->lastpath = strdup(path);
-        } else
-            cctx->bytescopied += dcpctx->off - cctx->lastoff;
-        cctx->lastoff = dcpctx->off;
-
-        pcnt = (double)100 * cctx->bytescopied / cctx->fsbytesused;
-        if (debug) {
-            double throughput;
-            struct timespec curtm, difftm;
-
-            clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
-            timespec_diff(&curtm, &cctx->starttm, &difftm);
-            throughput = cctx->bytescopied
-                         / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
-                         / (1024 * 1024);
-            fprintf(stderr, "\rProgress: %.6f%% (%11.6f MiB/s)", pcnt,
-                    throughput);
-        }
-        broadcast_progress(cctx->busconn, pcnt);
+    if (dcpctx->off < 0) {
+        ret = do_execute_hook(cctx, path);
+        if (ret)
+            return ret;
+        goto end;
     }
 
+    if (new_file) {
+        if (cctx->lastpath != NULL) {
+            ret = do_execute_hook(cctx, cctx->lastpath);
+            if (ret)
+                return ret;
+            if (debug)
+                fprintf(stderr, " (copied %s)\n", cctx->lastpath);
+            free((void *)(cctx->lastpath));
+        }
+        cctx->bytescopied += dcpctx->off;
+        cctx->lastdev = s->st_dev;
+        cctx->lastino = s->st_ino;
+        cctx->lastpath = strdup(path);
+    } else
+        cctx->bytescopied += dcpctx->off - cctx->lastoff;
+    cctx->lastoff = dcpctx->off;
+
+    pcnt = (double)100 * cctx->bytescopied / cctx->fsbytesused;
+    if (debug) {
+        double throughput;
+        struct timespec curtm, difftm;
+
+        clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
+        timespec_diff(&curtm, &cctx->starttm, &difftm);
+        throughput = cctx->bytescopied
+                     / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
+                     / (1024 * 1024);
+        fprintf(stderr, "\rProgress: %.6f%% (%11.6f MiB/s)", pcnt,
+                throughput);
+    }
+    broadcast_progress(cctx->busconn, pcnt);
+
+end:
     return quit ? -EINTR : 0;
 }
 
@@ -235,13 +307,15 @@ copy_fn(void *arg)
     cctx.lastino = 0;
     cctx.filesprocessed = 0;
     cctx.lastpath = NULL;
+    cctx.hookbin = cargs->hookbin;
+    cctx.hookfd = cargs->hookfd;
 
     fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_PRESERVE_LINKS
          | DIR_COPY_SYNC | DIR_COPY_TMPFILE;
     if (!(cargs->keep_cache))
         fl |= DIR_COPY_DISCARD_CACHE;
 
-    umask(0);
+    cctx.hookumask = umask(0);
 
     if (debug) {
         /* disable floating-point traps from calculations for debugging

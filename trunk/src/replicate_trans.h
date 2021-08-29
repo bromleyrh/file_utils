@@ -9,6 +9,8 @@
 
 #include <unistd.h>
 
+#include <sys/types.h>
+
 struct copy_args {
     int             srcfd;
     int             dstfd;
@@ -16,6 +18,9 @@ struct copy_args {
     DBusConnection  *busconn;
     uid_t           uid;
     gid_t           gid;
+    const char      *hookbin;
+    int             hookfd;
+    mode_t          hookumask;
 };
 
 int do_copy(struct copy_args *copy_args);

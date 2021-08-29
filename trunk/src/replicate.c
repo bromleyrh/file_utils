@@ -612,11 +612,23 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
 
+        if (transfer->hook != NULL) {
+            ca.hookfd = open(transfer->hook, O_NONBLOCK | O_RDONLY);
+            if (ca.hookfd == -1) {
+                err = -errno;
+                error(0, -err, "Error opening hook binary %s", transfer->hook);
+                return err;
+            }
+            ca.hookbin = transfer->hook;
+        } else
+            ca.hookfd = -1;
+
         ca.srcfd = mount_file_system(NULL, transfer->srcpath,
                                      transfer->srcmntopts, MNT_FS_READ);
         if (ca.srcfd < 0) {
-            error(0, -ca.srcfd, "Error mounting %s", transfer->srcpath);
-            return ca.srcfd;
+            err = ca.srcfd;
+            error(0, -err, "Error mounting %s", transfer->srcpath);
+            goto err1;
         }
 
         if (transfer->setro) {
@@ -624,7 +636,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             if (err) {
                 error(0, 0, "Error setting block device read-only flag for %s",
                       transfer->dstpath);
-                goto err1;
+                goto err2;
             }
         }
 
@@ -633,7 +645,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         if (err) {
             if (err > 0)
                 error(0, 0, "Formatting command returned status %d", err);
-            goto err2;
+            goto err3;
         }
 
         ca.dstfd = mount_file_system(transfer->dstpath, transfer->dstmntpath,
@@ -649,7 +661,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
                 error(0, 0, "%s must match replicate configuration",
                       transfer->dstmntpath);
             }
-            goto err2;
+            goto err3;
         }
 
         /* change ownership of destination root directory if needed */
@@ -657,7 +669,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             err = -errno;
             error(0, errno, "Error changing ownership of %s",
                   transfer->dstmntpath);
-            goto err3;
+            goto err4;
         }
 
         nfilesproc = 0;
@@ -665,7 +677,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         if (err) {
             error(0, -err, "Error copying from %s to %s", transfer->srcpath,
                   transfer->dstmntpath);
-            goto err3;
+            goto err4;
         }
         if (nfilesproc < 2) {
             fprintf(stderr, "No files processed in %s: if not expected, check "
@@ -679,7 +691,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         err = unmount_file_system(transfer->dstmntpath, ca.dstfd);
         if (err) {
             error(0, -err, "Error unmounting %s", transfer->dstmntpath);
-            goto err2;
+            goto err3;
         }
 
         if (transfer->setro) {
@@ -688,15 +700,18 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
                 error(0, -err, "Error setting block device read-only flag for "
                                "%s",
                       transfer->dstpath);
-                goto err1;
+                goto err2;
             }
         }
 
         err = unmount_file_system(transfer->srcpath, ca.srcfd);
         if (err) {
             error(0, -err, "Error unmounting %s", transfer->srcpath);
-            return err;
+            goto err1;
         }
+
+        if (ca.hookfd != -1)
+            close(ca.hookfd);
 
         log_print(LOG_INFO, "Finished transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
@@ -708,13 +723,16 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
 
     return 0;
 
-err3:
+err4:
     unmount_file_system(transfer->dstmntpath, ca.dstfd);
-err2:
+err3:
     if (transfer->setro)
         blkdev_set_read_only(transfer->dstpath, 1, NULL);
-err1:
+err2:
     unmount_file_system(transfer->srcpath, ca.srcfd);
+err1:
+    if (ca.hookfd != -1)
+        close(ca.hookfd);
     return err;
 }
 
@@ -737,10 +755,12 @@ print_transfers(FILE *f, struct transfer *transfers, int num)
         }
         fprintf(f,
                 "\tDestination device path: %s\n"
-                "\tDestination formatting command: \"%s\"\n"
-                "\tSet block device read-only flag: %d\n",
+                "\tDestination formatting command: \"%s\"\n",
                 transfer->dstpath,
-                transfer->format_cmd,
+                transfer->format_cmd);
+        if (transfer->hook != NULL)
+            fprintf(f, "\tHook binary: \"%s\"\n", transfer->hook);
+        fprintf(f, "\tSet block device read-only flag: %d\n",
                 !!(transfer->setro));
     }
 }

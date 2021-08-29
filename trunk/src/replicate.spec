@@ -27,6 +27,7 @@
     <transfer_dstpath>
     <transfer_format_cmd>
     <transfer_force_write?>
+    <transfer_hook?>
     <transfer_setro?>
 }
 
@@ -51,6 +52,8 @@
 <transfer_format_cmd> = "format_cmd" : <string>
 
 <transfer_force_write> = "force_write" : <Boolean>
+
+<transfer_hook> = "hook" : <string>
 
 <transfer_setro> = "setro" : <Boolean>
 

@@ -18,6 +18,7 @@ struct transfer {
     const char  *dstpath;
     const char  *dstmntpath;
     const char  *format_cmd;
+    const char  *hook;
     int         force_write;
     int         setro;
 };
