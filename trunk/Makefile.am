@@ -82,4 +82,7 @@ install-exec-hook:
 	@echo
 endif
 
+distclean-local:
+	rm -f src/replicate_fs.h
+
 ## vi: set noexpandtab sw=4 ts=4:

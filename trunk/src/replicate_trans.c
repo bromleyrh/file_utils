@@ -3,6 +3,7 @@
  */
 
 #include "replicate_common.h"
+#include "replicate_fs.h"
 #include "replicate_trans.h"
 #include "util.h"
 
@@ -27,6 +28,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <linux/magic.h>
+
 #include <sys/capability.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -50,6 +53,8 @@ struct copy_ctx {
 
 volatile sig_atomic_t quit;
 
+static int fs_supports_tmpfile(__fsword_t);
+
 static int check_protected_hard_links(void);
 
 static int getsgids(gid_t **);
@@ -65,6 +70,27 @@ static int copy_cb(int, int, const char *, const char *, struct stat *, int,
                    void *);
 
 static int copy_fn(void *);
+
+#define ENTRY(t) [LINUX_FS_TYPE_HASH(t)] = {.type = (t), .valid = 1}
+
+static int
+fs_supports_tmpfile(__fsword_t type)
+{
+    static const struct {
+        __fsword_t  type;
+        int         valid;
+    } typemap[256] = {
+#define X(type) ENTRY(type),
+        LIST_LINUX_TMPFILE_FS_TYPES()
+#undef X
+    }, *e;
+
+    e = &typemap[LINUX_FS_TYPE_HASH(type)];
+
+    return e->valid && (e->type == type);
+}
+
+#undef ENTRY
 
 static int
 check_protected_hard_links()
@@ -293,15 +319,16 @@ copy_fn(void *arg)
     int ret;
     struct copy_args *cargs = (struct copy_args *)arg;
     struct copy_ctx cctx;
-    struct statfs s;
+    struct statfs ds, ss;
 
-    if (fstatfs(cargs->srcfd, &s) == -1) {
+    if ((fstatfs(cargs->srcfd, &ss) == -1)
+        || (fstatfs(cargs->dstfd, &ds) == -1)) {
         ret = errno;
         error(0, errno, "Error getting file system statistics");
         return ret;
     }
     cctx.busconn = cargs->busconn;
-    cctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
+    cctx.fsbytesused = (ss.f_blocks - ss.f_bfree) * ss.f_frsize;
     cctx.bytescopied = 0;
     cctx.lastdev = 0;
     cctx.lastino = 0;
@@ -311,9 +338,11 @@ copy_fn(void *arg)
     cctx.hookfd = cargs->hookfd;
 
     fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_PRESERVE_LINKS
-         | DIR_COPY_SYNC | DIR_COPY_TMPFILE;
+         | DIR_COPY_SYNC;
     if (!(cargs->keep_cache))
         fl |= DIR_COPY_DISCARD_CACHE;
+    if (fs_supports_tmpfile(ds.f_type))
+        fl |= DIR_COPY_TMPFILE;
 
     cctx.hookumask = umask(0);
 

@@ -118,12 +118,46 @@ AC_SUBST([stack_protector])
 
 AX_FUNC_ERROR
 
+cat >src/replicate_fs.h <<EOF
+#define LIST_LINUX_TMPFILE_FS_TYPES(type)
+#define LINUX_FS_TYPE_HASH(type) 0
+EOF
+
 AS_IF(
     [test "x$platform" = xlinux],
     [AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [libxfs=false], [
 #include <stdint.h>
 typedef int64_t off64_t;
 ])
+     AC_CHECK_HEADERS([linux/magic.h])
+
+     AS_IF([test "x$ac_cv_header_linux_magic_h" = "xyes"],
+           [m4_define([linux_tmpfile_fs_types], [BTRFS EXT4 F2FS XFS])
+            m4_define([linux_tmpfile_fs_type_hash], [(type >> 8) & 0xff])
+
+            m4_foreach_w(i, linux_tmpfile_fs_types, [AX_LINUX_MAGIC(i)])
+
+            printf "" >src/replicate_fs.h
+            exec 9>>src/replicate_fs.h
+            cat >&9 <<'EOF'
+#include <linux/magic.h>
+
+#define LIST_LINUX_TMPFILE_FS_TYPES(type) \
+EOF
+            for i in linux_tmpfile_fs_types; do
+                eval "fs=\$ax_cv_linux_${i}_super_magic"
+                AS_IF([test $fs = yes],
+                      [printf '    X(type %s) \\\n' ${i}_SUPER_MAGIC >&9]
+                     )
+            done
+            hash_expr="linux_tmpfile_fs_type_hash"
+            cat >&9 <<EOF
+
+#define LINUX_FS_TYPE_HASH(type) ($hash_expr)
+EOF
+            exec 9>&-
+           ]
+          )
 
      AC_CHECK_FUNCS([syncfs])
 
