@@ -97,8 +97,9 @@ src_replicate_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \
 	@libutil_cppflags@ $(trace_cppflags)
 src_replicate_CFLAGS = $(AM_CFLAGS)
-src_replicate_LDADD = src/libfileutil.a -lcap -lm -lmount $(backup_link) \
-	$(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@
+src_replicate_LDADD = src/libfileutil.a -lcap -lm -lmount -lpthread \
+	$(backup_link) $(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ \
+	@libutil_link_dep@
 src_replicate_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la
 
 src_simpledb_SOURCES = src/simpledb.c

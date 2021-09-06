@@ -62,6 +62,8 @@ gid_t rgid;
 
 uint64_t nfilesproc;
 
+static volatile sig_atomic_t end;
+
 static int enable_debugging_features(int);
 
 static int set_capabilities(void);
@@ -74,6 +76,10 @@ static int parse_cmdline(int, char **, const char **, int *);
 static int get_conf_path(const char *, const char **);
 
 static void int_handler(int);
+static void end_handler(int);
+static void end_cancel_handler(int);
+
+static int get_end_sigmask(sigset_t *);
 
 static int set_signal_handlers(void);
 
@@ -378,9 +384,55 @@ int_handler(int signum)
     quit = 1;
 }
 
+static void
+end_handler(int signum)
+{
+    ssize_t ret;
+
+    static const char buf[] = "\nStopping after current transfer\n";
+
+    (void)signum;
+
+    if (end == 0) {
+        /* flag checked in do_transfers() */
+        end = 1;
+    }
+
+    ret = write(STDERR_FILENO, buf, sizeof(buf) - 1);
+    (void)ret;
+}
+
+static void
+end_cancel_handler(int signum)
+{
+    ssize_t ret;
+
+    static const char buf[] = "\nNot stopping after current transfer\n";
+
+    (void)signum;
+
+    if (end != -1) {
+        if (end == 1) {
+            /* flag checked in do_transfers() */
+            end = 0;
+        }
+        ret = write(STDERR_FILENO, buf, sizeof(buf) - 1);
+        (void)ret;
+    }
+}
+
+static int
+get_end_sigmask(sigset_t *set)
+{
+    return ((sigemptyset(set) == 0) && (sigaddset(set, SIGUSR1) == 0)
+            && (sigaddset(set, SIGUSR2) == 0))
+           ? 0 : -errno;
+}
+
 static int
 set_signal_handlers()
 {
+    int err;
     size_t i;
     struct sigaction sa;
 
@@ -394,6 +446,18 @@ set_signal_handlers()
         if (sigaction(intsignals[i], &sa, NULL) == -1)
             return -errno;
     }
+
+    err = get_end_sigmask(&sa.sa_mask);
+    if (err)
+        return err;
+
+    sa.sa_handler = &end_handler;
+    if (sigaction(SIGUSR1, &sa, NULL) == -1)
+        return -errno;
+
+    sa.sa_handler = &end_cancel_handler;
+    if (sigaction(SIGUSR2, &sa, NULL) == -1)
+        return -errno;
 
     return 0;
 }
@@ -590,8 +654,13 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
     char sesspath[PATH_MAX];
     int err;
     int i;
+    sigset_t oldset, set;
     struct copy_args ca;
     struct transfer *transfer;
+
+    err = get_end_sigmask(&set);
+    if (err)
+        return err;
 
     err = sess_init(sessid, sesspath, sizeof(sesspath));
     if (err)
@@ -607,6 +676,23 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
 
         if (sess_is_complete(sesspath, transfer->srcpath))
             continue;
+
+        err = pthread_sigmask(SIG_BLOCK, &set, &oldset);
+        if (err)
+            return err;
+        if (i == ctx->num_transfers - 1)
+            end = -1;
+        else if (end) {
+            end = -1;
+            err = pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+            if (err)
+                return err;
+            log_print(LOG_INFO, "Stopping before transfer %d", i);
+            break;
+        }
+        err = pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+        if (err)
+            return err;
 
         debug_print("Transfer %d:", i + 1);
         log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
