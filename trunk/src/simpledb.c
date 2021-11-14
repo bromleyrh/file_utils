@@ -1356,8 +1356,10 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         pfd.fd = sockfd2;
         for (;;) {
             while (poll(&pfd, 1, 0) == -1) {
-                if (errno != EINTR)
+                if (errno != EINTR) {
+                    err = MINUS_ERRNO;
                     goto err4;
+                }
             }
             if (pfd.revents & POLLHUP)
                 break;
