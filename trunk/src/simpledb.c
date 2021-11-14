@@ -166,10 +166,16 @@ static int release_id(struct db_ctx *, uint64_t, uint64_t);
 static int do_read_data(const char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
 
+static int resize_msg_buf(char **, size_t, size_t *, int);
+
 static int read_msg(char **, size_t *, int);
 static int read_msg_v(struct iovec *, size_t, int);
 static int write_msg(char *, size_t, int);
 static int write_msg_v(struct iovec *, size_t, int);
+
+static int open_db(struct db_ctx **, enum op, const char *);
+static int return_data(enum op, struct key *, uint64_t, char *, size_t, int);
+static int wait_for_client(int);
 
 static int process_trans(const char *, const char *, int);
 
@@ -1006,10 +1012,51 @@ do_write_data(const char *data, size_t datalen, int fd)
 }
 
 static int
+resize_msg_buf(char **buf, size_t len, size_t *sz, int sockfd)
+{
+    char *tmp;
+    ssize_t ret;
+    struct iovec iov;
+    struct msghdr msghdr;
+
+    for (;;) {
+        for (;;) {
+            iov.iov_base = *buf + len;
+            iov.iov_len = *sz - len;
+
+            memset(&msghdr, 0, sizeof(msghdr));
+            msghdr.msg_iov = &iov;
+            msghdr.msg_iovlen = 1;
+
+            ret = recvmsg(sockfd, &msghdr, MSG_PEEK);
+            if (ret > 0)
+                break;
+            if (ret == 0)
+                return 1;
+            if (errno != EINTR)
+                return MINUS_ERRNO;
+        }
+
+        if ((size_t)ret == *sz - len) {
+            *sz *= 2;
+            tmp = do_realloc(*buf, *sz);
+            if (tmp == NULL)
+                return MINUS_ERRNO;
+            *buf = tmp;
+        }
+
+        if (!(msghdr.msg_flags & MSG_TRUNC))
+            break;
+    }
+
+    return 0;
+}
+
+static int
 read_msg(char **msg, size_t *msglen, int sockfd)
 {
-    char *buf, *tmp;
-    int err;
+    char *buf;
+    int res;
     size_t len, sz;
     ssize_t ret;
     struct iovec iov;
@@ -1022,38 +1069,11 @@ read_msg(char **msg, size_t *msglen, int sockfd)
     len = 0;
 
     for (;;) {
-        for (;;) {
-            for (;;) {
-                iov.iov_base = buf + len;
-                iov.iov_len = sz - len;
-
-                memset(&msghdr, 0, sizeof(msghdr));
-                msghdr.msg_iov = &iov;
-                msghdr.msg_iovlen = 1;
-
-                ret = recvmsg(sockfd, &msghdr, MSG_PEEK);
-                if (ret > 0)
-                    break;
-                if (ret == 0)
-                    goto end;
-                if (errno != EINTR) {
-                    err = MINUS_ERRNO;
-                    goto err;
-                }
-            }
-
-            if ((size_t)ret == sz - len) {
-                sz *= 2;
-                tmp = do_realloc(buf, sz);
-                if (tmp == NULL) {
-                    err = MINUS_ERRNO;
-                    goto err;
-                }
-                buf = tmp;
-            }
-
-            if (!(msghdr.msg_flags & MSG_TRUNC))
-                break;
+        res = resize_msg_buf(&buf, len, &sz, sockfd);
+        if (res != 0) {
+            if (res != 1)
+                goto err;
+            goto end;
         }
 
         for (;;) {
@@ -1070,7 +1090,7 @@ read_msg(char **msg, size_t *msglen, int sockfd)
             if (ret == 0)
                 continue;
             if (errno != EINTR) {
-                err = MINUS_ERRNO;
+                res = MINUS_ERRNO;
                 goto err;
             }
         }
@@ -1089,7 +1109,7 @@ end:
 
 err:
     free(buf);
-    return err;
+    return res;
 }
 
 static int
@@ -1155,6 +1175,92 @@ write_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
 }
 
 static int
+open_db(struct db_ctx **dbctx, enum op op, const char *pathname)
+{
+    int err;
+
+    /* first operation determines whether database is created if it does
+       not exist */
+    if (op == OP_INSERT)
+        err = open_or_create(dbctx, pathname);
+    else {
+        err = do_db_hl_open(dbctx, pathname, sizeof(struct db_key), &db_key_cmp,
+                            0);
+    }
+
+    return err ? -err : do_db_hl_trans_new(*dbctx);
+}
+
+static int
+return_data(enum op op, struct key *key, uint64_t id, char *buf, size_t len,
+            int sockfd)
+{
+    int err;
+
+    switch (op) {
+    case OP_INSERT:
+        if (key->type == KEY_INTERNAL) {
+            /* send allocated key */
+            err = write_msg((char *)&id, sizeof(id), sockfd);
+            if (err)
+                return err;
+            err = write_msg(NULL, 0, sockfd);
+            if (err)
+                return err;
+        }
+        break;
+    case OP_LOOK_UP_NEAREST:
+    case OP_LOOK_UP_NEXT:
+    case OP_LOOK_UP_PREV:
+        /* send neighbor key */
+        if (key->type == KEY_INTERNAL)
+            err = write_msg((char *)&key->id, sizeof(key->id), sockfd);
+        else
+            err = write_msg((char *)(key->key), strlen(key->key) + 1, sockfd);
+        if (err)
+            return err;
+        err = write_msg(NULL, 0, sockfd);
+        if (err)
+            return err;
+        /* fallthrough */
+    case OP_LOOK_UP:
+        /* send data */
+        if (len > 0) {
+            err = write_msg(buf, len, sockfd);
+            if (err)
+                return err;
+        }
+        err = write_msg(NULL, 0, sockfd);
+        if (err)
+            return err;
+    default:
+        break;
+    }
+
+    return 0;
+}
+
+static int
+wait_for_client(int sockfd)
+{
+    struct pollfd pfd;
+
+    memset(&pfd, 0, sizeof(pfd));
+    pfd.fd = sockfd;
+
+    for (;;) {
+        while (poll(&pfd, 1, 0) == -1) {
+            if (errno != EINTR)
+                return MINUS_ERRNO;
+        }
+        if (pfd.revents & POLLHUP)
+            break;
+    }
+
+    return 0;
+}
+
+static int
 process_trans(const char *sock_pathname, const char *pathname, int pipefd)
 {
     char *databuf = NULL, *keybuf = NULL;
@@ -1162,7 +1268,6 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     int sockfd1, sockfd2;
     ssize_t ret;
     struct db_ctx *dbctx = NULL;
-    struct pollfd pfd;
     struct sockaddr_un addr;
 
     sockfd1 = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -1259,19 +1364,9 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         }
 
         if (dbctx == NULL) {
-            /* first operation determines whether database is created if it does
-               not exist */
-            if (op == OP_INSERT)
-                err = open_or_create(&dbctx, pathname);
-            else {
-                err = do_db_hl_open(&dbctx, pathname, sizeof(struct db_key),
-                                    &db_key_cmp, 0);
-            }
-            if (!err) {
-                err = do_db_hl_trans_new(dbctx);
-                if (err)
-                    goto err5;
-            }
+            err = open_db(&dbctx, op, pathname);
+            if (err < 0)
+                goto err5;
         }
 
         if (!err) {
@@ -1287,7 +1382,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             }
             if (key.type == KEY_EXTERNAL)
                 keybuf = (char *)(key.key);
-        }
+        } else
+            err = -err;
 
         /* send error status */
         if (err)
@@ -1300,47 +1396,11 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             goto err5;
 
         if (!nodata) {
-            switch (op) {
-            case OP_INSERT:
-                if (key.type == KEY_INTERNAL) {
-                    /* send allocated key */
-                    err = write_msg((char *)&id, sizeof(id), sockfd2);
-                    if (err)
-                        goto err5;
-                    err = write_msg(NULL, 0, sockfd2);
-                    if (err)
-                        goto err5;
-                }
-                break;
-            case OP_LOOK_UP_NEAREST:
-            case OP_LOOK_UP_NEXT:
-            case OP_LOOK_UP_PREV:
-                /* send neighbor key */
-                if (key.type == KEY_INTERNAL)
-                    err = write_msg((char *)&key.id, sizeof(key.id), sockfd2);
-                else
-                    err = write_msg((char *)(key.key), strlen(key.key) + 1,
-                                    sockfd2);
-                if (err)
-                    goto err5;
-                err = write_msg(NULL, 0, sockfd2);
-                if (err)
-                    goto err5;
-                /* fallthrough */
-            case OP_LOOK_UP:
-                /* send data */
-                if (len > 0) {
-                    err = write_msg(buf, len, sockfd2);
-                    free(buf);
-                    if (err)
-                        goto err5;
-                }
-                err = write_msg(NULL, 0, sockfd2);
-                if (err)
-                    goto err5;
-            default:
-                break;
-            }
+            err = return_data(op, &key, id, buf, len, sockfd2);
+            if (op == OP_LOOK_UP)
+                free(buf);
+            if (err)
+                goto err5;
         }
 
         if (keybuf != NULL) {
@@ -1352,18 +1412,9 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
             databuf = NULL;
         }
 
-        memset(&pfd, 0, sizeof(pfd));
-        pfd.fd = sockfd2;
-        for (;;) {
-            while (poll(&pfd, 1, 0) == -1) {
-                if (errno != EINTR) {
-                    err = MINUS_ERRNO;
-                    goto err4;
-                }
-            }
-            if (pfd.revents & POLLHUP)
-                break;
-        }
+        err = wait_for_client(sockfd2);
+        if (err)
+            goto err4;
 
         if (shutdown(sockfd2, SHUT_RDWR) == -1) {
             err = MINUS_ERRNO;
