@@ -49,7 +49,6 @@ run_cmd(const char *cmd)
         execvp(argv[0], argv);
         error(0, errno, "Error executing %s", argv[0]);
         _exit(EXIT_FAILURE);
-        return -EIO;
     }
     if (pid == -1) {
         err = -errno;
