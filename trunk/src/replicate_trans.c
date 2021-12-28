@@ -216,7 +216,7 @@ execute_hook(int fd, const char *bin, const char *path, mode_t mask)
 
         fexecve(fd, argv, environ);
         error(0, errno, "Error executing %s", bin);
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
         return -EIO;
     }
     if (pid == -1)
