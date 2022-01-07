@@ -7,6 +7,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <paths.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +34,7 @@ do_open(int (*open_func)(const char *, int, ...), const char *pathname,
     char rp[PATH_MAX];
 
     if ((realpath(pathname, rp) == NULL)
-        || ((strncmp(rp, "/dev/null", sizeof("/dev/null") - 1) != 0)
+        || ((strncmp(rp, _PATH_DEVNULL, sizeof(_PATH_DEVNULL) - 1) != 0)
             && (strncmp(rp, "/proc/", sizeof("/proc/") - 1) != 0)
             && (strncmp(rp, "/sys/", sizeof("/sys/") - 1) != 0))) {
         fprintf(stderr, "Opening %s with O_DIRECT\n", pathname);

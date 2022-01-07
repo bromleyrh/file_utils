@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <paths.h>
 #include <poll.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -1492,7 +1493,7 @@ do_init_trans(const char *sock_pathname, const char *pathname)
 
         close(pipefd[0]);
 
-        fd = open("/dev/null", O_RDWR);
+        fd = open(_PATH_DEVNULL, O_RDWR);
         if (fd == -1) {
             err = MINUS_ERRNO;
             goto err3;
