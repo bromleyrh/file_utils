@@ -123,7 +123,7 @@ keep_mnt(const char *target)
 {
     size_t i;
 
-    static const struct {
+    static const struct ent {
         const char  *target;
         size_t      len;
     } keep[] = {
@@ -132,13 +132,13 @@ keep_mnt(const char *target)
         MNT("/run"),
         MNT("/sys"),
         MNT("/tmp")
-    }, *mnt;
+    };
 
     if (strcmp("/", target) == 0)
         return 1;
 
     for (i = 0; i < ARRAY_SIZE(keep); i++) {
-        mnt = &keep[i];
+        const struct ent *mnt = &keep[i];
 
         if ((strncmp(target, mnt->target, mnt->len) == 0)
             && ((target[mnt->len] == '\0') || (target[mnt->len] == '/')))

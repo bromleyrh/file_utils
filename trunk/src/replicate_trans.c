@@ -76,14 +76,15 @@ static int copy_fn(void *);
 static int
 fs_supports_tmpfile(__fsword_t type)
 {
-    static const struct {
+    static const struct ent {
         __fsword_t  type;
         int         valid;
     } typemap[256] = {
 #define X(type) ENTRY(type),
         LIST_LINUX_TMPFILE_FS_TYPES()
 #undef X
-    }, *e;
+    };
+    const struct ent *e;
 
     e = &typemap[LINUX_FS_TYPE_HASH(type)];
 

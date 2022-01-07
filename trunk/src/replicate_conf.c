@@ -417,7 +417,7 @@ read_json_config(json_val_t config, struct replicate_ctx *ctx)
     int err;
     int i, numopt;
 
-    static const struct {
+    static const struct ent {
         const wchar_t   *opt;
         int             (*fn)(json_val_t, void *);
     } opts[16] = {
@@ -426,10 +426,11 @@ read_json_config(json_val_t config, struct replicate_ctx *ctx)
         [0] = {L"keep_cache",   &read_keep_cache_opt},
         [6] = {L"log",          &read_log_opt},
         [1] = {L"transfers",    &read_transfers_opt}
-    }, *opt;
+    };
 
     numopt = json_val_object_get_num_elem(config);
     for (i = 0; i < numopt; i++) {
+        const struct ent *opt;
         json_object_elem_t elem;
 
         err = json_val_object_get_elem_by_idx(config, i, &elem);
