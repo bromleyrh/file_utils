@@ -239,7 +239,7 @@ AC_CONFIG_FILES([Makefile man/Makefile])
 AC_CONFIG_HEADERS([config.h])
 AC_OUTPUT
 
-cat <<- EOF
+cat <<-EOF
 
 $PACKAGE_NAME configuration
 
