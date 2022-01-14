@@ -30,7 +30,7 @@ AS_CASE(
             [platform=linux],
         [AC_MSG_ERROR([unsupported platform], [1])]
 )
-AM_CONDITIONAL([LINUX], [test "x$platform" = xlinux])
+AM_CONDITIONAL([LINUX], [test $platform = linux])
 
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -65,10 +65,10 @@ AC_ARG_ENABLE([debugging],
               ],
               [debug=false])
 AS_IF(
-    [test "x$sanitizers" = xtrue],
+    [test $sanitizers = true],
     [debug=true]
 )
-AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+AM_CONDITIONAL([DEBUG], [test $debug = true])
 
 AC_ARG_ENABLE([coverage_analysis],
               [  --enable-coverage-analysis
@@ -86,10 +86,10 @@ AC_ARG_ENABLE([coverage_analysis],
                )
               ],
               [coverage_analysis=false])
-AM_CONDITIONAL([COVERAGE_ANALYSIS], [test x$coverage_analysis = xtrue])
+AM_CONDITIONAL([COVERAGE_ANALYSIS], [test $coverage_analysis = true])
 
 AS_IF(
-    [test "x$sanitizers" = xtrue],
+    [test $sanitizers = true],
     [AC_CHECK_LIB([asan], [__interceptor_malloc], [asan_libs="-lasan"])
      AC_CHECK_LIB([ubsan], [__ubsan_handle_add_overflow],
                   [ubsan_libs="-lubsan"]
@@ -107,7 +107,7 @@ AS_IF(
      )
     ]
 )
-AM_CONDITIONAL([SANITIZERS], [test x$sanitizers = xtrue])
+AM_CONDITIONAL([SANITIZERS], [test $sanitizers = true])
 AC_SUBST([sanitizer])
 
 AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
@@ -124,7 +124,7 @@ cat >src/replicate_fs.h <<EOF
 EOF
 
 AS_IF(
-    [test "x$platform" = xlinux],
+    [test $platform = linux],
     [AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [libxfs=false], [
 #include <stdint.h>
 typedef int64_t off64_t;
@@ -212,7 +212,7 @@ AC_SUBST([libutil_cppflags])
 AC_SUBST([libutil_link_dep])
 
 AS_IF(
-    [test x$debug = xtrue],
+    [test $debug = true],
     [enable_trace=true],
     [enable_trace=false]
 )
