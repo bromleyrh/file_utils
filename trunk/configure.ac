@@ -42,7 +42,7 @@ AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 AC_ARG_ENABLE([sanitizers],
               [  --enable-sanitizers     enable GCC sanitizers],
               [AS_CASE(
-                  ["$enableval"],
+                  [$enableval],
                       [yes],
                           [sanitizers=true],
                       [no],
@@ -55,7 +55,7 @@ AC_ARG_ENABLE([sanitizers],
 AC_ARG_ENABLE([debugging],
               [  --enable-debugging      enable debugging],
               [AS_CASE(
-                  ["$enableval"],
+                  [$enableval],
                       [yes],
                           [debug=true],
                       [no],
@@ -74,7 +74,7 @@ AC_ARG_ENABLE([coverage_analysis],
               [  --enable-coverage-analysis
                           enable code coverage analysis],
               [AS_CASE(
-                  ["$enableval"],
+                  [$enableval],
                       [yes],
                           [coverage_analysis=true],
                       [no],
