@@ -5,7 +5,7 @@
 AC_INIT([file_utils], m4_esyscmd_s([cat .version]))
 AC_PREREQ([2.69])
 
-env_cflags="$CFLAGS"
+env_cflags=$CFLAGS
 
 AC_CONFIG_SRCDIR([src/fastcat.c])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -98,12 +98,12 @@ AS_IF(
      fsanitizer="-fsanitize=address -fsanitize=undefined"
      fsanitizer="$fsanitizer -fsanitize-undefined-trap-on-error"
      AX_CHECK_COMPILE_FLAG([-fsanitize=address],
-         [sanitizer="$fsanitizer"],
-         [sanitizer=""]
+         [sanitizer=$fsanitizer],
+         [sanitizer=]
      )
      AS_IF(
          [test "x$asan_libs" = x || test "x$ubsan_libs" = x],
-         [sanitizer=""]
+         [sanitizer=]
      )
     ]
 )
@@ -112,7 +112,7 @@ AC_SUBST([sanitizer])
 
 AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
     [stack_protector="-fstack-protector-all"],
-    [stack_protector=""]
+    [stack_protector=]
 )
 AC_SUBST([stack_protector])
 
@@ -220,7 +220,7 @@ AM_CONDITIONAL([TRACE], [test $enable_trace = true])
 
 AC_ARG_WITH([pkgconfigdir],
             [  --with-pkgconfigdir=DIR install pkg-config data in DIR],
-            [pkgconfigdir="$withval"],
+            [pkgconfigdir=$withval],
             [pkgconfigdir="$libdir/pkgconfig"])
 AC_SUBST([pkgconfigdir])
 
@@ -233,7 +233,7 @@ AC_SUBST([ldio_age], [0])
 AC_SUBST([ldio_rev], [0])
 
 dnl FIXME: Later, only prevent Autoconf from adding "-g -O2" to CFLAGS
-CFLAGS="$env_cflags"
+CFLAGS=$env_cflags
 
 AC_CONFIG_FILES([Makefile man/Makefile])
 AC_CONFIG_HEADERS([config.h])
