@@ -30,7 +30,7 @@ AS_CASE(
             [platform=linux],
         [AC_MSG_ERROR([unsupported platform], [1])]
 )
-AM_CONDITIONAL([LINUX], [test $platform = linux])
+AM_CONDITIONAL([LINUX], [test $platform = "linux"])
 
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -102,7 +102,7 @@ AS_IF(
          [sanitizer=]
      )
      AS_IF(
-         [test "x$asan_libs" = x || test "x$ubsan_libs" = x],
+         [test "x$asan_libs" = "x" || test "x$ubsan_libs" = "x"],
          [sanitizer=]
      )
     ]
@@ -124,7 +124,7 @@ cat >src/replicate_fs.h <<EOF
 EOF
 
 AS_IF(
-    [test $platform = linux],
+    [test $platform = "linux"],
     [AC_CHECK_HEADERS([xfs/xfs.h], [libxfs=true], [libxfs=false], [
 #include <stdint.h>
 typedef int64_t off64_t;
@@ -202,7 +202,7 @@ EOF
     ]
 )
 
-AM_CONDITIONAL([HAVE_LIBXFS], [test x$libxfs = xtrue])
+AM_CONDITIONAL([HAVE_LIBXFS], [test "x$libxfs" = "xtrue"])
 
 PKG_CHECK_MODULES([libutil], [libutil],
     [libutil_cppflags=$libutil_CFLAGS
