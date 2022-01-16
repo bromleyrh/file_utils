@@ -23,10 +23,10 @@ BUILT_SOURCES += $(gen_files)
 CLEANFILES += $(gen_files)
 
 src/replicate_gram.h: src/replicate.spec
-	scripts/spec_to_h.pl src/replicate.spec $(replicate_gram_macro) > $@
+	scripts/spec_to_h.pl src/replicate.spec $(replicate_gram_macro) >$@
 
 src/verify_gram.h: src/verify.spec
-	scripts/spec_to_h.pl src/verify.spec $(verify_gram_macro) > $@
+	scripts/spec_to_h.pl src/verify.spec $(verify_gram_macro) >$@
 
 noinst_LIBRARIES += src/libfileutil.a
 
