@@ -70,9 +70,9 @@ include src/Makefile.am
 
 if LINUX
 install-exec-hook:
-	ln -fs open $(bindir)/delete_input
-	chmod u+s $(bindir)/replicate $(bindir)/verify
-	@if ldc=`which ldconfig 2>/dev/null` && test -x ${ldc}; then \
+	ln -fs open "$(bindir)/delete_input"
+	chmod u+s "$(bindir)/replicate" "$(bindir)/verify"
+	@if ldc=`which ldconfig 2>/dev/null` && test -x "${ldc}"; then \
 		echo "Regenerating runtime linker cache"; \
 		ldconfig || true; \
 	fi
