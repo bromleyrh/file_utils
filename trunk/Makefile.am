@@ -73,7 +73,7 @@ install-exec-hook:
 	ln -fs open "$(bindir)/delete_input"
 	chmod u+s "$(bindir)/replicate" "$(bindir)/verify"
 	@if ldc=`which ldconfig 2>/dev/null` && test -x "${ldc}"; then \
-		echo "Regenerating runtime linker cache"; \
+		echo "Regenerating runtime linker cache" >&2; \
 		ldconfig || true; \
 	fi
 	@echo
