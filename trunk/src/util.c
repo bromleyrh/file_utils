@@ -4,6 +4,8 @@
 
 #include "common.h"
 
+#include <malloc_ext.h>
+
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -26,6 +28,15 @@ do_malloc(size_t size)
 }
 
 void *
+do_allocarray(size_t nmemb, size_t size)
+{
+    void *ret;
+
+    ASSURE_ERRNO_SET(ret, allocarray(nmemb, size));
+    return ret;
+}
+
+void *
 do_calloc(size_t nmemb, size_t size)
 {
     void *ret;
@@ -40,6 +51,15 @@ do_realloc(void *ptr, size_t size)
     void *ret;
 
     ASSURE_ERRNO_SET(ret, realloc(ptr, size));
+    return ret;
+}
+
+void *
+do_reallocarray(void *ptr, size_t nmemb, size_t size)
+{
+    void *ret;
+
+    ASSURE_ERRNO_SET(ret, reallocarray(ptr, nmemb, size));
     return ret;
 }
 

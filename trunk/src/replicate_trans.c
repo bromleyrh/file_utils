@@ -141,8 +141,7 @@ getsgids(gid_t **sgids)
     if (nsgids == -1)
         return -errno;
 
-    ret = do_malloc(nsgids * sizeof(*ret));
-    if (ret == NULL)
+    if (oeallocarray(&ret, nsgids) == NULL)
         return -errno;
 
     tmp = getgroups(nsgids, ret);

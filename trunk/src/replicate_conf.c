@@ -381,8 +381,7 @@ read_transfers_opt(json_val_t opt, void *data)
 
     ctx->num_transfers = json_val_array_get_num_elem(opt);
 
-    ctx->transfers = do_calloc(ctx->num_transfers, sizeof(*(ctx->transfers)));
-    if (ctx->transfers == NULL)
+    if (oecalloc(&ctx->transfers, ctx->num_transfers) == NULL)
         return -errno;
 
     for (i = 0; i < ctx->num_transfers; i++) {
