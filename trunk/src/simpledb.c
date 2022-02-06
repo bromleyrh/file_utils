@@ -412,14 +412,12 @@ do_db_hl_create(struct db_ctx **dbctx, const char *pathname, mode_t mode,
     int err;
     struct db_ctx *ret;
 
-    ret = do_malloc(sizeof(*ret));
-    if (ret == NULL)
+    if (oemalloc(&ret) == NULL)
         return MINUS_ERRNO;
     ret->key_size = key_size;
     ret->key_cmp = key_cmp;
 
-    ret->key_ctx = do_malloc(sizeof(*(ret->key_ctx)));
-    if (ret->key_ctx == NULL) {
+    if (oemalloc(&ret->key_ctx) == NULL) {
         err = MINUS_ERRNO;
         goto err1;
     }
@@ -456,14 +454,12 @@ do_db_hl_open(struct db_ctx **dbctx, const char *pathname, size_t key_size,
     int fl;
     struct db_ctx *ret;
 
-    ret = do_malloc(sizeof(*ret));
-    if (ret == NULL)
+    if (oemalloc(&ret) == NULL)
         return MINUS_ERRNO;
     ret->key_size = key_size;
     ret->key_cmp = key_cmp;
 
-    ret->key_ctx = do_malloc(sizeof(*(ret->key_ctx)));
-    if (ret->key_ctx == NULL) {
+    if (oemalloc(&ret->key_ctx) == NULL) {
         err = MINUS_ERRNO;
         goto err1;
     }
@@ -577,8 +573,7 @@ do_db_hl_iter_new(struct db_iter **iter, struct db_ctx *dbctx)
     int err;
     struct db_iter *ret;
 
-    ret = do_malloc(sizeof(*ret));
-    if (ret == NULL)
+    if (oemalloc(&ret) == NULL)
         return MINUS_ERRNO;
 
     err = db_hl_iter_new(&ret->iter, dbctx->dbh);
