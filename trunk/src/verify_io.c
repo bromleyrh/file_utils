@@ -87,8 +87,7 @@ sorted_stats_add(struct io_stats *stats, double ms)
     int ret;
     struct ms *m;
 
-    m = do_malloc(sizeof(*m));
-    if (m == NULL)
+    if (oemalloc(&m) == NULL)
         return -errno;
     m->ms = ms;
     m->count = 1;
@@ -236,8 +235,7 @@ io_state_init(struct io_state **state)
     int err;
     struct io_state *ret;
 
-    ret = do_malloc(sizeof(*ret));
-    if (ret == NULL)
+    if (oemalloc(&ret) == NULL)
         return -errno;
 
     err = io_stats_init(&ret->throughput_stats, STATS_WINDOW_SIZE);

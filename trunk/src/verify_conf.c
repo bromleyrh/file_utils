@@ -443,8 +443,7 @@ read_verifs_opt(json_val_t opt, void *data)
 
     ctx->num_verifs = json_val_array_get_num_elem(opt);
 
-    ctx->verifs = do_calloc(ctx->num_verifs, sizeof(*(ctx->verifs)));
-    if (ctx->verifs == NULL)
+    if (oecalloc(&ctx->verifs, ctx->num_verifs) == NULL)
         return -errno;
 
     for (i = 0; i < ctx->num_verifs; i++) {
