@@ -742,7 +742,7 @@ open_or_create(struct db_ctx **dbctx, const char *pathname)
 
         k.type = TYPE_FREE_ID;
         k.id = ROOT_ID;
-        memset(freeid.used_id, 0, sizeof(freeid.used_id));
+        omemset(&freeid.used_id, 0);
         freeid.flags = FREE_ID_LAST_USED;
         err = do_db_hl_insert(ret, &k, &freeid, sizeof(freeid));
         if (err) {
@@ -862,7 +862,7 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
             return res;
 
         k.id += FREE_ID_RANGE_SZ;
-        memset(freeid.used_id, 0, sizeof(freeid.used_id));
+        omemset(&freeid.used_id, 0);
         used_id_set(freeid.used_id, k.id, k.id, 1);
         freeid.flags = FREE_ID_LAST_USED;
         res = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
@@ -911,7 +911,7 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
             return res;
 
         /* insert new free ID information object */
-        memset(freeid.used_id, 0xff, sizeof(freeid.used_id));
+        omemset(&freeid.used_id, 0xff);
         used_id_set(freeid.used_id, k.id, id, 0);
         freeid.flags = 0;
         res = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
@@ -1020,7 +1020,7 @@ resize_msg_buf(char **buf, size_t len, size_t *sz, int sockfd)
             iov.iov_base = *buf + len;
             iov.iov_len = *sz - len;
 
-            memset(&msghdr, 0, sizeof(msghdr));
+            omemset(&msghdr, 0);
             msghdr.msg_iov = &iov;
             msghdr.msg_iovlen = 1;
 
@@ -1076,7 +1076,7 @@ read_msg(char **msg, size_t *msglen, int sockfd)
             iov.iov_base = buf + len;
             iov.iov_len = sz - len;
 
-            memset(&msghdr, 0, sizeof(msghdr));
+            omemset(&msghdr, 0);
             msghdr.msg_iov = &iov;
             msghdr.msg_iovlen = 1;
 
@@ -1113,7 +1113,7 @@ read_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
 {
     struct msghdr msghdr;
 
-    memset(&msghdr, 0, sizeof(msghdr));
+    omemset(&msghdr, 0);
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = iovlen;
 
@@ -1136,7 +1136,7 @@ write_msg(char *msg, size_t msglen, int sockfd)
         iov.iov_base = msg + sent;
         iov.iov_len = msglen - sent;
 
-        memset(&msghdr, 0, sizeof(msghdr));
+        omemset(&msghdr, 0);
         msghdr.msg_iov = &iov;
         msghdr.msg_iovlen = 1;
 
@@ -1163,7 +1163,7 @@ write_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
 
     fl = (iovlen == 0) ? MSG_EOR : 0;
 
-    memset(&msghdr, 0, sizeof(msghdr));
+    omemset(&msghdr, 0);
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = iovlen;
 
@@ -1241,7 +1241,7 @@ wait_for_client(int sockfd)
 {
     struct pollfd pfd;
 
-    memset(&pfd, 0, sizeof(pfd));
+    omemset(&pfd, 0);
     pfd.fd = sockfd;
 
     for (;;) {
@@ -1272,7 +1272,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         goto err1;
     }
 
-    memset(&addr, 0, sizeof(addr));
+    omemset(&addr, 0);
     addr.sun_family = AF_UNIX;
     strlcpy(addr.sun_path, sock_pathname, sizeof(addr.sun_path));
     if (bind(sockfd1, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
@@ -1577,7 +1577,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
         return err;
     }
 
-    memset(&addr, 0, sizeof(addr));
+    omemset(&addr, 0);
     addr.sun_family = AF_UNIX;
     strlcpy(addr.sun_path, sock_pathname, sizeof(addr.sun_path));
     if (connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
