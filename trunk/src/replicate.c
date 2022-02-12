@@ -178,7 +178,7 @@ enable_debugging_features(int trace)
     int err;
     struct sigaction sa;
 
-    memset(&sa, 0, sizeof(sa));
+    omemset(&sa, 0);
     sa.sa_flags = SA_SIGINFO;
 
     sa.sa_sigaction = sigaction_segv_diag;
@@ -438,7 +438,7 @@ set_signal_handlers()
 
     static const int intsignals[] = {SIGINT, SIGTERM};
 
-    memset(&sa, 0, sizeof(sa));
+    omemset(&sa, 0);
     sa.sa_handler = &int_handler;
     sa.sa_flags = SA_RESETHAND;
 

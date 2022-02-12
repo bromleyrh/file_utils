@@ -267,7 +267,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
     mbstate_t s;
     struct replicate_ctx *ctx = (struct replicate_ctx *)data;
 
-    memset(&s, 0, sizeof(s));
+    omemset(&s, 0);
 
     err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
     if (!err) {
@@ -280,7 +280,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(opt, L"gid", &elem);
         if (err)
             return err;
-        memset(&s, 0, sizeof(s));
+        omemset(&s, 0);
         if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
             == (size_t)-1)
             return -errno;
@@ -301,7 +301,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(opt, L"group", &elem);
         if (err)
             return err;
-        memset(&s, 0, sizeof(s));
+        omemset(&s, 0);
         if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
             == (size_t)-1)
             return -errno;
