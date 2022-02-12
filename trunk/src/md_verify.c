@@ -10,6 +10,7 @@
 
 #include <option_parsing.h>
 #include <radix_tree.h>
+#include <strings_ext.h>
 
 #include <adt/set.h>
 
@@ -376,7 +377,7 @@ scan_timestamp(char *str, char *key, struct timespec *ts)
         return NULL;
     memmove(ns, tz, strlen(tz) + 1);
 
-    memset(&tm, 0, sizeof(tm));
+    omemset(&tm, 0);
     ret = strptime(ret + strlen(key), " " TM_FMT, &tm);
     if (ret == NULL)
         return NULL;

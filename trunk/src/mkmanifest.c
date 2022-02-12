@@ -123,7 +123,7 @@ set_signal_handlers()
 
     static const int intsignals[] = {SIGINT, SIGTERM};
 
-    memset(&sa, 0, sizeof(sa));
+    omemset(&sa, 0);
     sa.sa_handler = SIG_IGN;
     sa.sa_flags = SA_RESETHAND;
 

@@ -105,7 +105,7 @@ set_sigbus_handler()
 {
     struct sigaction sa;
 
-    memset(&sa, 0, sizeof(sa));
+    omemset(&sa, 0);
     sa.sa_handler = &buserr_handler;
 
     return sigaction(SIGBUS, &sa, NULL);
