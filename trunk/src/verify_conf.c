@@ -259,7 +259,7 @@ read_base_dir_opt(json_val_t opt, void *data)
     mbstate_t s;
     struct verify_ctx *ctx = (struct verify_ctx *)data;
 
-    memset(&s, 0, sizeof(s));
+    omemset(&s, 0);
     return (awcstombs((char **)&ctx->base_dir, json_val_string_get(opt), &s)
             == (size_t)-1) ? -errno : 0;
 }
@@ -273,7 +273,7 @@ read_creds_opt(json_val_t opt, void *data)
     mbstate_t s;
     struct verify_ctx *ctx = (struct verify_ctx *)data;
 
-    memset(&s, 0, sizeof(s));
+    omemset(&s, 0);
 
     err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
     if (!err) {
@@ -286,7 +286,7 @@ read_creds_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(opt, L"gid", &elem);
         if (err)
             return err;
-        memset(&s, 0, sizeof(s));
+        omemset(&s, 0);
         if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
             == (size_t)-1)
             return -errno;
@@ -307,7 +307,7 @@ read_creds_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(opt, L"group", &elem);
         if (err)
             return err;
-        memset(&s, 0, sizeof(s));
+        omemset(&s, 0);
         if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
             == (size_t)-1)
             return -errno;
@@ -368,7 +368,7 @@ read_exclude_opt(json_val_t opt, void *data)
         if (val == NULL)
             return -EIO;
 
-        memset(&s, 0, sizeof(s));
+        omemset(&s, 0);
         brlen = awcstombs(&regexbr, json_val_string_get(val), &s);
         if (brlen == (size_t)-1)
             return -errno;
@@ -395,7 +395,7 @@ read_input_file_opt(json_val_t opt, void *data)
     mbstate_t s;
     struct verify_ctx *ctx = (struct verify_ctx *)data;
 
-    memset(&s, 0, sizeof(s));
+    omemset(&s, 0);
     return (awcstombs((char **)&ctx->input_file, json_val_string_get(opt), &s)
             == (size_t)-1) ? -errno : 0;
 }
@@ -406,7 +406,7 @@ read_output_file_opt(json_val_t opt, void *data)
     mbstate_t s;
     struct verify_ctx *ctx = (struct verify_ctx *)data;
 
-    memset(&s, 0, sizeof(s));
+    omemset(&s, 0);
     return (awcstombs((char **)&ctx->output_file, json_val_string_get(opt), &s)
             == (size_t)-1) ? -errno : 0;
 }

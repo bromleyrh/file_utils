@@ -18,6 +18,7 @@
 
 #include <avl_tree.h>
 #include <radix_tree.h>
+#include <strings_ext.h>
 #include <time_ext.h>
 
 #include <files/util.h>
@@ -458,7 +459,7 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
         || (EVP_DigestInit_ex(initsumctx, EVP_sha1(), NULL) != 1))
         return -EIO;
 
-    memset(&aiocb, 0, sizeof(aiocb));
+    omemset(&aiocb, 0);
     aiocb.aio_nbytes = wctx->transfer_size;
     aiocb.aio_fildes = fd;
     aiocb.aio_buf = buf = buf1;
