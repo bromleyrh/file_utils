@@ -208,8 +208,8 @@ execute_hook(int fd, const char *bin, const char *path, mode_t mask)
 
         umask(mask);
 
-        strlcpy(arg0, bin, sizeof(arg0));
-        strlcpy(arg1, path, sizeof(arg1));
+        strfillbuf(arg0, bin);
+        strfillbuf(arg1, path);
         argv[0] = arg0;
         argv[1] = arg1;
         argv[2] = NULL;
