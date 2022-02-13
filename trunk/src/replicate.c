@@ -123,12 +123,10 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
         if (err) {
             char errbuf[128];
 
-            snprintf(fmtbuf, sizeof(fmtbuf), "%s(), %s:%d: %s (%s)\n", func,
-                     file, line, fmt, strerror_r(err, errbuf, sizeof(errbuf)));
-        } else {
-            snprintf(fmtbuf, sizeof(fmtbuf), "%s(), %s:%d: %s\n", func, file,
-                     line, fmt);
-        }
+            fillbuf(fmtbuf, "%s(), %s:%d: %s (%s)\n", func, file, line, fmt,
+                    strerror_r(err, errbuf, sizeof(errbuf)));
+        } else
+            fillbuf(fmtbuf, "%s(), %s:%d: %s\n", func, file, line, fmt);
 
         va_start(ap, fmt);
         vfprintf(stderr, fmtbuf, ap);
