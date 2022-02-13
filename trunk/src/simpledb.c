@@ -1274,7 +1274,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
 
     omemset(&addr, 0);
     addr.sun_family = AF_UNIX;
-    strlcpy(addr.sun_path, sock_pathname, sizeof(addr.sun_path));
+    strfillbuf(addr.sun_path, sock_pathname);
     if (bind(sockfd1, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
         err = MINUS_ERRNO;
         goto err2;
@@ -1579,7 +1579,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
 
     omemset(&addr, 0);
     addr.sun_family = AF_UNIX;
-    strlcpy(addr.sun_path, sock_pathname, sizeof(addr.sun_path));
+    strfillbuf(addr.sun_path, sock_pathname);
     if (connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
         err = MINUS_ERRNO;
         error(0, -err, "Error connecting");
