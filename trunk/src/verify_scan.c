@@ -592,8 +592,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (!S_ISREG(s->st_mode))
         return 0;
 
-    if (snprintf(fullpath, sizeof(fullpath), "%s/%s", wctx->prefix, path)
-        >= (int)sizeof(fullpath)) {
+    if (fmtbuf(fullpath, "%s/%s", wctx->prefix, path) != 0) {
         error(0, 0, "Path name too long");
         return -EIO;
     }
