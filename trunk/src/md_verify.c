@@ -576,8 +576,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
     (void)fd;
     (void)flags;
 
-    if (snprintf(fullpath, sizeof(fullpath), "%s/%s", pctx->rootdir, path)
-        >= (int)sizeof(fullpath)) {
+    if (fmtbuf(fullpath, "%s/%s", pctx->rootdir, path) != 0) {
         error(0, 0, "Cannot process file: File name too long");
         pctx->err = 1;
         return 0;

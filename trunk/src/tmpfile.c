@@ -6,6 +6,8 @@
 
 #define _GNU_SOURCE
 
+#include <strings_ext.h>
+
 #include <files/acc_ctl.h>
 
 #include <errno.h>
@@ -232,8 +234,7 @@ link_file(int fd, const char *name)
 {
     char path[PATH_MAX];
 
-    if (snprintf(path, sizeof(path), "/proc/self/fd/%d", fd)
-        >= (int)sizeof(path))
+    if (fmtbuf(path, "/proc/self/fd/%d", fd) != 0)
         return -ENAMETOOLONG;
 
     return (linkat(AT_FDCWD, path, AT_FDCWD, name, AT_SYMLINK_FOLLOW) == 0)

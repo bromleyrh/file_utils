@@ -5,6 +5,7 @@
 #define _GNU_SOURCE
 
 #include <option_parsing.h>
+#include <strings_ext.h>
 
 #include <files/util.h>
 
@@ -86,8 +87,7 @@ do_backup(int dirfd, const char *name)
 {
     char backup_name[PATH_MAX];
 
-    if (snprintf(backup_name, sizeof(backup_name), "%s~", name)
-        >= (int)sizeof(backup_name))
+    if (fmtbuf(backup_name, "%s~", name) != 0)
         return -ENAMETOOLONG;
 
     if (linkat(dirfd, name, dirfd, backup_name, 0) == -1)
