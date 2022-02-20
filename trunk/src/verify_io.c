@@ -2,6 +2,7 @@
  * verify_io.c
  */
 
+#include "common.h"
 #include "util.h"
 #include "verify_io.h"
 
@@ -299,8 +300,8 @@ io_state_update(struct io_state *state, size_t len, double tp)
         || (io_stats_get_median(&state->throughput_stats, &throughput, &min,
                                 &max) != 0))
         goto end;
-/*  fprintf(stderr, "\rThroughput: %11.6f, %11.6f, %11.6f MiB/s", min,
-            throughput, max);
+/*  infomsgf("\rThroughput: %11.6f, %11.6f, %11.6f MiB/s", min, throughput,
+             max);
 */
     if ((int)(throughput * 100) == (int)(state->last_throughput * 100))
         ++(state->steadiness);
@@ -337,7 +338,7 @@ io_state_update(struct io_state *state, size_t len, double tp)
                                        - state->probe_step);
         }
     }
-    fprintf(stderr, " (transfer size %7zd bytes)", state->transfer_size);
+    infomsgf(" (transfer size %7zd bytes)", state->transfer_size);
 
     state->last_throughput = throughput;
 

@@ -106,14 +106,14 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
         va_list ap;
 
 #ifdef ENABLE_TRACE
-        fputs(sep, stderr);
+        infomsg(sep);
 
         bt = (const char **)get_backtrace(&n);
         if (bt != NULL) {
             int i;
 
             for (i = n - 1; i > 2; i--)
-                fprintf(stderr, "%s()\n", bt[i]);
+                infomsgf("%s()\n", bt[i]);
             free_backtrace((char **)bt);
         }
 
@@ -131,7 +131,7 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
         va_end(ap);
 
 #ifdef ENABLE_TRACE
-        fputs(sep, stderr);
+        infomsg(sep);
 
 #endif
         errno = old_errno;
@@ -265,7 +265,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new)
     } END_GET_LONG_OPTIONS;
 
     if (optind != argc) {
-        fputs("Unrecognized arguments\n", stderr);
+        errmsg("Unrecognized arguments\n");
         return -1;
     }
 
@@ -616,7 +616,7 @@ exec_dbus_daemon()
         res = -errno;
         goto err3;
     }
-    fprintf(stderr, DBUS_SESSION_BUS_ADDRESS_ENV " = %s\n", token);
+    infomsgf(DBUS_SESSION_BUS_ADDRESS_ENV " = %s\n", token);
 
     free(line);
 
@@ -683,8 +683,8 @@ do_verifs(struct verify_ctx *ctx)
     if (strcmp("-", ctx->output_file) == 0) {
         errno = 0;
         if (isatty(fileno(stdout))) {
-            fputs("Warning: Standard output is a terminal device: waiting 10 "
-                  "seconds\n", stderr);
+            infomsg("Warning: Standard output is a terminal device: waiting 10 "
+                    "seconds\n");
             if (wait_for_quit(10))
                 return -EINTR;
         } else if (errno != ENOTTY)
@@ -747,12 +747,11 @@ do_verifs(struct verify_ctx *ctx)
             goto err2;
         }
         if (nfilesproc < 2) {
-            fprintf(stderr, "No files processed in %s: if not expected, check "
-                            "for\n"
-                            "errors in /etc/fstab (for example, a duplicate "
-                            "entry for\n"
-                            "%s)\n",
-                    verif->srcpath, verif->devpath);
+            infomsgf("No files processed in %s: if not expected, check for\n"
+                     "errors in /etc/fstab (for example, a duplicate entry "
+                     "for\n"
+                     "%s)\n",
+                     verif->srcpath, verif->devpath);
         }
 
         err = unmount_file_system(verif->srcpath, va.srcfd);
@@ -904,7 +903,7 @@ main(int argc, char **argv)
 
     if (debug) {
         print_verifs(stderr, ctx->verifs, ctx->num_verifs);
-        fprintf(stderr, "UID: %d\nGID: %d\n", ctx->uid, ctx->gid);
+        infomsgf("UID: %d\nGID: %d\n", ctx->uid, ctx->gid);
     }
 
     if (log_verifs)

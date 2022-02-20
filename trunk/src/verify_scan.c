@@ -599,15 +599,15 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
     if ((wctx->reg_excl != NULL) /* check if excluded */
         && (regexec(wctx->reg_excl, fullpath, 0, NULL, 0) == 0)) {
-        fprintf(stderr, "%s excluded\n", fullpath);
+        infomsgf("%s excluded\n", fullpath);
         return 0;
     }
 
     /* check if file not opened but callback invoked due to
        DIR_WALK_ALLOW_ERR */
     if (fd == -1) {
-        fprintf(stderr, "Warning: Error opening %s/%s: %s\n", wctx->prefix,
-                path, strerror(EPERM));
+        infomsgf("Warning: Error opening %s/%s: %s\n", wctx->prefix, path,
+                 strerror(EPERM));
         return 0;
     }
 
@@ -665,13 +665,13 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
                         &verif_chksums_cb, wctx);
     if (res != 0) {
         if (debug)
-            fputc('\n', stderr);
+            infochr('\n');
         if (res == 1)
             goto verif_err;
         return res;
     }
     if (debug)
-        fprintf(stderr, " (read %s/%s)\n", wctx->prefix, path);
+        infomsgf(" (read %s/%s)\n", wctx->prefix, path);
 
     if (p_record_in != NULL) {
         res = radix_tree_delete(wctx->input_data, fullpath);
