@@ -7,6 +7,8 @@
 
 #include "config.h"
 
+#include <stdio.h>
+
 /* for eliminating false negatives from static analysis tools */
 #ifdef ASSERT_MACROS
 #include <assert.h>
@@ -22,6 +24,17 @@ static __thread int asserttmp;
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+#define stderrchr(c) fputc(c, stderr)
+#define stderrmsg(msg) fputs(msg, stderr)
+#define stderrmsgf(format, ...) fprintf(stderr, format, ##__VA_ARGS__)
+
+#define infochr stderrchr
+#define infomsg stderrmsg
+#define infomsgf stderrmsgf
+
+#define errmsg stderrmsg
+#define errmsgf stderrmsgf
+
 #if defined(HAVE_ERROR)
 #include <error.h>
 #elif defined(HAVE_ERRC) && defined(HAVE_WARNC)
@@ -34,7 +47,6 @@ static __thread int asserttmp;
             errc(eval, code, format, ##__VA_ARGS__); \
     } while (0)
 #else
-#include <stdio.h>
 #include <stdlib.h>
 #define error(eval, code, format, ...) \
     do { \
