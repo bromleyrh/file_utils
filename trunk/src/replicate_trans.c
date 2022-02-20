@@ -2,6 +2,7 @@
  * replicate_trans.c
  */
 
+#include "common.h"
 #include "replicate_common.h"
 #include "replicate_fs.h"
 #include "replicate_trans.h"
@@ -279,7 +280,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
             if (ret)
                 return ret;
             if (debug)
-                fprintf(stderr, " (copied %s)\n", cctx->lastpath);
+                infomsgf(" (copied %s)\n", cctx->lastpath);
             free((void *)(cctx->lastpath));
         }
         cctx->bytescopied += dcpctx->off;
@@ -300,8 +301,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         throughput = cctx->bytescopied
                      / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
                      / (1024 * 1024);
-        fprintf(stderr, "\rProgress: %.6f%% (%11.6f MiB/s)", pcnt,
-                throughput);
+        infomsgf("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
     }
     broadcast_progress(cctx->busconn, pcnt);
 
@@ -360,7 +360,7 @@ copy_fn(void *arg)
     ret = -dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
     if (debug) {
         feenableexcept(fexcepts);
-        fputc('\n', stderr);
+        infochr('\n');
     }
     if (cctx.lastpath != NULL)
         free((void *)(cctx.lastpath));
@@ -386,8 +386,8 @@ do_copy(struct copy_args *copy_args)
     uid_t euid;
 
     if (check_protected_hard_links() == 1) {
-        fputs("Warning: fs.protected_hardlinks is nonzero: permissions errors "
-              "may occur\n", stderr);
+        infomsg("Warning: fs.protected_hardlinks is nonzero: permissions "
+                "errors may occur\n");
     }
 
     ret = check_creds(ruid, rgid, copy_args->uid, copy_args->gid);

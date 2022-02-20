@@ -108,14 +108,14 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
         va_list ap;
 
 #ifdef ENABLE_TRACE
-        fputs(sep, stderr);
+        infomsg(sep);
 
         bt = (const char **)get_backtrace(&n);
         if (bt != NULL) {
             int i;
 
             for (i = n - 1; i > 2; i--)
-                fprintf(stderr, "%s()\n", bt[i]);
+                infomsgf("%s()\n", bt[i]);
             free_backtrace((char **)bt);
         }
 
@@ -133,7 +133,7 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
         va_end(ap);
 
 #ifdef ENABLE_TRACE
-        fputs(sep, stderr);
+        infomsg(sep);
 
 #endif
         errno = old_errno;
@@ -325,7 +325,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
     } END_GET_LONG_OPTIONS;
 
     if (optind != argc) {
-        fputs("Unrecognized arguments\n", stderr);
+        errmsg("Unrecognized arguments\n");
         return -1;
     }
 
@@ -506,7 +506,7 @@ exec_dbus_daemon()
         res = -errno;
         goto err3;
     }
-    fprintf(stderr, DBUS_SESSION_BUS_ADDRESS_ENV " = %s\n", token);
+    infomsgf(DBUS_SESSION_BUS_ADDRESS_ENV " = %s\n", token);
 
     free(line);
 
@@ -764,12 +764,11 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             goto err4;
         }
         if (nfilesproc < 2) {
-            fprintf(stderr, "No files processed in %s: if not expected, check "
-                            "for\n"
-                            "errors in /etc/fstab (for example, a duplicate "
-                            "entry for the device associated\n"
-                            "with %s)\n",
-                    transfer->srcpath, transfer->srcpath);
+            infomsgf("No files processed in %s: if not expected, check for\n"
+                     "errors in /etc/fstab (for example, a duplicate entry for "
+                     "the device associated\n"
+                     "with %s)\n",
+                     transfer->srcpath, transfer->srcpath);
         }
 
         err = unmount_file_system(transfer->dstmntpath, ca.dstfd);
@@ -903,7 +902,7 @@ main(int argc, char **argv)
 
     if (debug) {
         print_transfers(stderr, ctx.transfers, ctx.num_transfers);
-        fprintf(stderr, "UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
+        infomsgf("UID: %d\nGID: %d\n", ctx.uid, ctx.gid);
     }
 
     ret = init_privs();
