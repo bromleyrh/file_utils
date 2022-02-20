@@ -2530,7 +2530,7 @@ main(int argc, char **argv)
     if (op == OP_INIT_TRANS) {
         ret = do_init_trans(sock_pathname, pathname);
         if (ret == 0)
-            fprintf(stderr, "%s: Transaction started\n", argv[0]);
+            infomsgf("%s: Transaction started\n", argv[0]);
     } else if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)
              || (trans && (op != OP_LOOK_UP_PREFIX) && (op != OP_DUMP)))
         ret = do_update_trans(sock_pathname, op, &key);
