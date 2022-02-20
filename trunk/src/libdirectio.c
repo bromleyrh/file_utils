@@ -4,6 +4,8 @@
 
 #define _GNU_SOURCE
 
+#include "common.h"
+
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -37,7 +39,7 @@ do_open(int (*open_func)(const char *, int, ...), const char *pathname,
         || ((strncmp(rp, _PATH_DEVNULL, sizeof(_PATH_DEVNULL) - 1) != 0)
             && (strncmp(rp, "/proc/", sizeof("/proc/") - 1) != 0)
             && (strncmp(rp, "/sys/", sizeof("/sys/") - 1) != 0))) {
-        fprintf(stderr, "Opening %s with O_DIRECT\n", pathname);
+        infomsgf("Opening %s with O_DIRECT\n", pathname);
         flags |= O_DIRECT;
     }
 
@@ -91,17 +93,17 @@ __open64(const char *pathname, int flags, ...)
 void __attribute__((constructor))
 ctor()
 {
-    fprintf(stderr, "libdirectio loaded\n");
+    infomsg("libdirectio loaded\n");
 
     orig_open = dlsym(RTLD_NEXT, "open");
     if (orig_open == NULL) {
-        fprintf(stderr, "Missing open() symbol\n");
+        errmsgf("Missing open() symbol\n");
         exit(EXIT_FAILURE);
     }
 
     orig_open64 = dlsym(RTLD_NEXT, "open64");
     if (orig_open64 == NULL) {
-        fprintf(stderr, "Missing open64() symbol\n");
+        errmsgf("Missing open64() symbol\n");
         exit(EXIT_FAILURE);
     }
 }

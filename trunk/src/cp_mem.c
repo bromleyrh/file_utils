@@ -8,6 +8,8 @@
 
 #include "config.h"
 
+#include "common.h"
+
 #include <files/acc_ctl.h>
 
 #include <option_parsing.h>
@@ -500,7 +502,7 @@ copy(int n)
     }
 
     if (verbose)
-        fprintf(stderr, "%s -> %s\n", srcfile, dstfile);
+        infomsgf("%s -> %s\n", srcfile, dstfile);
     return 0;
 
 err2:

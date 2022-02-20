@@ -716,8 +716,7 @@ main(int argc, char **argv)
     else {
         error(0, -ret, "Error processing files");
         if (ret == -EIO) {
-            fprintf(stderr,
-                    "\nHints:\n"
+            errmsgf("\nHints:\n"
                     "- Program must be run from correct working directory\n"
                     "- More specific error messages written to standard "
                     "output\n");

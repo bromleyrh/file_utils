@@ -6,6 +6,7 @@
 
 #include "btree.h"
 #include "btree_mmap.h"
+#include "common.h"
 #include "option_parsing.h"
 
 #include "files/acc_ctl.h"
@@ -277,7 +278,7 @@ walk_dir(struct btree *bt, char *dir, int check)
     fts_close(wctx);
 
     if (check)
-        fprintf(stderr, "%d files checked\n", ncheck);
+        infomsgf("%d files checked\n", ncheck);
 
     return ret;
 }

@@ -81,7 +81,7 @@ parse_cmdline(int argc, char **argv, char *conf_path, char *template_path)
     } END_GET_LONG_OPTIONS;
 
     if (optind != argc) {
-        fputs("Unrecognized arguments\n", stderr);
+        errmsg("Unrecognized arguments\n");
         return -1;
     }
 
@@ -166,8 +166,8 @@ main(int argc, char **argv)
     if (isatty(fileno(stdout))) {
         int rem;
 
-        fputs("Warning: Standard output is a terminal device: waiting 10 "
-              "seconds\n", stderr);
+        infomsg("Warning: Standard output is a terminal device: waiting 10 "
+                "seconds\n");
         for (rem = 10; rem > 0; rem = sleep(rem))
             ;
     } else if (errno != ENOTTY)
