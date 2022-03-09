@@ -507,11 +507,10 @@ print_input_data(FILE *f, struct radix_tree *input_data)
 static int
 cmp_timestamps(struct md_record *record, struct stat *s)
 {
-    return ((record->atim.tv_sec == s->st_atim.tv_sec)
-            && (record->atim.tv_nsec == s->st_atim.tv_nsec)
-            && (record->mtim.tv_sec == s->st_mtim.tv_sec)
-            && (record->mtim.tv_nsec == s->st_mtim.tv_nsec))
-           ? 0 : -1;
+    return -((record->atim.tv_sec != s->st_atim.tv_sec)
+             || (record->atim.tv_nsec != s->st_atim.tv_nsec)
+             || (record->mtim.tv_sec != s->st_mtim.tv_sec)
+             || (record->mtim.tv_nsec != s->st_mtim.tv_nsec));
 }
 
 static void
@@ -535,7 +534,7 @@ check_gid(struct set *set, struct stat *s)
     if (ret < 0)
         return ret;
 
-    return (ret == 1) ? 0 : 1;
+    return (ret != 1);
 }
 
 static int
@@ -548,7 +547,7 @@ check_mode(struct set *set, struct stat *s)
     if (ret < 0)
         return ret;
 
-    return (ret == 1) ? 0 : 1;
+    return (ret != 1);
 }
 
 static int
@@ -561,7 +560,7 @@ check_uid(struct set *set, struct stat *s)
     if (ret < 0)
         return ret;
 
-    return (ret == 1) ? 0 : 1;
+    return (ret != 1);
 }
 
 static int
