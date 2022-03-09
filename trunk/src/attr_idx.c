@@ -184,8 +184,8 @@ index_close(struct index_ctx *ictx)
 static int
 key_cmp(const void *k1, const void *k2, void *key_ctx)
 {
-    struct attr_key *key1 = (struct attr_key *)k1;
-    struct attr_key *key2 = (struct attr_key *)k2;
+    const struct attr_key *key1 = k1;
+    const struct attr_key *key2 = k2;
 
     (void)key_ctx;
 
@@ -195,7 +195,7 @@ key_cmp(const void *k1, const void *k2, void *key_ctx)
 static int
 walk_cb(const void *keyval, void *ctx)
 {
-    struct attr_key *key = (struct attr_key *)keyval;
+    const struct attr_key *key = keyval;
 
     (void)ctx;
 

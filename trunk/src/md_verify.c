@@ -570,7 +570,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
 {
     char fullpath[PATH_MAX];
     int ret;
-    struct ctx *pctx = (struct ctx *)ctx;
+    struct ctx *pctx = ctx;
     struct md_record record;
 
     (void)fd;

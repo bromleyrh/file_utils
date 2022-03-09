@@ -254,14 +254,14 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
     int ret;
     int new_file;
     struct copy_ctx *cctx;
-    struct dir_copy_ctx *dcpctx = (struct dir_copy_ctx *)ctx;
+    struct dir_copy_ctx *dcpctx = ctx;
 
     (void)fd;
     (void)dirfd;
     (void)name;
     (void)flags;
 
-    cctx = (struct copy_ctx *)dcpctx->ctx;
+    cctx = dcpctx->ctx;
 
     new_file = ((s->st_ino != cctx->lastino) || (s->st_dev != cctx->lastdev));
     if (new_file)
@@ -316,7 +316,7 @@ copy_fn(void *arg)
     int fexcepts = 0;
     int fl;
     int ret;
-    struct copy_args *cargs = (struct copy_args *)arg;
+    struct copy_args *cargs = arg;
     struct copy_ctx cctx;
     struct statfs ds, ss;
 

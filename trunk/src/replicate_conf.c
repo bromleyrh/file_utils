@@ -217,7 +217,7 @@ config_trusted(struct stat *s)
 static size_t
 read_cb(char *buf, size_t off, size_t len, void *ctx)
 {
-    FILE *f = (FILE *)ctx;
+    FILE *f = ctx;
     size_t ret;
 
     (void)off;
@@ -265,7 +265,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
     int err;
     json_object_elem_t elem;
     mbstate_t s;
-    struct replicate_ctx *ctx = (struct replicate_ctx *)data;
+    struct replicate_ctx *ctx = data;
 
     omemset(&s, 0);
 
@@ -334,7 +334,7 @@ read_debug_opt(json_val_t opt, void *data)
 static int
 read_keep_cache_opt(json_val_t opt, void *data)
 {
-    struct replicate_ctx *ctx = (struct replicate_ctx *)data;
+    struct replicate_ctx *ctx = data;
 
     ctx->keep_cache = json_val_boolean_get(opt);
 
@@ -358,7 +358,7 @@ read_transfers_opt(json_val_t opt, void *data)
 {
     int err;
     int i;
-    struct replicate_ctx *ctx = (struct replicate_ctx *)data;
+    struct replicate_ctx *ctx = data;
 
     static const struct json_scan_spec spec[] = {
         {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,

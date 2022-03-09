@@ -303,8 +303,8 @@ cancel_aio(struct aiocb *cb)
 static int
 verif_record_cmp(const void *k1, const void *k2, void *ctx)
 {
-    struct verif_record_output *record1 = (struct verif_record_output *)k1;
-    struct verif_record_output *record2 = (struct verif_record_output *)k2;
+    const struct verif_record_output *record1 = k1;
+    const struct verif_record_output *record2 = k2;
 
     (void)ctx;
 
@@ -407,7 +407,7 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
 {
     double pcnt, throughput;
     struct timespec curtm, difftm;
-    struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
+    struct verif_walk_ctx *wctx = ctx;
 
     (void)fd;
 
@@ -451,7 +451,7 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
     off_t flen = 0, initrem = 512;
     ssize_t len;
     struct aiocb aiocb;
-    struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
+    struct verif_walk_ctx *wctx = ctx;
 
     (void)bufsz;
 
@@ -577,7 +577,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     int res;
     struct verif_record record_in, *p_record_in;
     struct verif_record_output record;
-    struct verif_walk_ctx *wctx = (struct verif_walk_ctx *)ctx;
+    struct verif_walk_ctx *wctx = ctx;
     unsigned sumlen = 0;
 
     (void)dirfd;
@@ -713,7 +713,7 @@ verif_fn(void *arg)
     int64_t fullbufsize;
     ssize_t bufsz;
     struct statfs s;
-    struct verif_args *vargs = (struct verif_args *)arg;
+    struct verif_args *vargs = arg;
     struct verif_walk_ctx wctx;
 
     bufsz = get_io_size(vargs->srcfd);
@@ -807,8 +807,7 @@ verif_fn(void *arg)
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &wctx.starttm);
 
-    err = -dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR,
-                       (void *)&wctx);
+    err = -dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR, &wctx);
 
     io_state_free(wctx.io_state);
 

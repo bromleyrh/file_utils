@@ -63,8 +63,8 @@ mnt_cmp(struct libmnt_table *tbl, struct libmnt_fs *fs1, struct libmnt_fs *fs2)
 static int
 fs_cmp(const void *k1, const void *k2, void *ctx)
 {
-    struct libmnt_fs *fs1 = (struct libmnt_fs *)k1;
-    struct libmnt_fs *fs2 = (struct libmnt_fs *)k2;
+    const struct libmnt_fs *fs1 = k1;
+    const struct libmnt_fs *fs2 = k2;
 
     (void)ctx;
 

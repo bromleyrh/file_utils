@@ -319,12 +319,12 @@ uint64_cmp(uint64_t n1, uint64_t n2)
 static int
 db_key_cmp(const void *k1, const void *k2, void *key_ctx)
 {
+    const struct db_key *key1 = k1;
+    const struct db_key *key2 = k2;
     int cmp;
-    struct db_key *key1 = (struct db_key *)k1;
-    struct db_key *key2 = (struct db_key *)k2;
 
     if (key_ctx != NULL) {
-        struct db_key_ctx *ctx = (struct db_key_ctx *)key_ctx;
+        struct db_key_ctx *ctx = key_ctx;
 
         memcpy(ctx->last_key, k2, sizeof(struct db_key));
         ctx->last_key_valid = 1;
@@ -342,9 +342,9 @@ db_key_cmp(const void *k1, const void *k2, void *key_ctx)
 static int
 db_walk_cb(const void *key, const void *data, size_t datasize, void *ctx)
 {
+    const struct db_key *k = key;
     int datafd = (intptr_t)ctx;
     int ret;
-    struct db_key *k = (struct db_key *)key;
 
     switch (k->type) {
     case TYPE_INTERNAL:

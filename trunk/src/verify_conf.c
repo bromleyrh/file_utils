@@ -243,7 +243,7 @@ config_trusted(struct stat *s)
 static size_t
 read_cb(char *buf, size_t off, size_t len, void *ctx)
 {
-    FILE *f = (FILE *)ctx;
+    FILE *f = ctx;
     size_t ret;
 
     (void)off;
@@ -257,7 +257,7 @@ static int
 read_base_dir_opt(json_val_t opt, void *data)
 {
     mbstate_t s;
-    struct verify_ctx *ctx = (struct verify_ctx *)data;
+    struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
     return (awcstombs((char **)&ctx->base_dir, json_val_string_get(opt), &s)
@@ -271,7 +271,7 @@ read_creds_opt(json_val_t opt, void *data)
     int err;
     json_object_elem_t elem;
     mbstate_t s;
-    struct verify_ctx *ctx = (struct verify_ctx *)data;
+    struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
 
@@ -353,7 +353,7 @@ read_exclude_opt(json_val_t opt, void *data)
     int err;
     int first;
     int i, numexcl;
-    struct parse_ctx *pctx = (struct parse_ctx *)data;
+    struct parse_ctx *pctx = data;
 
     numexcl = json_val_array_get_num_elem(opt);
     first = (pctx->regexlen == 0);
@@ -393,7 +393,7 @@ static int
 read_input_file_opt(json_val_t opt, void *data)
 {
     mbstate_t s;
-    struct verify_ctx *ctx = (struct verify_ctx *)data;
+    struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
     return (awcstombs((char **)&ctx->input_file, json_val_string_get(opt), &s)
@@ -404,7 +404,7 @@ static int
 read_output_file_opt(json_val_t opt, void *data)
 {
     mbstate_t s;
-    struct verify_ctx *ctx = (struct verify_ctx *)data;
+    struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
     return (awcstombs((char **)&ctx->output_file, json_val_string_get(opt), &s)
@@ -428,7 +428,7 @@ read_verifs_opt(json_val_t opt, void *data)
 {
     int err;
     int i;
-    struct verify_ctx *ctx = (struct verify_ctx *)data;
+    struct verify_ctx *ctx = data;
 
     static const struct json_scan_spec spec[] = {
         {L"dev", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
