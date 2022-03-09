@@ -380,7 +380,7 @@ read_exclude_opt(json_val_t opt, void *data)
         if (first)
             first = 0;
         else
-            *((pctx->regexcurbr)++) = '|';
+            *pctx->regexcurbr++ = '|';
         pctx->regexcurbr = stpcpy(pctx->regexcurbr, regexbr);
 
         free(regexbr);
@@ -553,7 +553,7 @@ read_json_config(json_val_t config, struct parse_ctx *ctx)
         if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
             return -EIO;
 
-        err = (*(opt->fn))(elem.value, ctx);
+        err = (*opt->fn)(elem.value, ctx);
         if (err)
             return err;
     }

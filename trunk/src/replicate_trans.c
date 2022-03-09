@@ -261,11 +261,11 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
     (void)name;
     (void)flags;
 
-    cctx = (struct copy_ctx *)(dcpctx->ctx);
+    cctx = (struct copy_ctx *)dcpctx->ctx;
 
     new_file = ((s->st_ino != cctx->lastino) || (s->st_dev != cctx->lastdev));
     if (new_file)
-        ++(cctx->filesprocessed);
+        ++cctx->filesprocessed;
 
     if (dcpctx->off < 0) {
         ret = do_execute_hook(cctx, path);
@@ -281,7 +281,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
                 return ret;
             if (debug)
                 infomsgf(" (copied %s)\n", cctx->lastpath);
-            free((void *)(cctx->lastpath));
+            free((void *)cctx->lastpath);
         }
         cctx->bytescopied += dcpctx->off;
         cctx->lastdev = s->st_dev;
@@ -363,7 +363,7 @@ copy_fn(void *arg)
         infochr('\n');
     }
     if (cctx.lastpath != NULL)
-        free((void *)(cctx.lastpath));
+        free((void *)cctx.lastpath);
     if (ret == 0)
         nfilesproc = cctx.filesprocessed;
     else if (ret == EPERM) {

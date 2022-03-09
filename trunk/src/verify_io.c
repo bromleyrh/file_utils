@@ -95,7 +95,7 @@ sorted_stats_add(struct io_stats *stats, double ms)
 
     ret = set_insert(stats->ms_sorted, &m);
     if (ret == 0)
-        ++(stats->num_uniq_ms);
+        ++stats->num_uniq_ms;
     else {
         struct ms *res;
 
@@ -107,7 +107,7 @@ sorted_stats_add(struct io_stats *stats, double ms)
         free(m);
         if (ret != 1)
             return (ret == 0) ? -EIO : ret;
-        ++(res->count);
+        ++res->count;
     }
 
     return 0;
@@ -126,7 +126,7 @@ sorted_stats_remove(struct io_stats *stats, double ms)
         return (ret == 0) ? -EIO : ret;
 
     if (res->count > 1) {
-        --(res->count);
+        --res->count;
         return 0;
     }
 
@@ -134,7 +134,7 @@ sorted_stats_remove(struct io_stats *stats, double ms)
     if (ret != 0)
         return ret;
     free(res);
-    --(stats->num_uniq_ms);
+    --stats->num_uniq_ms;
 
     return 0;
 }
@@ -183,12 +183,12 @@ io_stats_add(struct io_stats *stats, double ms)
         if ((err = queue_pop_front(stats->ms_buf, &ret))
             || (err = sorted_stats_remove(stats, ret)))
             return err;
-        --(stats->num_ms);
+        --stats->num_ms;
     }
     if ((err = queue_push_back(stats->ms_buf, &ms))
         || (err = sorted_stats_add(stats, ms)))
         return err;
-    ++(stats->num_ms);
+    ++stats->num_ms;
 
     return 0;
 }
@@ -304,7 +304,7 @@ io_state_update(struct io_state *state, size_t len, double tp)
              max);
 */
     if ((int)(throughput * 100) == (int)(state->last_throughput * 100))
-        ++(state->steadiness);
+        ++state->steadiness;
     else
         state->steadiness = 0;
 

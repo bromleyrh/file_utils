@@ -844,7 +844,7 @@ print_transfers(FILE *f, struct transfer *transfers, int num)
         if (transfer->hook != NULL)
             fprintf(f, "\tHook binary: \"%s\"\n", transfer->hook);
         fprintf(f, "\tSet block device read-only flag: %d\n",
-                !!(transfer->setro));
+                !!transfer->setro);
     }
 }
 
@@ -856,9 +856,9 @@ free_transfers(struct transfer *transfers, int num)
     for (i = 0; i < num; i++) {
         struct transfer *transfer = &transfers[i];
 
-        free((void *)(transfer->srcpath));
-        free((void *)(transfer->dstpath));
-        free((void *)(transfer->format_cmd));
+        free((void *)transfer->srcpath);
+        free((void *)transfer->dstpath);
+        free((void *)transfer->format_cmd);
     }
 
     free(transfers);

@@ -335,7 +335,7 @@ db_key_cmp(const void *k1, const void *k2, void *key_ctx)
         return cmp;
 
     return (key1->type == TYPE_EXTERNAL)
-           ? strcmp((const char *)(key1->key), (const char *)(key2->key))
+           ? strcmp((const char *)key1->key, (const char *)key2->key)
            : uint64_cmp(key1->id, key2->id);
 }
 
@@ -538,7 +538,7 @@ do_db_hl_look_up(struct db_ctx *dbctx, const void *key, void *retkey,
     if (look_up_nearest && (res == 0) && dbctx->key_ctx->last_key_valid) {
         int cmp;
 
-        cmp = (*(dbctx->key_cmp))(dbctx->key_ctx->last_key, key, NULL);
+        cmp = (*dbctx->key_cmp)(dbctx->key_ctx->last_key, key, NULL);
         if (cmp > 0) {
             res = db_hl_search(dbctx->dbh, dbctx->key_ctx->last_key, retkey,
                                retdata, retdatasize);
@@ -636,7 +636,7 @@ do_db_hl_iter_get(struct db_iter *iter, void *retkey, void *retdata,
         if (res < 0)
             return res;
 
-        if ((*(dbctx->key_cmp))(dbctx->key_ctx->last_key, iter->srch_key, NULL)
+        if ((*dbctx->key_cmp)(dbctx->key_ctx->last_key, iter->srch_key, NULL)
             < 0) {
             res = db_hl_iter_next(dbiter);
             if (res != 0)
@@ -792,7 +792,7 @@ free_id_find(uint64_t *used_id, uint64_t base)
             return 0;
     }
     id = base + idx * NBWD;
-    word = ~(used_id[idx]);
+    word = ~used_id[idx];
 
     idx = 0;
     if (!(word & 0xffffffff)) {
@@ -886,7 +886,7 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     if (res != 1)
         return (res == 0) ? -EILSEQ : res;
 
-    ++(hdr.numobj);
+    ++hdr.numobj;
     res = do_db_hl_replace(dbctx, &k, &hdr, sizeof(hdr));
     if (res != 0)
         return res;
@@ -929,7 +929,7 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
     if (res != 1)
         return (res == 0) ? -EILSEQ : res;
 
-    --(hdr.numobj);
+    --hdr.numobj;
     return do_db_hl_replace(dbctx, &k, &hdr, sizeof(hdr));
 }
 
@@ -1212,7 +1212,7 @@ return_data(enum op op, struct key *key, uint64_t id, char *buf, size_t len,
         if (key->type == KEY_INTERNAL)
             err = write_msg((char *)&key->id, sizeof(key->id), sockfd);
         else
-            err = write_msg((char *)(key->key), strlen(key->key) + 1, sockfd);
+            err = write_msg((char *)key->key, strlen(key->key) + 1, sockfd);
         if (err)
             return err;
         err = write_msg(NULL, 0, sockfd);
@@ -1377,7 +1377,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                 goto err5;
             }
             if (key.type == KEY_EXTERNAL)
-                keybuf = (char *)(key.key);
+                keybuf = (char *)key.key;
         } else
             err = -err;
 
@@ -1604,7 +1604,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
         err = write_msg((char *)&key->id, sizeof(key->id), sockfd);
     else {
         /* FIXME: avoid cast to non-const type */
-        err = write_msg((char *)(key->key), keylen, sockfd);
+        err = write_msg((char *)key->key, keylen, sockfd);
     }
     if (err)
         goto err;
@@ -1692,7 +1692,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
             key->id = *(uint64_t *)msg;
             free(msg);
         } else {
-            free((void *)(key->key));
+            free((void *)key->key);
             key->key = msg;
         }
         /* fallthrough */
@@ -1778,7 +1778,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy((char *)(k.key), key->key, sizeof(k.key));
+        strlcpy((char *)k.key, key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -1864,7 +1864,7 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy((char *)(k.key), key->key, sizeof(k.key));
+        strlcpy((char *)k.key, key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -1924,7 +1924,7 @@ do_look_up(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy((char *)(k.key), key->key, sizeof(k.key));
+        strlcpy((char *)k.key, key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -2005,7 +2005,7 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy((char *)(k.key), key->key, sizeof(k.key));
+        strlcpy((char *)k.key, key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -2064,7 +2064,7 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         if (key->type == KEY_INTERNAL)
             key->id = k.id;
         else {
-            key->key = strdup((const char *)(k.key));
+            key->key = strdup((const char *)k.key);
             if (key->key == NULL)
                 return MINUS_ERRNO;
         }
@@ -2113,7 +2113,7 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy((char *)(k.key), key->key, sizeof(k.key));
+        strlcpy((char *)k.key, key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -2182,7 +2182,7 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         if (key->type == KEY_INTERNAL)
             key->id = k.id;
         else {
-            key->key = strdup((const char *)(k.key));
+            key->key = strdup((const char *)k.key);
             if (key->key == NULL)
                 return MINUS_ERRNO;
         }
@@ -2221,7 +2221,7 @@ do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
     }
 
     k.type = TYPE_EXTERNAL;
-    strlcpy((char *)(k.key), key->key, sizeof(k.key));
+    strlcpy((char *)k.key, key->key, sizeof(k.key));
     res = do_db_hl_iter_search(iter, &k);
     if (res < 0) {
         error(0, -res, "Error reading database file");
@@ -2234,7 +2234,7 @@ do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
         if (res != 0)
             goto err1;
 
-        if (strncmp(key->key, (const char *)(k.key), keylen) != 0)
+        if (strncmp(key->key, (const char *)k.key, keylen) != 0)
             break;
 
         d = do_malloc(dlen);
@@ -2309,7 +2309,7 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy((char *)(k.key), key->key, sizeof(k.key));
+        strlcpy((char *)k.key, key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -2378,7 +2378,7 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         if (key->type == KEY_INTERNAL)
             key->id = k.id;
         else {
-            key->key = strdup((const char *)(k.key));
+            key->key = strdup((const char *)k.key);
             if (key->key == NULL)
                 return MINUS_ERRNO;
         }
@@ -2417,7 +2417,7 @@ do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
         break;
     case KEY_EXTERNAL:
         k.type = TYPE_EXTERNAL;
-        strlcpy((char *)(k.key), key->key, sizeof(k.key));
+        strlcpy((char *)k.key, key->key, sizeof(k.key));
         break;
     default:
         abort();
@@ -2581,7 +2581,7 @@ end:
     if (sock_pathname != default_sock_pathname)
         free((void *)sock_pathname);
     if (key.key != NULL)
-        free((void *)(key.key));
+        free((void *)key.key);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

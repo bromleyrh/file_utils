@@ -469,7 +469,7 @@ main(int argc, char **argv)
 
 end:
     if (opts.index_file != NULL)
-        free((void *)(opts.index_file));
+        free((void *)opts.index_file);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

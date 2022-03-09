@@ -429,7 +429,7 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
                    "verify.signal.Throughput", "Throughput");
 
     wctx->transfer_size = io_state_update(wctx->io_state,
-                                          (size_t)(wctx->bytesverified), -1.0);
+                                          (size_t)wctx->bytesverified, -1.0);
 
     return quit ? -EINTR : 0;
 }
@@ -584,7 +584,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     (void)name;
     (void)flags;
 
-    ++(wctx->filesprocessed);
+    ++wctx->filesprocessed;
 
     if (quit)
         return -EINTR;
@@ -634,7 +634,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
                 TRACE(-res, "radix_tree_search()");
                 return res;
             }
-            if (!(wctx->allow_new)) {
+            if (!wctx->allow_new) {
                 error(0, 0, "Verification error: %s added", fullpath);
                 return -EIO;
             }

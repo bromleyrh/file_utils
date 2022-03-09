@@ -152,7 +152,7 @@ is_on_fs_of_type(const char *pathname, __fsword_t fstype)
             return -1;
     }
 
-    return (__fsword_t)(buf.f_type) == fstype;
+    return (__fsword_t)buf.f_type == fstype;
 }
 
 static int

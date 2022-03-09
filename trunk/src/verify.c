@@ -827,7 +827,7 @@ free_verifs(struct verif *verifs, int num)
     int i;
 
     for (i = 0; i < num; i++)
-        free((void *)(verifs[i].srcpath));
+        free((void *)verifs[i].srcpath);
 
     free(verifs);
 }
@@ -887,7 +887,7 @@ main(int argc, char **argv)
 
     if (pctx.regex != NULL) {
         ret = get_regex(&reg_excl, pctx.regex);
-        free((void *)(pctx.regex));
+        free((void *)pctx.regex);
         if (ret != 0)
             goto end1;
         ctx->reg_excl = &reg_excl;
@@ -934,12 +934,12 @@ end2:
     radix_tree_free(ctx->input_data);
 end1:
     if (ctx->base_dir != NULL)
-        free((void *)(ctx->base_dir));
+        free((void *)ctx->base_dir);
     if (ctx->reg_excl != NULL)
         regfree(ctx->reg_excl);
     if (ctx->input_file != NULL)
-        free((void *)(ctx->input_file));
-    free((void *)(ctx->output_file));
+        free((void *)ctx->input_file);
+    free((void *)ctx->output_file);
     free_verifs(ctx->verifs, ctx->num_verifs);
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
