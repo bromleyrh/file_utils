@@ -449,11 +449,9 @@ do_copy(struct copy_args *copy_args)
     return ret;
 
 err3:
-    tmp = seteuid(euid);
-    (void)tmp;
+    (void)(tmp = seteuid(euid));
 err2:
-    tmp = setegid(egid);
-    (void)tmp;
+    (void)(tmp = setegid(egid));
 err1:
     setgroups(nsgids, sgids);
     free(sgids);

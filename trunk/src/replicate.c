@@ -395,8 +395,7 @@ end_handler(int signum)
         end = 1;
     }
 
-    ret = write(STDERR_FILENO, buf, sizeof(buf) - 1);
-    (void)ret;
+    (void)(ret = write(STDERR_FILENO, buf, sizeof(buf) - 1));
 }
 
 static void
