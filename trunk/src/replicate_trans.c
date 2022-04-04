@@ -89,7 +89,7 @@ fs_supports_tmpfile(__fsword_t type)
 
     e = &typemap[LINUX_FS_TYPE_HASH(type)];
 
-    return e->valid && (e->type == type);
+    return e->valid && e->type == type;
 }
 
 #undef ENTRY
@@ -124,8 +124,8 @@ check_protected_hard_links()
 
     close(fd);
 
-    return ((buf[0] != '\0')
-            && ((buf[0] != '0') || ((buf[1] != '\n') && (buf[1] != '\0'))));
+    return buf[0] != '\0'
+           && (buf[0] != '0' || (buf[1] != '\n' && buf[1] != '\0'));
 
 err:
     close(fd);
@@ -147,7 +147,7 @@ getsgids(gid_t **sgids)
 
     tmp = getgroups(nsgids, ret);
     if (tmp != nsgids) {
-        tmp = (tmp == -1) ? -errno : -EIO;
+        tmp = tmp == -1 ? -errno : -EIO;
         free(ret);
         return tmp;
     }
@@ -159,10 +159,10 @@ getsgids(gid_t **sgids)
 static int
 check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid)
 {
-    if ((ruid == 0) || (ruid == uid))
+    if (ruid == 0 || ruid == uid)
         return 0;
 
-    return ((rgid == gid) || group_member(gid)) ? 0 : -EPERM;
+    return rgid == gid || group_member(gid) ? 0 : -EPERM;
 }
 
 static int
@@ -226,7 +226,7 @@ execute_hook(int fd, const char *bin, const char *path, mode_t mask)
         err = -errno;
         goto err;
     }
-    if (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         err = -EIO;
         goto err;
     }
@@ -241,7 +241,7 @@ err:
 static int
 do_execute_hook(struct copy_ctx *cctx, const char *path)
 {
-    return (cctx->hookfd == -1)
+    return cctx->hookfd == -1
            ? 0
            : execute_hook(cctx->hookfd, cctx->hookbin, path, cctx->hookumask);
 }
@@ -263,7 +263,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
 
     cctx = dcpctx->ctx;
 
-    new_file = ((s->st_ino != cctx->lastino) || (s->st_dev != cctx->lastdev));
+    new_file = s->st_ino != cctx->lastino || s->st_dev != cctx->lastdev;
     if (new_file)
         ++cctx->filesprocessed;
 
@@ -320,8 +320,7 @@ copy_fn(void *arg)
     struct copy_ctx cctx;
     struct statfs ds, ss;
 
-    if ((fstatfs(cargs->srcfd, &ss) == -1)
-        || (fstatfs(cargs->dstfd, &ds) == -1)) {
+    if (fstatfs(cargs->srcfd, &ss) == -1 || fstatfs(cargs->dstfd, &ds) == -1) {
         ret = errno;
         error(0, errno, "Error getting file system statistics");
         return ret;
@@ -338,7 +337,7 @@ copy_fn(void *arg)
 
     fl = DIR_COPY_CALLBACK | DIR_COPY_PHYSICAL | DIR_COPY_PRESERVE_LINKS
          | DIR_COPY_SYNC;
-    if (!(cargs->keep_cache))
+    if (!cargs->keep_cache)
         fl |= DIR_COPY_DISCARD_CACHE;
     if (fs_supports_tmpfile(ds.f_type))
         fl |= DIR_COPY_TMPFILE;
@@ -409,13 +408,13 @@ do_copy(struct copy_args *copy_args)
     }
 
     egid = getegid();
-    if ((copy_args->gid != (gid_t)-1) && (setegid(copy_args->gid) == -1)) {
+    if (copy_args->gid != (gid_t)-1 && setegid(copy_args->gid) == -1) {
         ret = errno;
         error(0, errno, "Error changing group");
         goto err1;
     }
     euid = geteuid();
-    if ((copy_args->uid != (uid_t)-1) && (seteuid(copy_args->uid) == -1)) {
+    if (copy_args->uid != (uid_t)-1 && seteuid(copy_args->uid) == -1) {
         ret = errno;
         error(0, errno, "Error changing user");
         goto err2;
@@ -427,8 +426,8 @@ do_copy(struct copy_args *copy_args)
         ret = errno;
         goto err3;
     }
-    if ((cap_set_flag(caps, CAP_EFFECTIVE, 1, &capval_fsetid, CAP_SET) == -1)
-        || (cap_set_proc(caps) == -1)) {
+    if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &capval_fsetid, CAP_SET) == -1
+        || cap_set_proc(caps) == -1) {
         ret = errno;
         error(0, errno, "Error setting process privileges");
         goto err3;
@@ -441,8 +440,8 @@ do_copy(struct copy_args *copy_args)
     if (ret != 0)
         goto err3;
 
-    ret = ((seteuid(euid) == 0) && (setegid(egid) == 0)
-           && (setgroups(nsgids, sgids) == 0))
+    ret = seteuid(euid) == 0 && setegid(egid) == 0
+          && setgroups(nsgids, sgids) == 0
           ? 0 : -errno;
 
     free(sgids);

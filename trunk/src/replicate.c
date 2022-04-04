@@ -192,8 +192,8 @@ enable_debugging_features(int trace)
     }
 
     if (trace) {
-        if ((setenv("MALLOC_CHECK_", "7", 1) == -1)
-            || (setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1)) {
+        if (setenv("MALLOC_CHECK_", "7", 1) == -1
+            || setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1) {
             errmsg = "Couldn't set environment variable";
             goto err;
         }
@@ -230,10 +230,9 @@ set_capabilities()
     if (caps == NULL)
         return -errno;
 
-    if ((cap_set_flag(caps, CAP_PERMITTED, ncapvals, capvals, CAP_SET) == -1)
-        || (cap_set_flag(caps, CAP_EFFECTIVE, ncapvals, capvals, CAP_SET)
-            == -1)
-        || (cap_set_proc(caps) == -1))
+    if (cap_set_flag(caps, CAP_PERMITTED, ncapvals, capvals, CAP_SET) == -1
+        || cap_set_flag(caps, CAP_EFFECTIVE, ncapvals, capvals, CAP_SET) == -1
+        || cap_set_proc(caps) == -1)
         goto err;
 
     cap_free(caps);
@@ -254,7 +253,7 @@ init_privs()
 
     /* FIXME: needed to mount file systems; prevents invoking user from sending
        signals to replicate */
-    if ((setresuid(0, 0, 0) == -1) || (setresgid(0, 0, 0) == -1))
+    if (setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
         return -errno;
 
     return set_capabilities();
@@ -414,16 +413,15 @@ end_cancel_handler(int signum)
             /* flag checked in do_transfers() */
             end = 0;
         }
-        ret = write(STDERR_FILENO, buf, sizeof(buf) - 1);
-        (void)ret;
+        (void)(ret = write(STDERR_FILENO, buf, sizeof(buf) - 1));
     }
 }
 
 static int
 get_end_sigmask(sigset_t *set)
 {
-    return ((sigemptyset(set) == 0) && (sigaddset(set, SIGUSR1) == 0)
-            && (sigaddset(set, SIGUSR2) == 0))
+    return sigemptyset(set) == 0 && sigaddset(set, SIGUSR1) == 0
+           && sigaddset(set, SIGUSR2) == 0
            ? 0 : -errno;
 }
 
@@ -482,7 +480,7 @@ exec_dbus_daemon()
     for (;;) {
         errno = 0;
         if (getline(&line, &n, proc) == -1) {
-            res = (errno == 0) ? -EIO : -errno;
+            res = errno == 0 ? -EIO : -errno;
             if (line != NULL)
                 free(line);
             goto err2;
@@ -499,7 +497,7 @@ exec_dbus_daemon()
 
     ++token;
     n = strlen(line);
-    if ((n > 1) && (line[n-1] == '\n'))
+    if (n > 1 && line[n-1] == '\n')
         line[n-1] = '\0';
 
     if (setenv(DBUS_SESSION_BUS_ADDRESS_ENV, token, 1) == -1) {
@@ -512,7 +510,7 @@ exec_dbus_daemon()
 
     res = pclose(proc);
     if (res != 0) {
-        res = (res > 0) ? -EIO : -errno;
+        res = res > 0 ? -EIO : -errno;
         goto err1;
     }
 
@@ -577,7 +575,7 @@ get_sess_path(const char *sesspath, const char *path, char *fullpath,
 
     free((void *)newpath);
 
-    return (ret >= (int)len) ? -ENAMETOOLONG : 0;
+    return ret >= (int)len ? -ENAMETOOLONG : 0;
 }
 
 static int
@@ -590,13 +588,13 @@ sess_init(int sessid, char *sesspath, size_t len)
         return 0;
     }
 
-    if ((mkdir(VAR_PATH, ACC_MODE_ACCESS_PERMS) == -1) && (errno != EEXIST))
+    if (mkdir(VAR_PATH, ACC_MODE_ACCESS_PERMS) == -1 && errno != EEXIST)
         return -errno;
 
     if (snprintf(sesspath, len, VAR_PATH "/%d", sessid) >= (int)len)
         return -ENAMETOOLONG;
 
-    return ((mkdir(sesspath, ACC_MODE_ACCESS_PERMS) == -1) && (errno != EEXIST))
+    return mkdir(sesspath, ACC_MODE_ACCESS_PERMS) == -1 && errno != EEXIST
            ? -errno : 0;
 }
 
@@ -612,7 +610,7 @@ sess_end(const char *sesspath)
     if (err)
         return err;
 
-    return (rmdir(sesspath) == -1) ? -errno : 0;
+    return rmdir(sesspath) == -1 ? -errno : 0;
 }
 
 static int
@@ -626,7 +624,7 @@ sess_is_complete(const char *sesspath, const char *path)
     if (get_sess_path(sesspath, path, fullpath, sizeof(fullpath)) != 0)
         return 0;
 
-    return (access(fullpath, F_OK) == 0);
+    return access(fullpath, F_OK) == 0;
 }
 
 static int
@@ -642,7 +640,7 @@ sess_record_complete(const char *sesspath, const char *path)
     if (err)
         return err;
 
-    return (mknod(fullpath, S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 0) == -1)
+    return mknod(fullpath, S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 0) == -1
            ? -errno : 0;
 }
 
@@ -749,7 +747,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         }
 
         /* change ownership of destination root directory if needed */
-        if ((ctx->uid != 0) && (fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1)) {
+        if (ctx->uid != 0 && fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1) {
             err = -errno;
             error(0, errno, "Error changing ownership of %s",
                   transfer->dstmntpath);
@@ -872,7 +870,7 @@ main(int argc, char **argv)
     int sessid;
     struct replicate_ctx ctx;
 
-    if ((getuid() != 0) && (clearenv() != 0))
+    if (getuid() != 0 && clearenv() != 0)
         return EXIT_FAILURE;
 
     setlinebuf(stdout);
@@ -887,7 +885,7 @@ main(int argc, char **argv)
 
     ret = parse_cmdline(argc, argv, &confpath, &sessid);
     if (ret != 0)
-        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+        return ret == -1 ? EXIT_FAILURE : EXIT_SUCCESS;
 
     if (confpath == NULL) {
         ret = get_conf_path(CONFIG_PATH, &confpath);
@@ -938,7 +936,7 @@ end2:
     }
 end1:
     free_transfers(ctx.transfers, ctx.num_transfers);
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /* vi: set expandtab sw=4 ts=4: */

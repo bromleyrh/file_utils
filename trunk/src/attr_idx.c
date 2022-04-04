@@ -448,7 +448,7 @@ main(int argc, char **argv)
         goto end;
     }
 
-    index_file = (opts.index_file == NULL) ? INDEX_FILE : opts.index_file;
+    index_file = opts.index_file == NULL ? INDEX_FILE : opts.index_file;
 
     switch (opts.op) {
     case APPLY:
@@ -470,7 +470,7 @@ main(int argc, char **argv)
 end:
     if (opts.index_file != NULL)
         free((void *)opts.index_file);
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /* vi: set expandtab sw=4 ts=4: */

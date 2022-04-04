@@ -232,7 +232,7 @@ config_trusted(struct stat *s)
 
     mode = s->st_mode;
 
-    if (((mode & S_IWGRP) && (s->st_gid != 0)) || (mode & S_IWOTH)) {
+    if (mode & S_IWGRP && (s->st_gid != 0 || mode & S_IWOTH)) {
         error(0, 0, "Configuration file writable by non-root users");
         return 0;
     }
@@ -250,7 +250,7 @@ read_cb(char *buf, size_t off, size_t len, void *ctx)
 
     ret = fread(buf, 1, len, f);
 
-    return ((ret == 0) && !feof(f)) ? (size_t)-1 : ret;
+    return ret == 0 && !feof(f) ? (size_t)-1 : ret;
 }
 
 static int
@@ -260,8 +260,8 @@ read_base_dir_opt(json_val_t opt, void *data)
     struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
-    return (awcstombs((char **)&ctx->base_dir, json_val_string_get(opt), &s)
-            == (size_t)-1) ? -errno : 0;
+    return awcstombs((char **)&ctx->base_dir, json_val_string_get(opt), &s)
+           == (size_t)-1 ? -errno : 0;
 }
 
 static int
@@ -356,7 +356,7 @@ read_exclude_opt(json_val_t opt, void *data)
     struct parse_ctx *pctx = data;
 
     numexcl = json_val_array_get_num_elem(opt);
-    first = (pctx->regexlen == 0);
+    first = pctx->regexlen == 0;
 
     for (i = 0; i < numexcl; i++) {
         char *regexbr;
@@ -396,8 +396,8 @@ read_input_file_opt(json_val_t opt, void *data)
     struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
-    return (awcstombs((char **)&ctx->input_file, json_val_string_get(opt), &s)
-            == (size_t)-1) ? -errno : 0;
+    return awcstombs((char **)&ctx->input_file, json_val_string_get(opt), &s)
+           == (size_t)-1 ? -errno : 0;
 }
 
 static int
@@ -407,8 +407,8 @@ read_output_file_opt(json_val_t opt, void *data)
     struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
-    return (awcstombs((char **)&ctx->output_file, json_val_string_get(opt), &s)
-            == (size_t)-1) ? -errno : 0;
+    return awcstombs((char **)&ctx->output_file, json_val_string_get(opt), &s)
+           == (size_t)-1 ? -errno : 0;
 }
 
 static int
@@ -549,8 +549,8 @@ read_json_config(json_val_t config, struct parse_ctx *ctx)
         if (err)
             return err;
 
-        opt = &opts[(hash_wcs(elem.key, -1) >> 3) & 63];
-        if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
+        opt = &opts[hash_wcs(elem.key, -1) >> 3 & 63];
+        if (opt->opt == NULL || wcscmp(elem.key, opt->opt) != 0)
             return -EIO;
 
         err = (*opt->fn)(elem.value, ctx);

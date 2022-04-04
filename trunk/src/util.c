@@ -14,7 +14,7 @@
     do { \
         errno = 0; \
         (ret) = (expr); \
-        if (((ret) == NULL) && (errno == 0)) \
+        if ((ret) == NULL && errno == 0) \
             errno = ENOMEM; \
     } while (0)
 

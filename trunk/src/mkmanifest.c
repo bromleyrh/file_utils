@@ -155,11 +155,11 @@ main(int argc, char **argv)
 
     ret = parse_cmdline(argc, argv, conf_path, template_path);
     if (ret != 0)
-        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+        return ret == -1 ? EXIT_FAILURE : EXIT_SUCCESS;
 
-    if (((conf_path[0] == '\0') && (get_path(CONF_PATH, conf_path) != 0))
-        || ((template_path[0] == '\0')
-            && (get_path(TEMPLATE_PATH, template_path) != 0)))
+    if ((conf_path[0] == '\0' && get_path(CONF_PATH, conf_path) != 0)
+        || (template_path[0] == '\0'
+            && get_path(TEMPLATE_PATH, template_path) != 0))
         return EXIT_FAILURE;
 
     errno = 0;
@@ -188,11 +188,11 @@ main(int argc, char **argv)
                 break;
             error(EXIT_FAILURE, errno, "Error");
         }
-        if ((ret == 0) && (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)))
+        if (ret == 0 && (!WIFEXITED(status) || WEXITSTATUS(status) != 0))
             ret = -EIO;
     }
 
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /* vi: set expandtab sw=4 ts=4: */

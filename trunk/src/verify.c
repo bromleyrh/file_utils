@@ -167,9 +167,9 @@ log_print(int priority, const char *fmt, ...)
 static signed char
 from_hex(char hexchar)
 {
-    if ((hexchar >= '0') && (hexchar <= '9'))
+    if (hexchar >= '0' && hexchar <= '9')
         return hexchar - '0';
-    if ((hexchar >= 'a') && (hexchar <= 'f'))
+    if (hexchar >= 'a' && hexchar <= 'f')
         return hexchar + 10 - 'a';
 
     return -1;
@@ -185,13 +185,13 @@ scan_chksum(const char *str, unsigned char *sum, unsigned sumlen)
 
         if (*str == '\0')
             return -EINVAL;
-        tmp2 = from_hex(tolower(*(str++)));
+        tmp2 = from_hex(tolower(*str++));
         if (tmp2 == -1)
             return -EINVAL;
 
         if (*str == '\0')
             return -EINVAL;
-        tmp1 = from_hex(tolower(*(str++)));
+        tmp1 = from_hex(tolower(*str++));
         if (tmp1 == -1)
             return -EINVAL;
 
@@ -308,8 +308,8 @@ enable_debugging_features(int trace)
     }
 
     if (trace) {
-        if ((setenv("MALLOC_CHECK_", "7", 1) == -1)
-            || (setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1)) {
+        if (setenv("MALLOC_CHECK_", "7", 1) == -1
+            || setenv("MALLOC_TRACE", MTRACE_FILE, 1) == -1) {
             errmsg = "Couldn't set environment variable";
             goto err;
         }
@@ -345,10 +345,9 @@ set_capabilities()
     if (caps == NULL)
         return -errno;
 
-    if ((cap_set_flag(caps, CAP_PERMITTED, ncapvals, capvals, CAP_SET) == -1)
-        || (cap_set_flag(caps, CAP_EFFECTIVE, ncapvals, capvals, CAP_SET)
-            == -1)
-        || (cap_set_proc(caps) == -1))
+    if (cap_set_flag(caps, CAP_PERMITTED, ncapvals, capvals, CAP_SET) == -1
+        || cap_set_flag(caps, CAP_EFFECTIVE, ncapvals, capvals, CAP_SET) == -1
+        || cap_set_proc(caps) == -1)
         goto err;
 
     cap_free(caps);
@@ -369,7 +368,7 @@ init_privs()
 
     /* FIXME: needed to mount file systems; prevents invoking user from sending
        signals to verify */
-    if ((setresuid(0, 0, 0) == -1) || (setresgid(0, 0, 0) == -1))
+    if (setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
         return -errno;
 
     return set_capabilities();
@@ -479,7 +478,7 @@ wait_for_quit(int seconds)
     extern volatile sig_atomic_t quit;
     int rem;
 
-    for (rem = seconds; (rem > 0) && !quit; rem = sleep(rem))
+    for (rem = seconds; rem > 0 && !quit; rem = sleep(rem))
         ;
 
     return quit;
@@ -531,14 +530,14 @@ scan_input_file(const char *path, struct radix_tree **data)
         }
         res = sscanf(ln, "%s\t%s\t%s\t%s", buf1, buf2, buf3, buf4);
         if (res != 4) {
-            if ((res != EOF) || !ferror(f))
+            if (res != EOF || !ferror(f))
                 goto err3;
             res = -errno;
             goto err2;
         }
         record.size = strtoll(buf1, NULL, 10);
-        if ((scan_chksum(buf2, record.initsum, 20) != 0)
-            || (scan_chksum(buf3, record.sum, 20) != 0))
+        if (scan_chksum(buf2, record.initsum, 20) != 0
+            || scan_chksum(buf3, record.sum, 20) != 0)
             goto err3;
         res = radix_tree_insert(ret, buf4, &record);
         if (res != 0)
@@ -592,7 +591,7 @@ exec_dbus_daemon()
     for (;;) {
         errno = 0;
         if (getline(&line, &n, proc) == -1) {
-            res = (errno == 0) ? -EIO : -errno;
+            res = errno == 0 ? -EIO : -errno;
             if (line != NULL)
                 free(line);
             goto err2;
@@ -609,7 +608,7 @@ exec_dbus_daemon()
 
     ++token;
     n = strlen(line);
-    if ((n > 1) && (line[n-1] == '\n'))
+    if (n > 1 && line[n-1] == '\n')
         line[n-1] = '\0';
 
     if (setenv(DBUS_SESSION_BUS_ADDRESS_ENV, token, 1) == -1) {
@@ -622,7 +621,7 @@ exec_dbus_daemon()
 
     res = pclose(proc);
     if (res != 0) {
-        res = (res > 0) ? -EIO : -errno;
+        res = res > 0 ? -EIO : -errno;
         goto err1;
     }
 
@@ -760,7 +759,7 @@ do_verifs(struct verify_ctx *ctx)
             goto err1;
         }
 
-        if ((va.dstf != stdout) && (fsync(fileno(va.dstf)) == -1)) {
+        if (va.dstf != stdout && fsync(fileno(va.dstf)) == -1) {
             err = -errno;
             error(0, errno, "Error writing output file %s", ctx->output_file);
             goto err1;
@@ -786,7 +785,7 @@ do_verifs(struct verify_ctx *ctx)
         }
     }
 
-    if ((va.dstf != stdout) && (fclose(va.dstf) == EOF)) {
+    if (va.dstf != stdout && fclose(va.dstf) == EOF) {
         err = -errno;
         error(0, -errno, "Error closing %s", ctx->output_file);
         return err;
@@ -848,7 +847,7 @@ main(int argc, char **argv)
 
     ret = parse_cmdline(argc, argv, &confpath, &pctx.ctx.allow_new);
     if (ret != 0)
-        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+        return ret == -1 ? EXIT_FAILURE : EXIT_SUCCESS;
 
     if (confpath == NULL) {
         ret = get_conf_path(CONFIG_PATH, &confpath);
@@ -879,7 +878,7 @@ main(int argc, char **argv)
         goto end1;
     }
 
-    if ((ctx->base_dir != NULL) && (chdir(ctx->base_dir) == -1)) {
+    if (ctx->base_dir != NULL && chdir(ctx->base_dir) == -1) {
         ret = -errno;
         error(0, errno, "Error changing directory to %s", ctx->base_dir);
         goto end1;
@@ -941,7 +940,7 @@ end1:
         free((void *)ctx->input_file);
     free((void *)ctx->output_file);
     free_verifs(ctx->verifs, ctx->num_verifs);
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /* vi: set expandtab sw=4 ts=4: */

@@ -44,8 +44,8 @@ do_fs_cmp(struct libmnt_fs *fs1, struct libmnt_fs *fs2)
 {
     const char *target1, *target2;
 
-    if (((target1 = mnt_fs_get_target(fs1)) == NULL)
-        || ((target2 = mnt_fs_get_target(fs2)) == NULL))
+    if ((target1 = mnt_fs_get_target(fs1)) == NULL
+        || (target2 = mnt_fs_get_target(fs2)) == NULL)
         return -1;
 
     return strcmp(target1, target2);
@@ -140,8 +140,8 @@ keep_mnt(const char *target)
     for (i = 0; i < ARRAY_SIZE(keep); i++) {
         const struct ent *mnt = &keep[i];
 
-        if ((strncmp(target, mnt->target, mnt->len) == 0)
-            && ((target[mnt->len] == '\0') || (target[mnt->len] == '/')))
+        if (strncmp(target, mnt->target, mnt->len) == 0
+            && (target[mnt->len] == '\0' || target[mnt->len] == '/'))
             return 1;
     }
 
@@ -193,8 +193,8 @@ mount_ns_unshare()
 #endif
         goto err;
 
-    if ((mnt_table_first_fs(tbl, &fs) != 0)
-        || (mnt_table_set_iter(tbl, itr, fs) != 0))
+    if (mnt_table_first_fs(tbl, &fs) != 0
+        || mnt_table_set_iter(tbl, itr, fs) != 0)
         goto err;
 
     for (;;) {
@@ -206,9 +206,9 @@ mount_ns_unshare()
 
         if (!keep_mnt(target)) {
             debug_print("Unmounting %s in private namespace", target);
-            if ((mnt_reset_context(mntctx) != 0)
-                || (mnt_context_set_fs(mntctx, fs) != 0)
-                || (mnt_context_umount(mntctx) != 0))
+            if (mnt_reset_context(mntctx) != 0
+                || mnt_context_set_fs(mntctx, fs) != 0
+                || mnt_context_umount(mntctx) != 0)
                 goto err;
         }
 
@@ -255,9 +255,9 @@ mount_file_system(const char *devpath, const char *mntpath, const char *opts,
     if (mnt_context_set_mflags(mntctx, mflags) != 0)
         goto err1;
 
-    if (((opts != NULL) && (mnt_context_append_options(mntctx, opts) != 0))
-        || ((flags == MNT_FS_FORCE_WRITE)
-            && (mnt_context_append_options(mntctx, "rw") != 0)))
+    if ((opts != NULL && mnt_context_append_options(mntctx, opts) != 0)
+        || (flags == MNT_FS_FORCE_WRITE
+            && mnt_context_append_options(mntctx, "rw") != 0))
         goto err1;
 
     if (devpath != NULL) {
@@ -283,7 +283,7 @@ mount_file_system(const char *devpath, const char *mntpath, const char *opts,
 
 err2:
     mnt_free_context(mntctx);
-    return (ret > 0) ? -ret : ret;
+    return ret > 0 ? -ret : ret;
 
 err1:
     mnt_free_context(mntctx);
@@ -324,7 +324,7 @@ unmount_file_system(const char *path, int rootfd)
 
     mnt_free_context(mntctx);
 
-    return (ret > 0) ? -ret : ret;
+    return ret > 0 ? -ret : ret;
 }
 
 int

@@ -35,10 +35,10 @@ do_open(int (*open_func)(const char *, int, ...), const char *pathname,
 {
     char rp[PATH_MAX];
 
-    if ((realpath(pathname, rp) == NULL)
-        || ((strncmp(rp, _PATH_DEVNULL, sizeof(_PATH_DEVNULL) - 1) != 0)
-            && (strncmp(rp, "/proc/", sizeof("/proc/") - 1) != 0)
-            && (strncmp(rp, "/sys/", sizeof("/sys/") - 1) != 0))) {
+    if (realpath(pathname, rp) == NULL
+        || (strncmp(rp, _PATH_DEVNULL, sizeof(_PATH_DEVNULL) - 1) != 0
+            && strncmp(rp, "/proc/", sizeof("/proc/") - 1) != 0
+            && strncmp(rp, "/sys/", sizeof("/sys/") - 1) != 0)) {
         infomsgf("Opening %s with O_DIRECT\n", pathname);
         flags |= O_DIRECT;
     }

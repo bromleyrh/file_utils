@@ -39,7 +39,7 @@ blkdev_set_read_only(const char *path, int read_only, int *prev_read_only)
         goto err;
     }
 
-    if ((prev != read_only) && (ioctl(fd, BLKROSET, &read_only) == -1)) {
+    if (prev != read_only && ioctl(fd, BLKROSET, &read_only) == -1) {
         error(0, errno, "Error setting %s read-only", path);
         goto err;
     }

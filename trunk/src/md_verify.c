@@ -179,7 +179,7 @@ quit:
 static int
 set_time_variables()
 {
-    return (setenv("TZ", ":" TZ_FILE, 0) == -1) ? -errno : 0;
+    return setenv("TZ", ":" TZ_FILE, 0) == -1 ? -errno : 0;
 }
 
 static int
@@ -433,7 +433,7 @@ scan_input_file(const char *path, struct radix_tree **data)
 
         res = sscanf(ln, "'%[^']'%n", buf, &pathlen);
         if (res != 1) {
-            if ((res != EOF) || !ferror(f))
+            if (res != EOF || !ferror(f))
                 goto err3;
             res = MINUS_ERRNO;
             goto err2;
@@ -507,10 +507,11 @@ print_input_data(FILE *f, struct radix_tree *input_data)
 static int
 cmp_timestamps(struct md_record *record, struct stat *s)
 {
-    return -((record->atim.tv_sec != s->st_atim.tv_sec)
-             || (record->atim.tv_nsec != s->st_atim.tv_nsec)
-             || (record->mtim.tv_sec != s->st_mtim.tv_sec)
-             || (record->mtim.tv_nsec != s->st_mtim.tv_nsec));
+    return record->atim.tv_sec == s->st_atim.tv_sec
+           && record->atim.tv_nsec == s->st_atim.tv_nsec
+           && record->mtim.tv_sec == s->st_mtim.tv_sec
+           && record->mtim.tv_nsec == s->st_mtim.tv_nsec
+           ? 0 : -1;
 }
 
 static void
@@ -534,7 +535,7 @@ check_gid(struct set *set, struct stat *s)
     if (ret < 0)
         return ret;
 
-    return (ret != 1);
+    return ret != 1;
 }
 
 static int
@@ -547,7 +548,7 @@ check_mode(struct set *set, struct stat *s)
     if (ret < 0)
         return ret;
 
-    return (ret != 1);
+    return ret != 1;
 }
 
 static int
@@ -560,7 +561,7 @@ check_uid(struct set *set, struct stat *s)
     if (ret < 0)
         return ret;
 
-    return (ret != 1);
+    return ret != 1;
 }
 
 static int
@@ -624,7 +625,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
 
     ret = radix_tree_search(pctx->data, fullpath, &record);
     if (ret != 1) {
-        if (!ignore_additions && (ret == 0)) {
+        if (!ignore_additions && ret == 0) {
             if (!verbose)
                 puts(fullpath);
             puts("File added");
@@ -697,7 +698,7 @@ main(int argc, char **argv)
 
     ret = parse_cmdline(argc, argv, &manifest_path, &paths);
     if (ret != 0)
-        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+        return ret == -1 ? EXIT_FAILURE : EXIT_SUCCESS;
 
     ret = set_time_variables();
     if (ret != 0)

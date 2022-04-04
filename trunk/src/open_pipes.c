@@ -106,8 +106,7 @@ open_pipes(struct pipe_data *pd)
 
     if (pd->npipes == 0)
         return 0;
-    if ((pd->npipes < 0)
-        || ((size_t)pd->npipes > SIZE_MAX / sizeof(pipes[0])))
+    if (pd->npipes < 0 || (size_t)pd->npipes > SIZE_MAX / sizeof(pipes[0]))
         return -EINVAL;
 
     pipes = calloc(pd->npipes, sizeof(pipes[0]));
@@ -121,8 +120,8 @@ open_pipes(struct pipe_data *pd)
             error(0, errno, "Error opening pipe");
             break;
         }
-        if ((do_dup2(pipes[i][0], pd->pipefds[2*i]) == -1)
-            || (do_dup2(pipes[i][1], pd->pipefds[2*i+1]) == -1)) {
+        if (do_dup2(pipes[i][0], pd->pipefds[2*i]) == -1
+            || do_dup2(pipes[i][1], pd->pipefds[2*i+1]) == -1) {
             error(0, errno, "Error duplicating file descriptor");
             close(pipes[i][0]);
             close(pipes[i][1]);

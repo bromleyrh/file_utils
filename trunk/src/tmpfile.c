@@ -48,7 +48,7 @@ dirname_len(const char *path)
 {
     const char *last_slash = strrchr(path, '/');
 
-    return (last_slash == NULL) ? 0 : last_slash - path;
+    return last_slash == NULL ? 0 : last_slash - path;
 }
 
 #endif
@@ -76,7 +76,7 @@ parse_cmdline(int argc, char **argv, char *file, int *write_to_stdout)
             return -1;
     }
 
-    if ((argc > 2) && (strcmp(argv[2], "-t") == 0))
+    if (argc > 2 && strcmp(argv[2], "-t") == 0)
         *write_to_stdout = 1;
 
     return 0;
@@ -108,7 +108,7 @@ close_stdout_pipe(int pipefd[2])
 {
     int ret, tmp;
 
-    if ((pipefd[0] == STDOUT_FILENO) || (pipefd[0] == -1))
+    if (pipefd[0] == STDOUT_FILENO || pipefd[0] == -1)
         return 0;
 
     ret = close(pipefd[0]);
@@ -134,7 +134,7 @@ open_file(char *path)
     ret = open(path, O_TMPFILE | O_WRONLY, ACC_MODE_DEFAULT);
     path[dnlen] = '/';
 
-    return (ret == -1) ? -errno : ret;
+    return ret == -1 ? -errno : ret;
 #else
     (void)path;
 
@@ -226,7 +226,7 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
         }
     }
 
-    return (ret == 0) ? 0 : -errno;
+    return ret == 0 ? 0 : -errno;
 }
 
 static int
@@ -237,7 +237,7 @@ link_file(int fd, const char *name)
     if (fmtbuf(path, "/proc/self/fd/%d", fd) != 0)
         return -ENAMETOOLONG;
 
-    return (linkat(AT_FDCWD, path, AT_FDCWD, name, AT_SYMLINK_FOLLOW) == 0)
+    return linkat(AT_FDCWD, path, AT_FDCWD, name, AT_SYMLINK_FOLLOW) == 0
            ? 0 : -errno;
 }
 
@@ -257,7 +257,7 @@ main(int argc, char **argv)
     if (fd < 0)
         error(EXIT_FAILURE, -fd, "Error opening %s", file);
 
-    if (write_to_stdout && (get_stdout(stdout_pipe, &stdout_splice) < 0))
+    if (write_to_stdout && get_stdout(stdout_pipe, &stdout_splice) < 0)
         goto err1;
 
     err = copy_file(STDIN_FILENO, fd, stdout_pipe, stdout_splice);

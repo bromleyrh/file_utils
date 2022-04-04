@@ -206,7 +206,7 @@ config_trusted(struct stat *s)
 
     mode = s->st_mode;
 
-    if (((mode & S_IWGRP) && (s->st_gid != 0)) || (mode & S_IWOTH)) {
+    if (mode & S_IWGRP && (s->st_gid != 0 || mode & S_IWOTH)) {
         error(0, 0, "Configuration file writable by non-root users");
         return 0;
     }
@@ -224,7 +224,7 @@ read_cb(char *buf, size_t off, size_t len, void *ctx)
 
     ret = fread(buf, 1, len, f);
 
-    return ((ret == 0) && !feof(f)) ? (size_t)-1 : ret;
+    return ret == 0 && !feof(f) ? (size_t)-1 : ret;
 }
 
 static int
@@ -436,8 +436,8 @@ read_json_config(json_val_t config, struct replicate_ctx *ctx)
         if (err)
             return err;
 
-        opt = &opts[(hash_wcs(elem.key, -1) >> 6) & 7];
-        if ((opt->opt == NULL) || (wcscmp(elem.key, opt->opt) != 0))
+        opt = &opts[hash_wcs(elem.key, -1) >> 6 & 7];
+        if (opt->opt == NULL || wcscmp(elem.key, opt->opt) != 0)
             return -EIO;
 
         err = (*opt->fn)(elem.value, ctx);

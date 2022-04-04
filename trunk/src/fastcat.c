@@ -98,8 +98,7 @@ main(int argc, char **argv)
         error(EXIT_FAILURE, errno, "Couldn't get file stats");
 
     fl_out = fcntl(STDOUT_FILENO, F_GETFL);
-    if ((fl_out == -1)
-        || (fcntl(STDOUT_FILENO, F_SETFL, fl_out & ~O_APPEND) == -1))
+    if (fl_out == -1 || fcntl(STDOUT_FILENO, F_SETFL, fl_out & ~O_APPEND) == -1)
         error(EXIT_FAILURE, errno, "Error");
 
     for (i = 0; files[i] != NULL; i++) {

@@ -61,8 +61,7 @@ main(int argc, char **argv)
 
     close(fd);
 
-    if ((strcmp(basename(argv[0]), "delete_input") == 0)
-        && (unlink(file) == -1))
+    if (strcmp(basename(argv[0]), "delete_input") == 0 && unlink(file) == -1)
         warn("Could not remove %s", file);
 
     execvp(prog, args);

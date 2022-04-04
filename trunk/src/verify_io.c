@@ -106,7 +106,7 @@ sorted_stats_add(struct io_stats *stats, double ms)
         ret = set_search(stats->ms_sorted, &m, &res);
         free(m);
         if (ret != 1)
-            return (ret == 0) ? -EIO : ret;
+            return ret == 0 ? -EIO : ret;
         ++res->count;
     }
 
@@ -123,7 +123,7 @@ sorted_stats_remove(struct io_stats *stats, double ms)
     mp = &m;
     ret = set_search(stats->ms_sorted, &mp, &res);
     if (ret != 1)
-        return (ret == 0) ? -EIO : ret;
+        return ret == 0 ? -EIO : ret;
 
     if (res->count > 1) {
         --res->count;
@@ -144,7 +144,7 @@ io_stats_init(struct io_stats *stats, unsigned window_size)
 {
     int err;
 
-    if ((window_size == 0) || (window_size > 4096 / sizeof(double)))
+    if (window_size == 0 || window_size > 4096 / sizeof(double))
         return -EINVAL;
 
     err = queue_new(&stats->ms_buf, QUEUE_FNS_CIRCULAR_BUF, sizeof(double),
@@ -227,7 +227,7 @@ io_stats_get_median(struct io_stats *stats, double *ms, double *min,
     return 0;
 
 err:
-    return (ret == 0) ? -EIO : ret;
+    return ret == 0 ? -EIO : ret;
 }
 
 int
@@ -296,9 +296,9 @@ io_state_update(struct io_state *state, size_t len, double tp)
     } else
         throughput = tp;
 
-    if ((io_stats_add(&state->throughput_stats, throughput) != 0)
-        || (io_stats_get_median(&state->throughput_stats, &throughput, &min,
-                                &max) != 0))
+    if (io_stats_add(&state->throughput_stats, throughput) != 0
+        || io_stats_get_median(&state->throughput_stats, &throughput, &min,
+                               &max) != 0)
         goto end;
 /*  infomsgf("\rThroughput: %11.6f, %11.6f, %11.6f MiB/s", min, throughput,
              max);
@@ -318,8 +318,8 @@ io_state_update(struct io_state *state, size_t len, double tp)
 
         prev_probe_dir = state->probe_dir;
         state->probe_dir *= -1 + 2
-                            * (((int)(throughput * 100)
-                               - (int)(state->last_throughput * 100)) >= 0);
+                            * ((int)(throughput * 100)
+                               - (int)(state->last_throughput * 100) >= 0);
         if (state->probe_dir == prev_probe_dir) {
             state->probe_step = MIN(1024 * 1024,
                                     state->probe_step + TRANSFER_GRAN);

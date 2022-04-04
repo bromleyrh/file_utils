@@ -212,7 +212,7 @@ get_page_offset(off_t off, int hugetlbfs_fd)
     static int pagesize = -1;
 
     if (pagesize == -1) {
-        pagesize = (hugetlbfs_fd == -1) ? sysconf(_SC_PAGESIZE)
+        pagesize = hugetlbfs_fd == -1 ? sysconf(_SC_PAGESIZE)
                    : get_hugepage_size(hugetlbfs_fd);
         if (pagesize == -1)
             return -1;
@@ -253,7 +253,7 @@ dest_buf_reposition(off_t offset, off_t bufsize, struct dest *dst)
     if (pgoff == -1)
         return -1;
 
-    if (!dst->hugetlbfs && (do_ftruncate(dst->fd, offset + bufsize) == -1))
+    if (!dst->hugetlbfs && do_ftruncate(dst->fd, offset + bufsize) == -1)
         goto err;
 
     if (dst->buf.buf != NULL)
@@ -390,7 +390,7 @@ do_copy(int fd1, int fd2, int on_hugetlbfs)
 
     dest_free(&dsts);
 
-    if (!on_hugetlbfs && (do_ftruncate(fd2, off) == -1)) {
+    if (!on_hugetlbfs && do_ftruncate(fd2, off) == -1) {
         error(0, errno, "Couldn't truncate destination file");
         return -1;
     }

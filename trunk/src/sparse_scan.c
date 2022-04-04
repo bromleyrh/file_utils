@@ -105,7 +105,7 @@ parse_cmdline(int argc, char **argv, const char **path)
     } END_GET_LONG_OPTIONS;
 
     if (optind != argc - 1) {
-        error(0, 0, (optind >= argc)
+        error(0, 0, optind >= argc
                     ? "Must specify file" : "Unrecognized arguments");
         return -1;
     }
@@ -194,7 +194,7 @@ scan_data(struct file_info *fi, const char *buf, size_t len, off_t off,
     nonzero1 = nonzero2 = 1;
     if (memcchr(buf, 0, cmplen1) == NULL)
         nonzero1 = 0;
-    if ((cmplen2 == 0) || (memcchr(buf + cmplen1, 0, cmplen2) == NULL))
+    if (cmplen2 == 0 || memcchr(buf + cmplen1, 0, cmplen2) == NULL)
         nonzero2 = 0;
 
     if (nonzero1) {
@@ -285,7 +285,7 @@ block_scan_cb(int fd, int dirfd, const char *name, const char *path,
         return err;
     }
 
-    return (close(fi.fd) == 0) ? 0 : -errno;
+    return close(fi.fd) == 0 ? 0 : -errno;
 }
 
 static void
@@ -329,14 +329,14 @@ main(int argc, char **argv)
 
     ret = parse_cmdline(argc, argv, &path);
     if (ret != 0)
-        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+        return ret == -1 ? EXIT_FAILURE : EXIT_SUCCESS;
 
     acc = create_holes ? O_RDWR : O_RDONLY;
     for (;;) {
         fd = open(path, acc | O_NOCTTY);
         if (fd >= 0)
             break;
-        if ((errno != EISDIR) || (acc == O_RDONLY))
+        if (errno != EISDIR || acc == O_RDONLY)
             error(EXIT_FAILURE, errno, "Error opening %s", path);
         acc = O_RDONLY;
     }
@@ -365,7 +365,7 @@ main(int argc, char **argv)
         goto err1;
 
     printf("Up to %" PRIu64 " byte%s %s freed\n", totbytes,
-           (totbytes == 1) ? "" : "s", create_holes ? "were" : "can be");
+           totbytes == 1 ? "" : "s", create_holes ? "were" : "can be");
 
     return EXIT_SUCCESS;
 

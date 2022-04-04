@@ -146,7 +146,7 @@ getsgids(gid_t **sgids)
 
     tmp = getgroups(nsgids, ret);
     if (tmp != nsgids) {
-        tmp = (tmp == -1) ? -errno : -EIO;
+        tmp = tmp == -1 ? -errno : -EIO;
         free(ret);
         return tmp;
     }
@@ -158,10 +158,10 @@ getsgids(gid_t **sgids)
 static int
 check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid)
 {
-    if ((ruid == 0) || (ruid == uid))
+    if (ruid == 0 || ruid == uid)
         return 0;
 
-    return ((rgid == gid) || group_member(gid)) ? 0 : -EPERM;
+    return rgid == gid || group_member(gid) ? 0 : -EPERM;
 }
 
 static int
@@ -187,7 +187,7 @@ get_io_size(int rootfd)
         return BUFSIZE;
 
     /* FIXME: ensure XFS file systems are mounted with "largeio" mount option */
-    return (fstat(rootfd, &s) == 0) ? s.st_blksize : -errno;
+    return fstat(rootfd, &s) == 0 ? s.st_blksize : -errno;
 #else
     (void)rootfd;
 
@@ -277,8 +277,8 @@ set_direct_io(int fd)
     int fl;
 
     fl = fcntl(fd, F_GETFL);
-    return ((fl != -1)
-            && ((fcntl(fd, F_SETFL, fl | O_DIRECT) != -1) || (errno == EINVAL)))
+    return fl != -1
+           && (fcntl(fd, F_SETFL, fl | O_DIRECT) != -1 || errno == EINVAL)
            ? 0 : -errno; /* EINVAL from fcntl(F_SETFL, fl | O_DIRECT) means
                             O_DIRECT not supported by file system */
 }
@@ -292,7 +292,7 @@ cancel_aio(struct aiocb *cb)
 
     if (ret == AIO_NOTCANCELED) {
         while (aio_suspend((const struct aiocb **)&cb, 1, NULL) == -1) {
-            if ((errno != EAGAIN) && (errno != EINTR))
+            if (errno != EAGAIN && errno != EINTR)
                 break;
         }
     }
@@ -455,8 +455,8 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
 
     (void)bufsz;
 
-    if ((EVP_DigestInit_ex(sumctx, EVP_sha1(), NULL) != 1)
-        || (EVP_DigestInit_ex(initsumctx, EVP_sha1(), NULL) != 1))
+    if (EVP_DigestInit_ex(sumctx, EVP_sha1(), NULL) != 1
+        || EVP_DigestInit_ex(initsumctx, EVP_sha1(), NULL) != 1)
         return -EIO;
 
     omemset(&aiocb, 0);
@@ -486,7 +486,7 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
 
         aiocb.aio_nbytes = wctx->transfer_size;
         aiocb.aio_offset = flen;
-        aiocb.aio_buf = nextbuf = (buf == buf1) ? buf2 : buf1;
+        aiocb.aio_buf = nextbuf = buf == buf1 ? buf2 : buf1;
         if (aio_read(&aiocb) == -1)
             return -errno;
 
@@ -497,12 +497,12 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
                 goto err;
             initrem -= sz;
         }
-        if (!init_verif && (initrem == 0)) {
+        if (!init_verif && initrem == 0) {
             if (EVP_DigestFinal_ex(initsumctx, initsum, sumlen) != 1)
                 goto err;
-            if ((record_in != NULL)
-                && ((*sumlen != 20)
-                    || (memcmp(initsum, record_in->initsum, *sumlen) != 0)))
+            if (record_in != NULL
+                && (*sumlen != 20
+                    || memcmp(initsum, record_in->initsum, *sumlen) != 0))
                 goto verif_err;
             init_verif = 1;
         }
@@ -519,15 +519,15 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
     if (!init_verif) {
         if (EVP_DigestFinal_ex(initsumctx, initsum, sumlen) != 1)
             return -EIO;
-        if ((record_in != NULL)
-            && ((*sumlen != 20)
-                || (memcmp(initsum, record_in->initsum, *sumlen) != 0)))
+        if (record_in != NULL
+            && (*sumlen != 20
+                || memcmp(initsum, record_in->initsum, *sumlen) != 0))
             return 1;
     }
     if (EVP_DigestFinal_ex(sumctx, sum, sumlen) != 1)
         return -EIO;
-    if ((record_in != NULL)
-        && ((*sumlen != 20) || (memcmp(sum, record_in->sum, *sumlen) != 0)))
+    if (record_in != NULL
+        && (*sumlen != 20 || memcmp(sum, record_in->sum, *sumlen) != 0))
         return 1;
 
     return 0;
@@ -537,7 +537,7 @@ verif_err:
     return 1;
 
 err:
-    err = (errno == 0) ? EIO : errno;
+    err = errno == 0 ? EIO : errno;
     cancel_aio(&aiocb);
     return -err;
 }
@@ -551,7 +551,7 @@ output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
         goto err;
 
     /* print checksum of first min(file_size, 512) bytes of file */
-    if ((print_chksum(f, initsum, sumlen) != 0) || (fputc('\t', f) == EOF))
+    if (print_chksum(f, initsum, sumlen) != 0 || fputc('\t', f) == EOF)
         goto err;
 
     /* print checksum of file */
@@ -562,7 +562,7 @@ output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
     if (fprintf(f, "\t%s/%s\n", prefix, path) <= 0)
         goto err;
 
-    return (fflush(f) == EOF) ? -errno : 0;
+    return fflush(f) == EOF ? -errno : 0;
 
 err:
     return -EIO;
@@ -597,8 +597,8 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         return -EIO;
     }
 
-    if ((wctx->reg_excl != NULL) /* check if excluded */
-        && (regexec(wctx->reg_excl, fullpath, 0, NULL, 0) == 0)) {
+    if (wctx->reg_excl != NULL /* check if excluded */
+        && regexec(wctx->reg_excl, fullpath, 0, NULL, 0) == 0) {
         infomsgf("%s excluded\n", fullpath);
         return 0;
     }
@@ -612,7 +612,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     }
 
     /* if multiple hard links, check if already checksummed */
-    mult_links = wctx->detect_hard_links && (s->st_nlink > 1);
+    mult_links = wctx->detect_hard_links && s->st_nlink > 1;
     if (mult_links) {
         res = look_up_ino(s, &record, wctx);
         if (res != 0) {
@@ -718,7 +718,7 @@ verif_fn(void *arg)
 
     bufsz = get_io_size(vargs->srcfd);
     if (bufsz < 1) {
-        err = (bufsz == 0) ? EIO : -bufsz;
+        err = bufsz == 0 ? EIO : -bufsz;
         goto stat_err;
     }
     wctx.bufsz = bufsz * 2;
@@ -765,8 +765,8 @@ verif_fn(void *arg)
         return ENOMEM;
     }
 
-    if ((EVP_DigestInit(wctx.sumctx, EVP_sha1()) != 1)
-        || (EVP_DigestInit(wctx.initsumctx, EVP_sha1()) != 1)) {
+    if (EVP_DigestInit(wctx.sumctx, EVP_sha1()) != 1
+        || EVP_DigestInit(wctx.initsumctx, EVP_sha1()) != 1) {
         TRACE(0, "EVP_DigestInit()");
         err = EIO;
         goto end1;
@@ -824,7 +824,7 @@ end1:
     return err;
 
 alloc_err2:
-    if ((err != ENOMEM) || (hugetlbfl == 0))
+    if (err != ENOMEM || hugetlbfl == 0)
         goto alloc_err1;
     error(0, 0, "Couldn't allocate memory (check " NR_HUGEPAGES " is at least "
           "%d)", nhugep);
@@ -866,13 +866,13 @@ do_verif(struct verif_args *verif_args)
     }
 
     egid = getegid();
-    if ((verif_args->gid != (gid_t)-1) && (setegid(verif_args->gid) == -1)) {
+    if (verif_args->gid != (gid_t)-1 && setegid(verif_args->gid) == -1) {
         ret = errno;
         error(0, ret, "Error changing group");
         goto err1;
     }
     euid = geteuid();
-    if ((verif_args->uid != (uid_t)-1) && (seteuid(verif_args->uid) == -1)) {
+    if (verif_args->uid != (uid_t)-1 && seteuid(verif_args->uid) == -1) {
         ret = errno;
         error(0, ret, "Error changing user");
         goto err2;
@@ -884,8 +884,8 @@ do_verif(struct verif_args *verif_args)
     if (ret != 0)
         goto err3;
 
-    ret = ((seteuid(euid) == 0) && (setegid(egid) == 0)
-           && (setgroups(nsgids, sgids) == 0))
+    ret = seteuid(euid) == 0 && setegid(egid) == 0
+          && setgroups(nsgids, sgids) == 0
           ? 0 : -errno;
 
     free(sgids);

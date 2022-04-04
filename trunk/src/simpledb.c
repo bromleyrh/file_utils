@@ -209,7 +209,7 @@ get_str_arg(const char **str)
 
     *str = strdup(optarg);
 
-    return (*str == NULL) ? -1 : 0;
+    return *str == NULL ? -1 : 0;
 }
 
 static void
@@ -331,10 +331,10 @@ db_key_cmp(const void *k1, const void *k2, void *key_ctx)
     }
 
     cmp = uint64_cmp(key1->type, key2->type);
-    if ((cmp != 0) || (key1->type == TYPE_HEADER))
+    if (cmp != 0 || key1->type == TYPE_HEADER)
         return cmp;
 
-    return (key1->type == TYPE_EXTERNAL)
+    return key1->type == TYPE_EXTERNAL
            ? strcmp((const char *)key1->key, (const char *)key2->key)
            : uint64_cmp(key1->id, key2->id);
 }
@@ -535,7 +535,7 @@ do_db_hl_look_up(struct db_ctx *dbctx, const void *key, void *retkey,
 
     res = db_hl_search(dbctx->dbh, key, retkey, retdata, retdatasize);
 
-    if (look_up_nearest && (res == 0) && dbctx->key_ctx->last_key_valid) {
+    if (look_up_nearest && res == 0 && dbctx->key_ctx->last_key_valid) {
         int cmp;
 
         cmp = (*dbctx->key_cmp)(dbctx->key_ctx->last_key, key, NULL);
@@ -543,12 +543,12 @@ do_db_hl_look_up(struct db_ctx *dbctx, const void *key, void *retkey,
             res = db_hl_search(dbctx->dbh, dbctx->key_ctx->last_key, retkey,
                                retdata, retdatasize);
             assert(res != 0);
-            return (res == 1) ? 2 : res;
+            return res == 1 ? 2 : res;
         }
         res = get_next_elem(retkey, retdata, retdatasize,
                             dbctx->key_ctx->last_key, dbctx);
         if (res != 0)
-            return (res == -EADDRNOTAVAIL) ? 0 : res;
+            return res == -EADDRNOTAVAIL ? 0 : res;
         return 2;
     }
 
@@ -767,7 +767,7 @@ used_id_set(uint64_t *used_id, uint64_t base, uint64_t id, int val)
 
     idx = id - base;
     wordidx = idx / NBWD;
-    mask = 1ull << (idx % NBWD);
+    mask = 1ull << idx % NBWD;
 
     if (val)
         used_id[wordidx] |= mask;
@@ -846,7 +846,7 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     res = do_db_hl_iter_get(iter, &k, &freeid, NULL);
     do_db_hl_iter_free(iter);
     if (res != 0)
-        return (res == -EADDRNOTAVAIL) ? -ENOSPC : res;
+        return res == -EADDRNOTAVAIL ? -ENOSPC : res;
     if (k.type != TYPE_FREE_ID)
         return -ENOSPC;
 
@@ -874,8 +874,8 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     }
 
     used_id_set(freeid.used_id, k.id, ret, 1);
-    res = ((memcchr(freeid.used_id, 0xff, sizeof(freeid.used_id)) == NULL)
-           && !(freeid.flags & FREE_ID_LAST_USED))
+    res = memcchr(freeid.used_id, 0xff, sizeof(freeid.used_id)) == NULL
+          && !(freeid.flags & FREE_ID_LAST_USED)
           ? do_db_hl_delete(dbctx, &k)
           : do_db_hl_replace(dbctx, &k, &freeid, sizeof(freeid));
     if (res != 0)
@@ -884,7 +884,7 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     k.type = TYPE_HEADER;
     res = do_db_hl_look_up(dbctx, &k, NULL, &hdr, NULL, 0);
     if (res != 1)
-        return (res == 0) ? -EILSEQ : res;
+        return res == 0 ? -EILSEQ : res;
 
     ++hdr.numobj;
     res = do_db_hl_replace(dbctx, &k, &hdr, sizeof(hdr));
@@ -927,7 +927,7 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
     k.type = TYPE_HEADER;
     res = do_db_hl_look_up(dbctx, &k, NULL, &hdr, NULL, 0);
     if (res != 1)
-        return (res == 0) ? -EILSEQ : res;
+        return res == 0 ? -EILSEQ : res;
 
     --hdr.numobj;
     return do_db_hl_replace(dbctx, &k, &hdr, sizeof(hdr));
@@ -1117,7 +1117,7 @@ read_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = iovlen;
 
-    return (recvmsg(sockfd, &msghdr, 0) == -1) ? MINUS_ERRNO : 0;
+    return recvmsg(sockfd, &msghdr, 0) == -1 ? MINUS_ERRNO : 0;
 }
 
 static int
@@ -1127,7 +1127,7 @@ write_msg(char *msg, size_t msglen, int sockfd)
     size_t sent;
     ssize_t ret;
 
-    fl = (msglen == 0) ? MSG_EOR : 0;
+    fl = msglen == 0 ? MSG_EOR : 0;
     sent = 0;
     for (;;) {
         struct iovec iov;
@@ -1161,13 +1161,13 @@ write_msg_v(struct iovec *iov, size_t iovlen, int sockfd)
     int fl;
     struct msghdr msghdr;
 
-    fl = (iovlen == 0) ? MSG_EOR : 0;
+    fl = iovlen == 0 ? MSG_EOR : 0;
 
     omemset(&msghdr, 0);
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = iovlen;
 
-    return (sendmsg(sockfd, &msghdr, fl) == -1) ? MINUS_ERRNO : 0;
+    return sendmsg(sockfd, &msghdr, fl) == -1 ? MINUS_ERRNO : 0;
 }
 
 static int
@@ -1291,7 +1291,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         ret = write(pipefd, &msg, 1);
         if (ret == 1)
             break;
-        if ((ret == -1) && (errno != EINTR)) {
+        if (ret == -1 && errno != EINTR) {
             err = MINUS_ERRNO;
             goto err2;
         }
@@ -1323,7 +1323,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         if (err)
             goto err4;
 
-        if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)) {
+        if (op == OP_ABORT_TRANS || op == OP_COMMIT_TRANS) {
             if (op == OP_ABORT_TRANS) {
                 err = -ECANCELED;
                 goto err4;
@@ -1420,8 +1420,8 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
     }
 
 end:
-    if ((shutdown(sockfd2, SHUT_RDWR) == -1)
-        || (shutdown(sockfd1, SHUT_RDWR) == -1)) {
+    if (shutdown(sockfd2, SHUT_RDWR) == -1
+        || shutdown(sockfd1, SHUT_RDWR) == -1) {
         err = MINUS_ERRNO;
         goto err4;
     }
@@ -1494,9 +1494,9 @@ do_init_trans(const char *sock_pathname, const char *pathname)
             goto err3;
         }
 
-        if ((dup2(fd, STDIN_FILENO) == -1)
-            || (dup2(fd, STDOUT_FILENO) == -1)
-            || (dup2(fd, STDERR_FILENO) == -1)) {
+        if (dup2(fd, STDIN_FILENO) == -1
+            || dup2(fd, STDOUT_FILENO) == -1
+            || dup2(fd, STDERR_FILENO) == -1) {
             err = MINUS_ERRNO;
             close(fd);
             goto err3;
@@ -1556,7 +1556,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     struct iovec iov[2];
     struct sockaddr_un addr;
 
-    if ((op != OP_ABORT_TRANS) && (op != OP_COMMIT_TRANS)) {
+    if (op != OP_ABORT_TRANS && op != OP_COMMIT_TRANS) {
         if (key->type == 0) {
             error(0, 0, "Must specify key");
             return -EINVAL;
@@ -1596,7 +1596,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     if (err)
         goto err;
 
-    if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS))
+    if (op == OP_ABORT_TRANS || op == OP_COMMIT_TRANS)
         goto end;
 
     /* send key */
@@ -1739,12 +1739,12 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         error(0, 0, "Must specify key");
         return -EINVAL;
     }
-    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+    if (key->type == KEY_EXTERNAL && strlen(key->key) > KEY_MAX) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
     }
 
-    if ((data == NULL) && (datafd >= 0)) {
+    if (data == NULL && datafd >= 0) {
         err = do_read_data(&d, &dlen, datafd);
         if (err) {
             error(0, -err, "Error reading data");
@@ -1790,7 +1790,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         goto err2;
     }
 
-    if ((data == NULL) && (datafd >= 0))
+    if (data == NULL && datafd >= 0)
         free((void *)d);
 
     if (!notrans) {
@@ -1815,7 +1815,7 @@ err2:
     if (!notrans)
         do_db_hl_trans_abort(dbctx);
 err1:
-    if ((data == NULL) && (datafd >= 0))
+    if (data == NULL && datafd >= 0)
         free((void *)d);
     return err;
 }
@@ -1829,16 +1829,16 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
     size_t dlen = 0;
     struct db_key k;
 
-    if ((key->type == 0) || ((key->type == KEY_INTERNAL) && (key->id == 0))) {
+    if (key->type == 0 || (key->type == KEY_INTERNAL && key->id == 0)) {
         error(0, 0, "Must specify key");
         return -EINVAL;
     }
-    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+    if (key->type == KEY_EXTERNAL && strlen(key->key) > KEY_MAX) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
     }
 
-    if ((data == NULL) && (datafd >= 0)) {
+    if (data == NULL && datafd >= 0) {
         err = do_read_data(&d, &dlen, datafd);
         if (err) {
             error(0, -err, "Error reading data");
@@ -1876,7 +1876,7 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         goto err2;
     }
 
-    if ((data == NULL) && (datafd >= 0))
+    if (data == NULL && datafd >= 0)
         free((void *)d);
 
     if (!notrans) {
@@ -1894,7 +1894,7 @@ err2:
     if (!notrans)
         do_db_hl_trans_abort(dbctx);
 err1:
-    if ((data == NULL) && (datafd >= 0))
+    if (data == NULL && datafd >= 0)
         free((void *)d);
     return err;
 }
@@ -1912,7 +1912,7 @@ do_look_up(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         error(0, 0, "Must specify key");
         return -EINVAL;
     }
-    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+    if (key->type == KEY_EXTERNAL && strlen(key->key) > KEY_MAX) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
     }
@@ -1987,7 +1987,7 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, 0, "Must specify key");
         return -EINVAL;
     }
-    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+    if (key->type == KEY_EXTERNAL && strlen(key->key) > KEY_MAX) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
     }
@@ -2022,7 +2022,7 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, -res, "Error reading database file");
         goto err1;
     }
-    if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
+    if (k.type != TYPE_INTERNAL && k.type != TYPE_EXTERNAL) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
         goto err1;
@@ -2042,7 +2042,7 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
 
     do_db_hl_iter_free(iter);
 
-    if ((data == NULL) && (datafd >= 0)) {
+    if (data == NULL && datafd >= 0) {
         switch (k.type) {
         case TYPE_INTERNAL:
             printf("%" PRIu64 "\n", k.id);
@@ -2095,7 +2095,7 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, 0, "Must specify key");
         return -EINVAL;
     }
-    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+    if (key->type == KEY_EXTERNAL && strlen(key->key) > KEY_MAX) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
     }
@@ -2140,7 +2140,7 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, -res, "Error reading database file");
         goto err1;
     }
-    if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
+    if (k.type != TYPE_INTERNAL && k.type != TYPE_EXTERNAL) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
         goto err1;
@@ -2160,7 +2160,7 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
 
     do_db_hl_iter_free(iter);
 
-    if ((data == NULL) && (datafd >= 0)) {
+    if (data == NULL && datafd >= 0) {
         switch (k.type) {
         case TYPE_INTERNAL:
             printf("%" PRIu64 "\n", k.id);
@@ -2291,7 +2291,7 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, 0, "Must specify key");
         return -EINVAL;
     }
-    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+    if (key->type == KEY_EXTERNAL && strlen(key->key) > KEY_MAX) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
     }
@@ -2336,7 +2336,7 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, -res, "Error reading database file");
         goto err1;
     }
-    if ((k.type != TYPE_INTERNAL) && (k.type != TYPE_EXTERNAL)) {
+    if (k.type != TYPE_INTERNAL && k.type != TYPE_EXTERNAL) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
         goto err1;
@@ -2356,7 +2356,7 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
 
     do_db_hl_iter_free(iter);
 
-    if ((data == NULL) && (datafd >= 0)) {
+    if (data == NULL && datafd >= 0) {
         switch (k.type) {
         case TYPE_INTERNAL:
             printf("%" PRIu64 "\n", k.id);
@@ -2405,7 +2405,7 @@ do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
         error(0, 0, "Must specify key");
         return -EINVAL;
     }
-    if ((key->type == KEY_EXTERNAL) && (strlen(key->key) > KEY_MAX)) {
+    if (key->type == KEY_EXTERNAL && strlen(key->key) > KEY_MAX) {
         error(0, 0, "Key too long");
         return -ENAMETOOLONG;
     }
@@ -2521,7 +2521,7 @@ main(int argc, char **argv)
     ret = parse_cmdline(argc, argv, &sock_pathname, &pathname, &op, &key,
                         &trans);
     if (ret != 0)
-        return (ret == -2) ? EXIT_SUCCESS : EXIT_FAILURE;
+        return ret == -2 ? EXIT_SUCCESS : EXIT_FAILURE;
     if (sock_pathname == NULL)
         sock_pathname = default_sock_pathname;
     if (pathname == NULL)
@@ -2531,8 +2531,8 @@ main(int argc, char **argv)
         ret = do_init_trans(sock_pathname, pathname);
         if (ret == 0)
             infomsgf("%s: Transaction started\n", argv[0]);
-    } else if ((op == OP_ABORT_TRANS) || (op == OP_COMMIT_TRANS)
-             || (trans && (op != OP_LOOK_UP_PREFIX) && (op != OP_DUMP)))
+    } else if (op == OP_ABORT_TRANS || op == OP_COMMIT_TRANS
+               || (trans && op != OP_LOOK_UP_PREFIX && op != OP_DUMP))
         ret = do_update_trans(sock_pathname, op, &key);
     else {
         switch (op) {
@@ -2582,7 +2582,7 @@ end:
         free((void *)sock_pathname);
     if (key.key != NULL)
         free((void *)key.key);
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /* vi: set expandtab sw=4 ts=4: */

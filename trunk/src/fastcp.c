@@ -70,7 +70,7 @@ parse_cmdline(int argc, char **argv, const char **src, const char **dst,
     } END_GET_LONG_OPTIONS;
 
     if (optind != argc - 2) {
-        error(0, 0, (optind > argc - 2)
+        error(0, 0, optind > argc - 2
                     ? "Must specify source and destination paths"
                     : "Unrecognized arguments");
         return -1;
@@ -115,7 +115,7 @@ main(int argc, char **argv)
 
     ret = parse_cmdline(argc, argv, &src, &dst, &back_up);
     if (ret != 0)
-        return (ret == -1) ? EXIT_FAILURE : EXIT_SUCCESS;
+        return ret == -1 ? EXIT_FAILURE : EXIT_SUCCESS;
 
     fd1 = open(src, O_RDONLY);
     if (fd1 == -1)
@@ -157,8 +157,8 @@ main(int argc, char **argv)
 
     close(dstdirfd);
 
-    if (((ret = file_copy_fd(fd1, fd2, 0)) != 0)
-        || ((ret = file_copy_attrs_fd(fd1, fd2, 0)) != 0)) {
+    if ((ret = file_copy_fd(fd1, fd2, 0)) != 0
+        || (ret = file_copy_attrs_fd(fd1, fd2, 0)) != 0) {
         error(0, -ret, "Error copying file");
         goto err2;
     }
