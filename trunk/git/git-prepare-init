@@ -43,8 +43,6 @@ while true; do
         --)
             shift
             break;;
-        *)
-            shift;;
     esac
 done
 
