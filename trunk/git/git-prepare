@@ -21,34 +21,24 @@ sign=0
 trunkdir=trunk
 undo=0
 
-temp=$(getopt ad:imst:u "$@") || exit 1
-eval "set -- $temp"
-while true; do
-    case $1 in
-        -a)
-            agent=1
-            shift;;
-        -d)
-            distdir=$2
-            shift 2;;
-        -i)
-            inc=1
-            shift;;
-        -m)
-            automake=1
-            shift;;
-        -s)
-            sign=1
-            shift;;
-        -t)
-            trunkdir=$2
-            shift 2;;
-        -u)
-            undo=1
-            shift;;
-        --)
-            shift
-            break;;
+while getopts ad:imst:u opt; do
+    case $opt in
+        a)
+            agent=1;;
+        d)
+            distdir=$OPTARG;;
+        i)
+            inc=1;;
+        m)
+            automake=1;;
+        s)
+            sign=1;;
+        t)
+            trunkdir=$OPTARG;;
+        u)
+            undo=1;;
+        *)
+            exit 1;;
     esac
 done
 

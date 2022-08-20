@@ -30,19 +30,14 @@ for i; do
 done
 args=$(printf "%s\n " "$args")
 
-temp=$(getopt ad:imst: "$@") || exit 1
-eval "set -- $temp"
-while true; do
-    case $1 in
-        -d)
-            distdir=$2
-            shift 2;;
-        -t)
-            trunkdir=$2
-            shift 2;;
-        --)
-            shift
-            break;;
+while getopts ad:imst: opt; do
+    case $opt in
+        d)
+            distdir=$OPTARG;;
+        t)
+            trunkdir=$OPTARG;;
+        *)
+            exit 1;;
     esac
 done
 

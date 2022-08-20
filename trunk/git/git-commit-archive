@@ -36,30 +36,24 @@ automake=0
 sign=0
 undo=0
 
-temp=$(getopt ad:msu "$@") || exit 1
-eval "set -- $temp"
-while true; do
-    case $1 in
-        -a)
-            amend=1
-            shift;;
-        -d)
-            dstdir=$2/
-            shift 2;;
-        -m)
-            automake=1
-            shift;;
-        -s)
-            sign=1
-            shift;;
-        -u)
-            undo=1
-            shift;;
-        --)
-            shift
-            break;;
+while getopts ad:msu opt; do
+    case $opt in
+        a)
+            amend=1;;
+        d)
+            dstdir=$OPTARG/;;
+        m)
+            automake=1;;
+        s)
+            sign=1;;
+        u)
+            undo=1;;
+        *)
+            exit 1;;
     esac
 done
+shift $(($OPTIND - 1))
+
 archive=$dstdir$reponame.tar.xz
 
 if [ $undo -eq 1 ]; then

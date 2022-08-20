@@ -9,23 +9,20 @@ if [ ! -d .git ] && [ ! -f .git ]; then
     exit 1
 fi
 
-temp=$(getopt p: "$@") || exit 1
-eval "set -- $temp"
-while true; do
-    case $1 in
-        -p)
-            path=$2
-            shift 2;;
-        --)
-            shift
-            break;;
+while getopts p: opt; do
+    case $opt in
+        p)
+            path=$OPTARG;;
+        *)
+            exit 1;;
     esac
 done
 
-if [ -z "$1" ]; then
+if [ $OPTIND -gt $# ]; then
     echo "Must specify archive file" >&2
     exit 1
 fi
+shift $(($OPTIND - 1))
 archive=$1
 
 mkdir -p $tmpdir

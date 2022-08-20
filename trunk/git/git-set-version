@@ -13,30 +13,23 @@ sign=0
 tagonly=0
 undo=0
 
-temp=$(getopt d:istu "$@") || exit 1
-eval "set -- $temp"
-while true; do
-    case $1 in
-        -d)
-            dir=$2
-            shift 2;;
-        -i)
-            inc=1
-            shift;;
-        -s)
-            sign=1
-            shift;;
-        -t)
-            tagonly=1
-            shift;;
-        -u)
-            undo=1
-            shift;;
-        --)
-            shift
-            break;;
+while getopts d:istu opt; do
+    case $opt in
+        d)
+            dir=$OPTARG;;
+        i)
+            inc=1;;
+        s)
+            sign=1;;
+        t)
+            tagonly=1;;
+        u)
+            undo=1;;
+        *)
+            exit 1;;
     esac
 done
+shift $(($OPTIND - 1))
 
 vfile=$dir/.version
 

@@ -5,26 +5,22 @@ set -e
 force=0
 ignore_errors=0
 
-temp=$(getopt ef "$@") || exit 1
-eval "set -- $temp"
-while true; do
-	case $1 in
-		-e)
-			ignore_errors=1
-			shift;;
-		-f)
-			force=1
-			shift;;
-		--)
-			shift
-			break;;
+while getopts ef opt; do
+	case $opt in
+		e)
+			ignore_errors=1;;
+		f)
+			force=1;;
+		*)
+			exit 1;;
 	esac
 done
 
-if [ -z "$1" ]; then
+if [ $OPTIND -gt $# ]; then
 	echo "Must specify remote" >&2
 	exit 1
 fi
+shift $(($OPTIND - 1))
 remote=$1
 
 trunkdir=trunk
