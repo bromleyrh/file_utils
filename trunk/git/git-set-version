@@ -29,6 +29,12 @@ while getopts d:istu opt; do
             exit 1;;
     esac
 done
+
+if [ $OPTIND -lt $# ]; then
+    echo "Unrecognized arguments" >&2
+    exit 1
+fi
+
 shift $(($OPTIND - 1))
 
 vfile=$dir/.version

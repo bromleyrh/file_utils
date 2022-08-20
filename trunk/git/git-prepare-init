@@ -41,6 +41,11 @@ while getopts ad:imst: opt; do
     esac
 done
 
+if [ $OPTIND -le $# ]; then
+    echo "Unrecognized arguments" >&2
+    exit 1
+fi
+
 vfile=$trunkdir/.version
 
 echo "0.0" > "$vfile"

@@ -16,6 +16,11 @@ while getopts ef opt; do
 	esac
 done
 
+if [ $OPTIND -lt $# ]; then
+	echo "Unrecognized arguments" >&2
+	exit 1
+fi
+
 if [ $OPTIND -gt $# ]; then
 	echo "Must specify remote" >&2
 	exit 1

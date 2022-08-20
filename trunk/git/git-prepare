@@ -42,6 +42,11 @@ while getopts ad:imst:u opt; do
     esac
 done
 
+if [ $OPTIND -le $# ]; then
+    echo "Unrecognized arguments" >&2
+    exit 1
+fi
+
 vfile=$trunkdir/.version
 
 test $sign -eq 1 && commitarchopts="-s"
