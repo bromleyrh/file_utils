@@ -13,12 +13,16 @@
 
 #include <backup.h>
 
+#include <dynamic_array.h>
 #include <forensics.h>
 #include <option_parsing.h>
 #include <radix_tree.h>
 #include <strings_ext.h>
 
+#include <files/util.h>
+
 #include <ctype.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -49,6 +53,9 @@
 
 #define CONFIG_PATH "\"$HOME/.verify.conf\""
 
+#define SO_SUFFIX ".so"
+#define SO_SUFFIX_LEN (sizeof(SO_SUFFIX) - 1)
+
 #define DBUS_LAUNCH_BIN "dbus-launch"
 #define DBUS_SESSION_BUS_ADDRESS_ENV "DBUS_SESSION_BUS_ADDRESS"
 
@@ -72,11 +79,17 @@ static int init_privs(void);
 
 static void print_usage(const char *);
 static void print_version(void);
-static int parse_cmdline(int, char **, const char **, int *);
+static int parse_cmdline(int, char **, const char **, int *,
+                         struct plugin_list *);
 
 static int get_conf_path(const char *, const char **);
 
 static int get_regex(regex_t *, const char *);
+
+static int add_to_plugin_list(struct plugin_list *, char *);
+static int free_plugin_list(struct plugin_list *);
+
+static int load_plugins(struct plugin_list *);
 
 static void int_handler(int);
 
@@ -210,7 +223,8 @@ print_usage(const char *progname)
            "encountering files\n"
            "            not listed in the input file\n"
            "    -c PATH use specified configuration file\n"
-           "    -h      output help\n",
+           "    -h      output help\n"
+           "    -p PATH load plugin referenced by specified shared object path",
            progname);
 }
 
@@ -224,7 +238,8 @@ print_version()
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new)
+parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new,
+              struct plugin_list *plist)
 {
     const char *cfpath = NULL;
     int ret;
@@ -235,7 +250,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new)
         {NULL, 0, NULL, 0}
     };
 
-    GET_LONG_OPTIONS(argc, argv, "ac:dh.", longopts) {
+    GET_LONG_OPTIONS(argc, argv, "ac:dh.p:", longopts) {
     case 'a':
         *allow_new = 1;
         break;
@@ -256,6 +271,12 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new)
     case 'h':
         print_usage(argv[0]);
         goto exit_success;
+    case 'p':
+        if (add_to_plugin_list(plist, optarg) != 0) {
+            ret = -1;
+            goto exit;
+        }
+        break;
     case '.':
         print_version();
         goto exit_success;
@@ -278,6 +299,7 @@ exit_success:
 exit:
     if (cfpath != NULL)
         free((void *)cfpath);
+    free_plugin_list(plist);
     return ret;
 }
 
@@ -440,6 +462,145 @@ get_regex(regex_t *reg, const char *regex)
 }
 
 #undef ERRBUF_INIT_SIZE
+
+static int
+add_to_plugin_list(struct plugin_list *plist, char *path)
+{
+    int err;
+    struct plugin e;
+
+    if (plist->list == NULL) {
+        err = dynamic_array_new(&plist->list, 16, sizeof(struct plugin));
+        if (err)
+            return err;
+    }
+
+    e.path = strdup(path);
+    if (e.path == NULL)
+        return -errno;
+    e.hdl = NULL;
+
+    return dynamic_array_push_back(plist->list, &e);
+}
+
+static int
+free_plugin_list(struct plugin_list *plist)
+{
+    int err = 0, tmp;
+    size_t i, n;
+
+    if (plist->list == NULL)
+        return 0;
+
+    err = dynamic_array_size(plist->list, &n);
+    if (err)
+        return err;
+
+    for (i = 0; i < n; i++) {
+        struct plugin e;
+
+        tmp = dynamic_array_get(plist->list, i, &e);
+        if (tmp == 0) {
+            if (e.hdl != NULL) {
+                (*e.fns->unload)(e.phdl);
+                dlclose(e.hdl);
+            }
+            free(e.path);
+        } else
+            err = tmp;
+    }
+
+    tmp = dynamic_array_free(plist->list);
+    return tmp == 0 ? err : tmp;
+}
+
+static int
+load_plugins(struct plugin_list *plist)
+{
+    int err;
+    size_t i, n;
+    struct plugin e;
+
+    if (plist->list == NULL)
+        return 0;
+
+    err = dynamic_array_size(plist->list, &n);
+    if (err)
+        return err;
+
+    for (i = 0; i < n; i++) {
+        char *fns_sym;
+        const char *bn;
+        int n;
+        size_t len, totlen;
+
+        err = dynamic_array_get(plist->list, i, &e);
+        if (err)
+            goto err1;
+
+        e.hdl = dlopen(e.path, RTLD_LAZY);
+        if (e.hdl == NULL) {
+            fprintf(stderr, "Error opening plugin: %s\n", dlerror());
+            err = -EIO;
+            goto err1;
+        }
+
+        bn = basename_safe(e.path);
+        if (bn == NULL) {
+            err = -EINVAL;
+            goto err2;
+        }
+        len = strlen(bn);
+        if (len >= SO_SUFFIX_LEN
+            && strcmp(bn + len - SO_SUFFIX_LEN, SO_SUFFIX) == 0)
+            len -= SO_SUFFIX_LEN;
+        totlen = len + sizeof(PLUGIN_FNS_SUFFIX);
+        fns_sym = malloc(totlen);
+        if (fns_sym == NULL) {
+            err = -errno;
+            goto err2;
+        }
+        n = snprintf(fns_sym, totlen, "%.*s" PLUGIN_FNS_SUFFIX, len, bn);
+        if (n >= (int)totlen) {
+            err = -ENAMETOOLONG;
+            free(fns_sym);
+            goto err2;
+        }
+
+        e.fns = dlsym(e.hdl, fns_sym);
+        if (e.fns == NULL) {
+            fprintf(stderr, "Error looking up %s in plugin: %s\n", fns_sym,
+                    dlerror());
+            err = -EIO;
+            free(fns_sym);
+            goto err2;
+        }
+
+        free(fns_sym);
+
+        err = (*e.fns->load)(&e.phdl);
+        if (err)
+            goto err2;
+
+        err = dynamic_array_insert(plist->list, i, &e);
+        if (err)
+            goto err2;
+    }
+
+    return 0;
+
+err2:
+    dlclose(e.hdl);
+err1:
+    n = i;
+    for (i = 0; i < n; i++) {
+        if (dynamic_array_get(plist->list, i, &e) == 0) {
+            (*e.fns->unload)(e.phdl);
+            dlclose(e.hdl);
+        }
+    }
+    return err;
+}
 
 static void
 int_handler(int signum)
@@ -705,6 +866,7 @@ do_verifs(struct verify_ctx *ctx)
     va.busconn = ctx->busconn;
     va.uid = ctx->uid;
     va.gid = ctx->gid;
+    va.plist = ctx->plist;
 
     for (i = 0; i < ctx->num_verifs; i++) {
         verif = &ctx->verifs[i];
@@ -838,6 +1000,7 @@ main(int argc, char **argv)
     int ret;
     regex_t reg_excl;
     struct parse_ctx pctx;
+    struct plugin_list plist;
     struct verify_ctx *ctx;
 
     setlinebuf(stdout);
@@ -845,14 +1008,15 @@ main(int argc, char **argv)
     if (enable_debugging_features(0) != 0)
         return EXIT_FAILURE;
 
-    ret = parse_cmdline(argc, argv, &confpath, &pctx.ctx.allow_new);
+    memset(&plist, 0, sizeof(plist));
+    ret = parse_cmdline(argc, argv, &confpath, &pctx.ctx.allow_new, &plist);
     if (ret != 0)
         return ret == -1 ? EXIT_FAILURE : EXIT_SUCCESS;
 
     if (confpath == NULL) {
         ret = get_conf_path(CONFIG_PATH, &confpath);
         if (ret != 0)
-            return EXIT_FAILURE;
+            goto end1;
     }
 
     ctx = &pctx.ctx;
@@ -870,25 +1034,25 @@ main(int argc, char **argv)
     ret = parse_config(confpath, &pctx);
     free((void *)confpath);
     if (ret != 0)
-        return EXIT_FAILURE;
+        goto end1;
 
     ret = init_privs();
     if (ret != 0) {
         error(0, -ret, "Error setting process privileges");
-        goto end1;
+        goto end2;
     }
 
     if (ctx->base_dir != NULL && chdir(ctx->base_dir) == -1) {
         ret = -errno;
         error(0, errno, "Error changing directory to %s", ctx->base_dir);
-        goto end1;
+        goto end2;
     }
 
     if (pctx.regex != NULL) {
         ret = get_regex(&reg_excl, pctx.regex);
         free((void *)pctx.regex);
         if (ret != 0)
-            goto end1;
+            goto end2;
         ctx->reg_excl = &reg_excl;
     }
 
@@ -896,7 +1060,7 @@ main(int argc, char **argv)
         ret = scan_input_file(ctx->input_file, &ctx->input_data);
         if (ret != 0) {
             error(0, -ret, "Error reading %s", ctx->input_file);
-            goto end1;
+            goto end2;
         }
     }
 
@@ -910,19 +1074,25 @@ main(int argc, char **argv)
 
     ret = mount_ns_unshare();
     if (ret != 0)
-        goto end2;
+        goto end3;
 
     ret = set_signal_handlers();
     if (ret != 0)
-        goto end2;
+        goto end3;
 
     ret = init_dbus(&ctx->busconn);
     if (ret != 0)
-        goto end2;
+        goto end3;
+
+    ret = load_plugins(&plist);
+    if (ret != 0)
+        goto end3;
+
+    ctx->plist = &plist;
 
     ret = do_verifs(ctx);
 
-end2:
+end3:
     if (log_verifs) {
         if (ret == 0)
             syslog(LOG_NOTICE, "Verification process successful");
@@ -931,7 +1101,7 @@ end2:
         closelog();
     }
     radix_tree_free(ctx->input_data);
-end1:
+end2:
     if (ctx->base_dir != NULL)
         free((void *)ctx->base_dir);
     if (ctx->reg_excl != NULL)
@@ -940,6 +1110,8 @@ end1:
         free((void *)ctx->input_file);
     free((void *)ctx->output_file);
     free_verifs(ctx->verifs, ctx->num_verifs);
+end1:
+    free_plugin_list(&plist);
     return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

@@ -11,7 +11,8 @@ EXTRA_DIST += src/replicate.conf.sample src/replicate.spec \
 
 noinst_HEADERS += src/common.h src/replicate_common.h src/replicate_conf.h \
 	src/replicate_gram.h src/replicate_trans.h src/util.h src/verify_common.h \
-	src/verify_conf.h src/verify_gram.h src/verify_io.h src/verify_scan.h
+	src/verify_conf.h src/verify_gram.h src/verify_io.h src/verify_plugin.h \
+	src/verify_scan.h
 
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM

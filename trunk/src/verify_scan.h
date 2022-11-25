@@ -5,6 +5,8 @@
 #ifndef _VERIFY_SCAN_H
 #define _VERIFY_SCAN_H
 
+#include "verify_common.h"
+
 #include <dbus/dbus.h>
 
 #include <radix_tree.h>
@@ -24,6 +26,7 @@ struct verif_args {
     const char          *prefix;
     uid_t               uid;
     gid_t               gid;
+    struct plugin_list  *plist;
 };
 
 int do_verif(struct verif_args *verif_args);

@@ -17,6 +17,7 @@
 #include <openssl/evp.h>
 
 #include <avl_tree.h>
+#include <dynamic_array.h>
 #include <radix_tree.h>
 #include <strings_ext.h>
 #include <time_ext.h>
@@ -86,6 +87,7 @@ struct verif_walk_ctx {
     struct avl_tree     *output_data;
     FILE                *dstf;
     const char          *prefix;
+    struct plugin_list  *plist;
 };
 
 volatile sig_atomic_t quit;
@@ -125,6 +127,10 @@ static int verif_chksums(int, char *, char *, size_t, EVP_MD_CTX *,
 
 static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
                          unsigned, const char *, const char *);
+
+static int handle_file_start(struct plugin_list *, const char *, const char *);
+static int handle_file_end(struct plugin_list *);
+static int handle_file_data(struct plugin_list *, const void *, size_t);
 
 static int verif_walk_fn(int, int, const char *, const char *, struct stat *,
                          int, void *);
@@ -480,6 +486,10 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
         }
         flen += len;
 
+        err = handle_file_data(wctx->plist, buf, len);
+        if (err)
+            return err;
+
         err = (*cb)(fd, flen, ctx);
         if (err)
             return err;
@@ -569,6 +579,90 @@ err:
 }
 
 static int
+handle_file_start(struct plugin_list *plist, const char *name, const char *path)
+{
+    int err;
+    size_t i, n;
+
+    if (plist->list == NULL)
+        return 0;
+
+    err = dynamic_array_size(plist->list, &n);
+    if (err)
+        return err;
+
+    for (i = 0; i < n; i++) {
+        struct plugin e;
+
+        err = dynamic_array_get(plist->list, i, &e);
+        if (err)
+            return err;
+
+        err = (*e.fns->handle_file_start)(e.phdl, name, path);
+        if (err)
+            return err;
+    }
+
+    return 0;
+}
+
+static int
+handle_file_end(struct plugin_list *plist)
+{
+    int err;
+    size_t i, n;
+
+    if (plist->list == NULL)
+        return 0;
+
+    err = dynamic_array_size(plist->list, &n);
+    if (err)
+        return err;
+
+    for (i = 0; i < n; i++) {
+        struct plugin e;
+
+        err = dynamic_array_get(plist->list, i, &e);
+        if (err)
+            return err;
+
+        err = (*e.fns->handle_file_end)(e.phdl);
+        if (err)
+            return err;
+    }
+
+    return 0;
+}
+
+static int
+handle_file_data(struct plugin_list *plist, const void *buf, size_t len)
+{
+    int err;
+    size_t i, n;
+
+    if (plist->list == NULL)
+        return 0;
+
+    err = dynamic_array_size(plist->list, &n);
+    if (err)
+        return err;
+
+    for (i = 0; i < n; i++) {
+        struct plugin e;
+
+        err = dynamic_array_get(plist->list, i, &e);
+        if (err)
+            return err;
+
+        err = (*e.fns->handle_file_data)(e.phdl, buf, len);
+        if (err)
+            return err;
+    }
+
+    return 0;
+}
+
+static int
 verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
               struct stat *s, int flags, void *ctx)
 {
@@ -610,6 +704,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
                  strerror(EPERM));
         return 0;
     }
+
+    res = handle_file_start(wctx->plist, name, fullpath);
+    if (res != 0)
+        return res;
 
     /* if multiple hard links, check if already checksummed */
     mult_links = wctx->detect_hard_links && s->st_nlink > 1;
@@ -694,9 +792,11 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
 end:
     res = posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED);
-    if (res != 0)
+    if (res != 0) {
         error(0, res, "Error writing %s", fullpath);
-    return -res;
+        return -res;
+    }
+    return handle_file_end(wctx->plist);
 
 verif_err:
     error(0, 0, "Verification error: %s failed verification", fullpath);
@@ -804,6 +904,8 @@ verif_fn(void *arg)
     err = io_state_init(&wctx.io_state);
     if (err)
         goto end3;
+
+    wctx.plist = vargs->plist;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &wctx.starttm);
 

@@ -5,10 +5,13 @@
 #ifndef _VERIFY_COMMON_H
 #define _VERIFY_COMMON_H
 
+#include "verify_plugin.h"
+
 #include <dbus/dbus.h>
 
 #include <openssl/evp.h>
 
+#include <dynamic_array.h>
 #include <radix_tree.h>
 
 #include <regex.h>
@@ -45,12 +48,24 @@ struct verify_ctx {
     const char          *output_file;
     uid_t               uid;
     gid_t               gid;
+    struct plugin_list  *plist;
 };
 
 struct verif_record {
     off_t           size;
     unsigned char   initsum[EVP_MAX_MD_SIZE];
     unsigned char   sum[EVP_MAX_MD_SIZE];
+};
+
+struct plugin {
+    char                            *path;
+    void                            *hdl;
+    void                            *phdl;
+    const struct verify_plugin_fns  *fns;
+};
+
+struct plugin_list {
+    struct dynamic_array *list;
 };
 
 #define TRACE(err, fmt, ...) \
