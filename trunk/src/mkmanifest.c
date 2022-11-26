@@ -26,6 +26,8 @@
 #define CONF_PATH "\"$HOME/.verify.conf\""
 #define TEMPLATE_PATH "\"$HOME/.manifest_temp\""
 
+#define MKV_PLUGIN_PATH "/usr/local/lib/libverify_mkv_plugin.so"
+
 static void print_usage(const char *);
 static void print_version(void);
 static int parse_cmdline(int, char **, char *, char *);
@@ -141,8 +143,10 @@ main(int argc, char **argv)
     int ret;
 
     static char conf_path[PATH_MAX] = "", template_path[PATH_MAX] = "";
+    static char plugin_path[] = MKV_PLUGIN_PATH;
 
-    static char *const cmd1[] = {"verify", "-a", "-c", conf_path, NULL};
+    static char *const cmd1[] = {"verify", "-a", "-c", conf_path, "-p",
+                                 plugin_path, NULL};
     static char *const cmd2[] = {"osort", "-k3", NULL};
     static char *const cmd3[] = {"fastcat", template_path, "-", NULL};
 
