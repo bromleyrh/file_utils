@@ -18,3 +18,4 @@
 /xfsutil
 
 /libdirectio.so*
+/libverify_mkv_plugin.so

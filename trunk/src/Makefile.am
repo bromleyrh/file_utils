@@ -34,12 +34,18 @@ noinst_LIBRARIES += src/libfileutil.a
 src_libfileutil_a_SOURCES = src/util.c
 src_libfileutil_a_CFLAGS = $(AM_CFLAGS)
 
-lib_LTLIBRARIES += src/libdirectio.la
+lib_LTLIBRARIES += src/libdirectio.la src/libverify_mkv_plugin.la
 
 src_libdirectio_la_SOURCES = src/libdirectio.c
 src_libdirectio_la_CFLAGS = $(AM_CFLAGS)
 src_libdirectio_la_LDFLAGS = -lc -ldl \
 	-version-info @ldio_cur@:@ldio_rev@:@ldio_age@
+
+src_libverify_mkv_plugin_la_SOURCES = src/verify_mkv_plugin.c
+src_libverify_mkv_plugin_la_CFLAGS = $(AM_CFLAGS) @libmatroskalite_cppflags@
+src_libverify_mkv_plugin_la_LDFLAGS = \
+	-version-info @lvmp_cur@:@lvmp_rev@:@lvmp_age@
+src_libverify_mkv_plugin_la_LIBADD = @libmatroskalite_link_dep@
 
 include src/libbackup/Makefile.am
 

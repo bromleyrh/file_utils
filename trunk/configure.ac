@@ -187,6 +187,10 @@ EOF
          [libjson_cppflags=$libjson_CFLAGS
           libjson_link_dep=$libjson_LIBS]
      )
+     PKG_CHECK_MODULES([libmatroskalite], [libmatroskalite],
+         [libmatroskalite_cppflags=$libmatroskalite_CFLAGS
+          libmatroskalite_link_dep=$libmatroskalite_LIBS]
+     )
      PKG_CHECK_MODULES([openssl], [openssl],
          [openssl_cppflags=$openssl_CFLAGS
           openssl_link_dep=$openssl_LIBS]
@@ -194,10 +198,12 @@ EOF
 
      AC_SUBST([dbus_cppflags])
      AC_SUBST([libjson_cppflags])
+     AC_SUBST([libmatroskalite_cppflags])
      AC_SUBST([openssl_cppflags])
 
      AC_SUBST([dbus_link_dep])
      AC_SUBST([libjson_link_dep])
+     AC_SUBST([libmatroskalite_link_dep])
      AC_SUBST([openssl_link_dep])
     ]
 )
@@ -231,6 +237,10 @@ AC_SUBST([lbu_rev], [0])
 AC_SUBST([ldio_cur], [0])
 AC_SUBST([ldio_age], [0])
 AC_SUBST([ldio_rev], [0])
+
+AC_SUBST([lvmp_cur], [0])
+AC_SUBST([lvmp_age], [0])
+AC_SUBST([lvmp_rev], [0])
 
 dnl FIXME: Later, only prevent Autoconf from adding "-g -O2" to CFLAGS
 CFLAGS=$env_cflags
