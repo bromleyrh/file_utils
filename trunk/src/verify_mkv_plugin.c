@@ -53,7 +53,7 @@ static int load(void **);
 static int unload(void *);
 static int handle_file_start(void *, const char *, const char *);
 static int handle_file_end(void *);
-static int handle_file_data(void *, const void *, size_t);
+static int handle_file_data(void *, const void *, size_t, int);
 
 EXPORTED const struct verify_plugin_fns libverify_mkv_plugin_fns = {
     .load               = &load,
@@ -212,7 +212,8 @@ handle_file_end(void *hdl)
 }
 
 static int
-handle_file_data(void *hdl, const void *buf, size_t count)
+handle_file_data(void *hdl, const void *buf, size_t count,
+                 int incomplete_line_output)
 {
     int err;
     struct mkv_ctx *ctx = hdl;
@@ -221,7 +222,8 @@ handle_file_data(void *hdl, const void *buf, size_t count)
     if (ctx->mkv_open != 1)
         return 0;
 
-    fprintf(stderr, "libverify_mkv_plugin.so: %zu bytes of data\n", count);
+    fprintf(stderr, "%slibverify_mkv_plugin.so: %zu bytes of data\n",
+            incomplete_line_output ? "\n" : "", count);
 
     read_ctx = &ctx->read_ctx;
 

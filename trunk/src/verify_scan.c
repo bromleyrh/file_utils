@@ -87,6 +87,7 @@ struct verif_walk_ctx {
     struct avl_tree     *output_data;
     FILE                *dstf;
     const char          *prefix;
+    int                 incomplete_line_output;
     struct plugin_list  *plist;
 };
 
@@ -130,7 +131,7 @@ static int output_record(FILE *, off_t, unsigned char *, unsigned char *,
 
 static int handle_file_start(struct plugin_list *, const char *, const char *);
 static int handle_file_end(struct plugin_list *);
-static int handle_file_data(struct plugin_list *, const void *, size_t);
+static int handle_file_data(struct plugin_list *, const void *, size_t, int);
 
 static int verif_walk_fn(int, int, const char *, const char *, struct stat *,
                          int, void *);
@@ -428,6 +429,8 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
                  / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
                  / (1024 * 1024);
     DEBUG_PRINT_NO_NL("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
+    if (debug)
+        wctx->incomplete_line_output = 1;
 
     broadcast_stat(wctx->busconn, pcnt, "/verify/signal/progress",
                    "verify.signal.Progress", "Progress");
@@ -486,7 +489,8 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
         }
         flen += len;
 
-        err = handle_file_data(wctx->plist, buf, len);
+        err = handle_file_data(wctx->plist, buf, len,
+                               wctx->incomplete_line_output);
         if (err)
             return err;
 
@@ -635,7 +639,8 @@ handle_file_end(struct plugin_list *plist)
 }
 
 static int
-handle_file_data(struct plugin_list *plist, const void *buf, size_t len)
+handle_file_data(struct plugin_list *plist, const void *buf, size_t len,
+                 int incomplete_line_output)
 {
     int err;
     size_t i, n;
@@ -654,7 +659,8 @@ handle_file_data(struct plugin_list *plist, const void *buf, size_t len)
         if (err)
             return err;
 
-        err = (*e.fns->handle_file_data)(e.phdl, buf, len);
+        err = (*e.fns->handle_file_data)(e.phdl, buf, len,
+                                         incomplete_line_output);
         if (err)
             return err;
     }
@@ -768,8 +774,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
             goto verif_err;
         return res;
     }
-    if (debug)
+    if (debug) {
         infomsgf(" (read %s/%s)\n", wctx->prefix, path);
+        wctx->incomplete_line_output = 0;
+    }
 
     if (p_record_in != NULL) {
         res = radix_tree_delete(wctx->input_data, fullpath);
@@ -888,6 +896,7 @@ verif_fn(void *arg)
     wctx.busconn = vargs->busconn;
     wctx.dstf = vargs->dstf;
     wctx.prefix = vargs->prefix;
+    wctx.incomplete_line_output = 0;
 
     if (debug) {
         /* disable floating-point traps from calculations for debugging

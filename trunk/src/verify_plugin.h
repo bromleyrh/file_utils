@@ -12,7 +12,7 @@ struct verify_plugin_fns {
     int (*unload)(void *);
     int (*handle_file_start)(void *, const char *, const char *);
     int (*handle_file_end)(void *);
-    int (*handle_file_data)(void *, const void *, size_t);
+    int (*handle_file_data)(void *, const void *, size_t, int);
 };
 
 #define PLUGIN_FNS_SUFFIX "_fns"
