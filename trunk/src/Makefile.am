@@ -9,10 +9,10 @@ if LINUX
 EXTRA_DIST += src/replicate.conf.sample src/replicate.spec \
 	src/verify.conf.sample src/verify.spec
 
-noinst_HEADERS += src/common.h src/replicate_common.h src/replicate_conf.h \
-	src/replicate_gram.h src/replicate_trans.h src/util.h src/verify_common.h \
-	src/verify_conf.h src/verify_gram.h src/verify_io.h src/verify_plugin.h \
-	src/verify_scan.h
+noinst_HEADERS += src/common.h src/debug.h src/replicate_common.h \
+	src/replicate_conf.h src/replicate_gram.h src/replicate_trans.h src/util.h \
+	src/verify_common.h src/verify_conf.h src/verify_gram.h src/verify_io.h \
+	src/verify_plugin.h src/verify_scan.h
 
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM
@@ -98,7 +98,7 @@ src_open_pipes_SOURCES = src/open_pipes.c
 src_open_pipes_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
 src_open_pipes_CFLAGS = $(AM_CFLAGS)
 
-src_replicate_SOURCES = src/replicate.c src/replicate_conf.c \
+src_replicate_SOURCES = src/debug.c src/replicate.c src/replicate_conf.c \
 	src/replicate_trans.c
 src_replicate_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \

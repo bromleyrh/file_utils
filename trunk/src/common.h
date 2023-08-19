@@ -22,7 +22,13 @@ static _Thread_local int asserttmp;
 
 #endif
 
+#define _STR(x) #x
+#define STR(x) _STR(x)
+
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+#define PL(val) PL_SUF(val, "", "s")
+#define PL_SUF(val, s, p) val, (val) == 1 ? (s) : (p)
 
 #define stderrchr(c) fputc(c, stderr)
 #define stderrmsg(msg) fputs(msg, stderr)

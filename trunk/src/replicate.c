@@ -3,6 +3,7 @@
  */
 
 #include "common.h"
+#include "debug.h"
 #include "replicate_common.h"
 #include "replicate_conf.h"
 #include "replicate_trans.h"
@@ -228,19 +229,20 @@ set_capabilities()
 
     caps = cap_init();
     if (caps == NULL)
-        return -errno;
+        return ERR_TAG(errno);
 
     if (cap_set_flag(caps, CAP_PERMITTED, ncapvals, capvals, CAP_SET) == -1
         || cap_set_flag(caps, CAP_EFFECTIVE, ncapvals, capvals, CAP_SET) == -1
-        || cap_set_proc(caps) == -1)
+        || cap_set_proc(caps) == -1) {
+        err = ERR_TAG(errno);
         goto err;
+    }
 
     cap_free(caps);
 
     return 0;
 
 err:
-    err = -errno;
     cap_free(caps);
     return err;
 }
@@ -254,7 +256,7 @@ init_privs()
     /* FIXME: needed to mount file systems; prevents invoking user from sending
        signals to replicate */
     if (setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
-        return -errno;
+        return ERR_TAG(errno);
 
     return set_capabilities();
 }
@@ -344,18 +346,22 @@ static int
 get_conf_path(const char *pathspec, const char **path)
 {
     const char *ret;
-    int err = -EIO;
+    int err;
     wordexp_t words;
 
-    if (wordexp(pathspec, &words, WRDE_NOCMD | WRDE_UNDEF) != 0)
+    if (wordexp(pathspec, &words, WRDE_NOCMD | WRDE_UNDEF) != 0) {
+        err = ERR_TAG(EIO);
         goto err1;
+    }
 
-    if (words.we_wordc != 1)
+    if (words.we_wordc != 1) {
+        err = ERR_TAG(EIO);
         goto err2;
+    }
 
     ret = strdup(words.we_wordv[0]);
     if (ret == NULL) {
-        err = -errno;
+        err = ERR_TAG(errno);
         goto err2;
     }
 
@@ -421,7 +427,7 @@ get_end_sigmask(sigset_t *set)
 {
     return sigemptyset(set) == 0 && sigaddset(set, SIGUSR1) == 0
            && sigaddset(set, SIGUSR2) == 0
-           ? 0 : -errno;
+           ? 0 : ERR_TAG(errno);
 }
 
 static int
@@ -439,7 +445,7 @@ set_signal_handlers()
 
     for (i = 0; i < ARRAY_SIZE(intsignals); i++) {
         if (sigaction(intsignals[i], &sa, NULL) == -1)
-            return -errno;
+            return ERR_TAG(errno);
     }
 
     err = get_end_sigmask(&sa.sa_mask);
@@ -448,11 +454,11 @@ set_signal_handlers()
 
     sa.sa_handler = &end_handler;
     if (sigaction(SIGUSR1, &sa, NULL) == -1)
-        return -errno;
+        return ERR_TAG(errno);
 
     sa.sa_handler = &end_cancel_handler;
     if (sigaction(SIGUSR2, &sa, NULL) == -1)
-        return -errno;
+        return ERR_TAG(errno);
 
     return 0;
 }
@@ -470,7 +476,7 @@ exec_dbus_daemon()
 
     proc = popen(DBUS_LAUNCH_BIN, "r");
     if (proc == NULL) {
-        res = -errno;
+        res = ERR_TAG(errno);
         goto err1;
     }
 
@@ -479,7 +485,7 @@ exec_dbus_daemon()
     for (;;) {
         errno = 0;
         if (getline(&line, &n, proc) == -1) {
-            res = errno == 0 ? -EIO : -errno;
+            res = ERR_TAG(errno == 0 ? EIO : errno);
             if (line != NULL)
                 free(line);
             goto err2;
@@ -487,7 +493,7 @@ exec_dbus_daemon()
 
         token = strchr(line, '=');
         if (token == NULL) {
-            res = -EIO;
+            res = ERR_TAG(EIO);
             goto err3;
         }
         if (strncmp(DBUS_SESSION_BUS_ADDRESS_ENV, line, token - line) == 0)
@@ -500,7 +506,7 @@ exec_dbus_daemon()
         line[n-1] = '\0';
 
     if (setenv(DBUS_SESSION_BUS_ADDRESS_ENV, token, 1) == -1) {
-        res = -errno;
+        res = ERR_TAG(errno);
         goto err3;
     }
     infomsgf(DBUS_SESSION_BUS_ADDRESS_ENV " = %s\n", token);
@@ -509,7 +515,7 @@ exec_dbus_daemon()
 
     res = pclose(proc);
     if (res != 0) {
-        res = res > 0 ? -EIO : -errno;
+        res = ERR_TAG(res > 0 ? EIO : errno);
         goto err1;
     }
 
@@ -520,7 +526,7 @@ err3:
 err2:
     pclose(proc);
 err1:
-    error(0, -res, "Error executing " DBUS_LAUNCH_BIN);
+    error(0, -err_get_code(res), "Error executing " DBUS_LAUNCH_BIN);
     return res;
 }
 
@@ -538,16 +544,24 @@ init_dbus(DBusConnection **busconn)
     dbus_error_init(&buserr);
 
     ret = dbus_bus_get(DBUS_BUS_SESSION, &buserr);
-    if (dbus_error_is_set(&buserr))
+    if (dbus_error_is_set(&buserr)) {
+        res = ERR_TAG(EIO);
         goto err2;
-    if (ret == NULL)
+    }
+    if (ret == NULL) {
+        res = ERR_TAG(EIO);
         goto err1;
+    }
 
     res = dbus_bus_request_name(ret, "replicate.replicate", 0, &buserr);
-    if (dbus_error_is_set(&buserr))
+    if (dbus_error_is_set(&buserr)) {
+        res = ERR_TAG(EIO);
         goto err2;
-    if (res != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER)
+    }
+    if (res != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
+        res = ERR_TAG(EIO);
         goto err1;
+    }
 
     *busconn = ret;
     return 0;
@@ -556,7 +570,7 @@ err2:
     error(0, 0, "Error connecting to session bus: %s", buserr.message);
     dbus_error_free(&buserr);
 err1:
-    return -EIO;
+    return res;
 }
 
 static int
@@ -568,13 +582,13 @@ get_sess_path(const char *sesspath, const char *path, char *fullpath,
 
     newpath = strsub(path, "/", "_");
     if (newpath == NULL)
-        return -ENOMEM;
+        return ERR_TAG(ENOMEM);
 
     ret = snprintf(fullpath, len, "%s/%s", sesspath, newpath);
 
     free((void *)newpath);
 
-    return ret >= (int)len ? -ENAMETOOLONG : 0;
+    return ret >= (int)len ? ERR_TAG(ENAMETOOLONG) : 0;
 }
 
 static int
@@ -588,13 +602,13 @@ sess_init(int sessid, char *sesspath, size_t len)
     }
 
     if (mkdir(VAR_PATH, ACC_MODE_ACCESS_PERMS) == -1 && errno != EEXIST)
-        return -errno;
+        return ERR_TAG(errno);
 
     if (snprintf(sesspath, len, VAR_PATH "/%d", sessid) >= (int)len)
-        return -ENAMETOOLONG;
+        return ERR_TAG(ENAMETOOLONG);
 
     return mkdir(sesspath, ACC_MODE_ACCESS_PERMS) == -1 && errno != EEXIST
-           ? -errno : 0;
+           ? ERR_TAG(errno) : 0;
 }
 
 static int
@@ -607,21 +621,23 @@ sess_end(const char *sesspath)
 
     err = dir_rem(sesspath, 0);
     if (err)
-        return err;
+        return ERR_TAG(-err);
 
-    return rmdir(sesspath) == -1 ? -errno : 0;
+    return rmdir(sesspath) == -1 ? ERR_TAG(errno) : 0;
 }
 
 static int
 sess_is_complete(const char *sesspath, const char *path)
 {
     char fullpath[PATH_MAX];
+    int err;
 
     if (*sesspath == '\0')
         return 0;
 
-    if (get_sess_path(sesspath, path, fullpath, sizeof(fullpath)) != 0)
-        return 0;
+    err = get_sess_path(sesspath, path, fullpath, sizeof(fullpath));
+    if (err)
+        return err;
 
     return access(fullpath, F_OK) == 0;
 }
@@ -640,7 +656,7 @@ sess_record_complete(const char *sesspath, const char *path)
         return err;
 
     return mknod(fullpath, S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 0) == -1
-           ? -errno : 0;
+           ? ERR_TAG(errno) : 0;
 }
 
 int
@@ -674,20 +690,20 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
 
         err = pthread_sigmask(SIG_BLOCK, &set, &oldset);
         if (err)
-            return err;
+            return ERR_TAG(err);
         if (i == ctx->num_transfers - 1)
             end = -1;
         else if (end) {
             end = -1;
             err = pthread_sigmask(SIG_SETMASK, &oldset, NULL);
             if (err)
-                return err;
+                return ERR_TAG(err);
             log_print(LOG_INFO, "Stopping before transfer %d", i);
             break;
         }
         err = pthread_sigmask(SIG_SETMASK, &oldset, NULL);
         if (err)
-            return err;
+            return ERR_TAG(err);
 
         debug_print("Transfer %d:", i + 1);
         log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
@@ -696,8 +712,9 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         if (transfer->hook != NULL) {
             ca.hookfd = open(transfer->hook, O_NONBLOCK | O_RDONLY);
             if (ca.hookfd == -1) {
-                err = -errno;
-                error(0, -err, "Error opening hook binary %s", transfer->hook);
+                err = errno;
+                error(0, err, "Error opening hook binary %s", transfer->hook);
+                err = ERR_TAG(err);
                 return err;
             }
             ca.hookbin = transfer->hook;
@@ -707,17 +724,19 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         ca.srcfd = mount_file_system(NULL, transfer->srcpath,
                                      transfer->srcmntopts, MNT_FS_READ);
         if (ca.srcfd < 0) {
-            err = ca.srcfd;
-            error(0, -err, "Error mounting %s", transfer->srcpath);
+            err = -ca.srcfd;
+            error(0, err, "Error mounting %s", transfer->srcpath);
+            err = ERR_TAG(err);
             goto err1;
         }
 
         if (transfer->setro) {
-            err = blkdev_set_read_only(transfer->dstpath, 0, &transfer->setro);
+            err = -blkdev_set_read_only(transfer->dstpath, 0, &transfer->setro);
             if (err) {
-                error(0, -err,
+                error(0, err,
                       "Error setting block device read-only flag for %s",
                       transfer->dstpath);
+                err = ERR_TAG(err);
                 goto err2;
             }
         }
@@ -725,8 +744,11 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         err = blkdev_format(transfer->dstpath, transfer->format_cmd,
                             FORMAT_CMD_DEST_SPECIFIER);
         if (err) {
-            if (err > 0)
+            if (err > 0) {
                 error(0, 0, "Formatting command returned status %d", err);
+                err = ERR_TAG(EIO);
+            } else
+                err = ERR_TAG(-err);
             goto err3;
         }
 
@@ -735,30 +757,32 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
                                      transfer->force_write
                                      ? MNT_FS_FORCE_WRITE : MNT_FS_WRITE);
         if (ca.dstfd < 0) {
-            err = ca.dstfd;
-            error(0, -ca.dstfd, "Error mounting %s", transfer->dstpath);
+            err = -ca.dstfd;
+            error(0, err, "Error mounting %s", transfer->dstpath);
             if (err == -EINVAL) {
                 error(0, 0, "/etc/fstab definition for device %s on "
                             "mount point", transfer->dstpath);
                 error(0, 0, "%s must match replicate configuration",
                       transfer->dstmntpath);
             }
+            err = ERR_TAG(err);
             goto err3;
         }
 
         /* change ownership of destination root directory if needed */
         if (ctx->uid != 0 && fchown(ca.dstfd, ctx->uid, (gid_t)-1) == -1) {
-            err = -errno;
-            error(0, errno, "Error changing ownership of %s",
+            err = errno;
+            error(0, err, "Error changing ownership of %s",
                   transfer->dstmntpath);
+            err = ERR_TAG(err);
             goto err4;
         }
 
         nfilesproc = 0;
         err = do_copy(&ca);
         if (err) {
-            error(0, -err, "Error copying from %s to %s", transfer->srcpath,
-                  transfer->dstmntpath);
+            error(0, -err_get_code(err), "Error copying from %s to %s",
+                  transfer->srcpath, transfer->dstmntpath);
             goto err4;
         }
         if (nfilesproc < 2) {
@@ -769,25 +793,28 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
                      transfer->srcpath, transfer->srcpath);
         }
 
-        err = unmount_file_system(transfer->dstmntpath, ca.dstfd);
+        err = -unmount_file_system(transfer->dstmntpath, ca.dstfd);
         if (err) {
-            error(0, -err, "Error unmounting %s", transfer->dstmntpath);
+            error(0, err, "Error unmounting %s", transfer->dstmntpath);
+            err = ERR_TAG(err);
             goto err3;
         }
 
         if (transfer->setro) {
-            err = blkdev_set_read_only(transfer->dstpath, 1, NULL);
+            err = -blkdev_set_read_only(transfer->dstpath, 1, NULL);
             if (err) {
-                error(0, -err, "Error setting block device read-only flag for "
-                               "%s",
+                error(0, err, "Error setting block device read-only flag for "
+                              "%s",
                       transfer->dstpath);
+                err = ERR_TAG(err);
                 goto err2;
             }
         }
 
-        err = unmount_file_system(transfer->srcpath, ca.srcfd);
+        err = -unmount_file_system(transfer->srcpath, ca.srcfd);
         if (err) {
-            error(0, -err, "Error unmounting %s", transfer->srcpath);
+            error(0, err, "Error unmounting %s", transfer->srcpath);
+            err = ERR_TAG(err);
             goto err1;
         }
 
@@ -797,10 +824,14 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         log_print(LOG_INFO, "Finished transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
 
-        sess_record_complete(sesspath, transfer->srcpath);
+        err = sess_record_complete(sesspath, transfer->srcpath);
+        if (err)
+            err_clear(err);
     }
 
-    sess_end(sesspath);
+    err = sess_end(sesspath);
+    if (err)
+        err_clear(err);
 
     return 0;
 
@@ -891,13 +922,13 @@ main(int argc, char **argv)
     if (confpath == NULL) {
         ret = get_conf_path(CONFIG_PATH, &confpath);
         if (ret != 0)
-            return EXIT_FAILURE;
+            goto end1;
     }
 
     ret = parse_config(confpath, &ctx);
     free((void *)confpath);
     if (ret != 0)
-        return EXIT_FAILURE;
+        goto end1;
 
     if (debug) {
         print_transfers(stderr, ctx.transfers, ctx.num_transfers);
@@ -906,8 +937,8 @@ main(int argc, char **argv)
 
     ret = init_privs();
     if (ret != 0) {
-        error(0, -ret, "Error setting process privileges");
-        goto end1;
+        error(0, -err_get_code(ret), "Error setting process privileges");
+        goto end2;
     }
 
     if (log_transfers)
@@ -915,19 +946,19 @@ main(int argc, char **argv)
 
     ret = mount_ns_unshare();
     if (ret != 0)
-        goto end2;
+        goto end3;
 
     ret = set_signal_handlers();
     if (ret != 0)
-        goto end2;
+        goto end3;
 
     ret = init_dbus(&ctx.busconn);
     if (ret != 0)
-        goto end2;
+        goto end3;
 
     ret = do_transfers(&ctx, sessid);
 
-end2:
+end3:
     if (log_transfers) {
         if (ret == 0)
             syslog(LOG_NOTICE, "Transfer process successful");
@@ -935,8 +966,13 @@ end2:
             syslog(LOG_ERR, "Transfer process returned error status");
         closelog();
     }
-end1:
+end2:
     free_transfers(ctx.transfers, ctx.num_transfers);
+end1:
+    if (ret > 0) {
+        err_print(stderr, &ret);
+        return EXIT_FAILURE;
+    }
     return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

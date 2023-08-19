@@ -3,6 +3,7 @@
  */
 
 #include "common.h"
+#include "debug.h"
 #include "replicate_common.h"
 #include "replicate_fs.h"
 #include "replicate_trans.h"
@@ -58,7 +59,7 @@ static int fs_supports_tmpfile(__fsword_t);
 
 static int check_protected_hard_links(void);
 
-static int getsgids(gid_t **);
+static int getsgids(gid_t **, int *);
 static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
 static int broadcast_progress(DBusConnection *, double);
@@ -133,27 +134,28 @@ err:
 }
 
 static int
-getsgids(gid_t **sgids)
+getsgids(gid_t **sgids, int *nsgids)
 {
-    gid_t *ret;
-    int nsgids, tmp;
+    gid_t *retsgids;
+    int retnsgids, tmp;
 
-    nsgids = getgroups(0, NULL);
-    if (nsgids == -1)
-        return -errno;
+    retnsgids = getgroups(0, NULL);
+    if (retnsgids == -1)
+        return ERR_TAG(errno);
 
-    if (oeallocarray(&ret, nsgids) == NULL)
-        return -errno;
+    if (oeallocarray(&retsgids, retnsgids) == NULL)
+        return ERR_TAG(errno);
 
-    tmp = getgroups(nsgids, ret);
-    if (tmp != nsgids) {
-        tmp = tmp == -1 ? -errno : -EIO;
-        free(ret);
+    tmp = getgroups(retnsgids, retsgids);
+    if (tmp != retnsgids) {
+        tmp = ERR_TAG(tmp == -1 ? errno : EIO);
+        free(retsgids);
         return tmp;
     }
 
-    *sgids = ret;
-    return nsgids;
+    *sgids = retsgids;
+    *nsgids = retnsgids;
+    return 0;
 }
 
 static int
@@ -162,7 +164,7 @@ check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid)
     if (ruid == 0 || ruid == uid)
         return 0;
 
-    return rgid == gid || group_member(gid) ? 0 : -EPERM;
+    return rgid == gid || group_member(gid) ? 0 : ERR_TAG(EPERM);
 }
 
 static int
@@ -171,19 +173,26 @@ broadcast_progress(DBusConnection *busconn, double pcnt)
     DBusMessage *msg;
     DBusMessageIter msgargs;
     dbus_uint32_t serial;
+    int err;
 
     msg = dbus_message_new_signal("/replicate/signal/progress",
                                   "replicate.signal.Progress", "Progress");
-    if (msg == NULL)
+    if (msg == NULL) {
+        err = ERR_TAG(ENOMEM);
         goto err1;
+    }
 
     dbus_message_iter_init_append(msg, &msgargs);
     if (dbus_message_iter_append_basic(&msgargs, DBUS_TYPE_DOUBLE, &pcnt)
-        == 0)
+        == 0) {
+        err = ERR_TAG(ENOMEM);
         goto err2;
+    }
 
-    if (dbus_connection_send(busconn, msg, &serial) == 0)
+    if (dbus_connection_send(busconn, msg, &serial) == 0) {
+        err = ERR_TAG(ENOMEM);
         goto err2;
+    }
 
     dbus_message_unref(msg);
 
@@ -192,7 +201,7 @@ broadcast_progress(DBusConnection *busconn, double pcnt)
 err2:
     dbus_message_unref(msg);
 err1:
-    return -ENOMEM;
+    return err;
 }
 
 static int
@@ -220,21 +229,21 @@ execute_hook(int fd, const char *bin, const char *path, mode_t mask)
         _exit(EXIT_FAILURE);
     }
     if (pid == -1)
-        return -errno;
+        return ERR_TAG(errno);
 
     if (waitpid(pid, &status, 0) == -1) {
-        err = -errno;
+        err = ERR_TAG(errno);
         goto err;
     }
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        err = -EIO;
+        err = ERR_TAG(EIO);
         goto err;
     }
 
     return 0;
 
 err:
-    error(0, -err, "Error executing %s", bin);
+    error(0, -err_get_code(err), "Error executing %s", bin);
     return err;
 }
 
@@ -251,8 +260,8 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         int flags, void *ctx)
 {
     double pcnt;
-    int ret;
     int new_file;
+    int ret;
     struct copy_ctx *cctx;
     struct dir_copy_ctx *dcpctx = ctx;
 
@@ -269,7 +278,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
 
     if (dcpctx->off < 0) {
         ret = do_execute_hook(cctx, path);
-        if (ret)
+        if (ret != 0)
             return ret;
         goto end;
     }
@@ -277,7 +286,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
     if (new_file) {
         if (cctx->lastpath != NULL) {
             ret = do_execute_hook(cctx, cctx->lastpath);
-            if (ret)
+            if (ret != 0)
                 return ret;
             if (debug)
                 infomsgf(" (copied %s)\n", cctx->lastpath);
@@ -303,7 +312,9 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
                      / (1024 * 1024);
         infomsgf("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
     }
-    broadcast_progress(cctx->busconn, pcnt);
+    ret = broadcast_progress(cctx->busconn, pcnt);
+    if (ret != 0)
+        err_clear(ret);
 
 end:
     return quit ? -EINTR : 0;
@@ -322,8 +333,8 @@ copy_fn(void *arg)
 
     if (fstatfs(cargs->srcfd, &ss) == -1 || fstatfs(cargs->dstfd, &ds) == -1) {
         ret = errno;
-        error(0, errno, "Error getting file system statistics");
-        return ret;
+        error(0, ret, "Error getting file system statistics");
+        return ERR_TAG(ret);
     }
     cctx.busconn = cargs->busconn;
     cctx.fsbytesused = (ss.f_blocks - ss.f_bfree) * ss.f_frsize;
@@ -350,13 +361,13 @@ copy_fn(void *arg)
         fexcepts = fedisableexcept(FE_ALL_EXCEPT);
         if (fexcepts == -1) {
             TRACE(0, "fedisableexcept()");
-            return EIO;
+            return ERR_TAG(EIO);
         }
     }
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &cctx.starttm);
 
-    ret = -dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
+    ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
     if (debug) {
         feenableexcept(fexcepts);
         infochr('\n');
@@ -365,7 +376,7 @@ copy_fn(void *arg)
         free((void *)cctx.lastpath);
     if (ret == 0)
         nfilesproc = cctx.filesprocessed;
-    else if (ret == EPERM) {
+    else if (ret == -EPERM) {
         error(0, 0, "Permissions error encountered while copying");
         error(0, 0, "It may be necessary to ensure fs.protected_hardlinks is "
                     "set to 0");
@@ -379,7 +390,7 @@ do_copy(struct copy_args *copy_args)
 {
     cap_t caps;
     gid_t egid, *sgids = NULL;
-    int nsgids;
+    int nsgids = 0;
     int ret, tmp;
     static const cap_value_t capval_fsetid = CAP_FSETID;
     uid_t euid;
@@ -395,54 +406,57 @@ do_copy(struct copy_args *copy_args)
         return ret;
     }
 
-    nsgids = getsgids(&sgids);
-    if (nsgids < 0) {
-        error(0, -nsgids, "Error getting groups");
-        return -nsgids;
+    ret = getsgids(&sgids, &nsgids);
+    if (ret != 0) {
+        error(0, -err_get_code(ret), "Error getting groups");
+        return ret;
     }
     if (setgroups(0, NULL) == -1) {
         ret = errno;
-        error(0, errno, "Error setting groups");
+        error(0, ret, "Error setting groups");
         free(sgids);
-        return ret;
+        return ERR_TAG(ret);
     }
 
     egid = getegid();
     if (copy_args->gid != (gid_t)-1 && setegid(copy_args->gid) == -1) {
         ret = errno;
-        error(0, errno, "Error changing group");
+        error(0, ret, "Error changing group");
+        ret = ERR_TAG(ret);
         goto err1;
     }
     euid = geteuid();
     if (copy_args->uid != (uid_t)-1 && seteuid(copy_args->uid) == -1) {
         ret = errno;
-        error(0, errno, "Error changing user");
+        error(0, ret, "Error changing user");
+        ret = ERR_TAG(ret);
         goto err2;
     }
 
     /* allow preservation of set-group-ID mode bits */
     caps = cap_get_proc();
     if (caps == NULL) {
-        ret = errno;
+        ret = ERR_TAG(errno);
         goto err3;
     }
     if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &capval_fsetid, CAP_SET) == -1
         || cap_set_proc(caps) == -1) {
         ret = errno;
-        error(0, errno, "Error setting process privileges");
+        error(0, ret, "Error setting process privileges");
+        ret = ERR_TAG(ret);
         goto err3;
     }
     cap_free(caps);
 
     debug_print("Performing copy");
 
-    ret = -copy_fn(copy_args);
+    ret = copy_fn(copy_args);
     if (ret != 0)
         goto err3;
 
     ret = seteuid(euid) == 0 && setegid(egid) == 0
           && setgroups(nsgids, sgids) == 0
-          ? 0 : -errno;
+          ? 0 : ERR_TAG(errno);
 
     free(sgids);
 
