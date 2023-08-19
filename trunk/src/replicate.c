@@ -715,7 +715,8 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         if (transfer->setro) {
             err = blkdev_set_read_only(transfer->dstpath, 0, &transfer->setro);
             if (err) {
-                error(0, 0, "Error setting block device read-only flag for %s",
+                error(0, -err,
+                      "Error setting block device read-only flag for %s",
                       transfer->dstpath);
                 goto err2;
             }
