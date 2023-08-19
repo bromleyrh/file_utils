@@ -873,7 +873,8 @@ main(int argc, char **argv)
     if (getuid() != 0 && clearenv() != 0)
         return EXIT_FAILURE;
 
-    setlinebuf(stdout);
+    if (setvbuf(stdout, NULL, _IOLBF, 0) != 0)
+        return EXIT_FAILURE;
 
     if (enable_debugging_features(0) != 0)
         return EXIT_FAILURE;

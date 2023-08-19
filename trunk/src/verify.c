@@ -1003,7 +1003,8 @@ main(int argc, char **argv)
     struct plugin_list plist;
     struct verify_ctx *ctx;
 
-    setlinebuf(stdout);
+    if (setvbuf(stdout, NULL, _IOLBF, 0) != 0)
+        return EXIT_FAILURE;
 
     if (enable_debugging_features(0) != 0)
         return EXIT_FAILURE;

@@ -694,7 +694,8 @@ main(int argc, char **argv)
     int ret, status = EXIT_FAILURE;
     struct radix_tree *data;
 
-    setlinebuf(stdout);
+    if (setvbuf(stdout, NULL, _IOLBF, 0) != 0)
+        return EXIT_FAILURE;
 
     ret = parse_cmdline(argc, argv, &manifest_path, &paths);
     if (ret != 0)

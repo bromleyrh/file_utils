@@ -325,7 +325,8 @@ main(int argc, char **argv)
     int ret;
     struct stat s;
 
-    setlinebuf(stdout);
+    if (setvbuf(stdout, NULL, _IOLBF, 0) != 0)
+        return EXIT_FAILURE;
 
     ret = parse_cmdline(argc, argv, &path);
     if (ret != 0)

@@ -2516,7 +2516,8 @@ main(int argc, char **argv)
     static const char default_sock_pathname[] = DEFAULT_SOCK_PATHNAME;
     static const char default_pathname[] = DEFAULT_PATHNAME;
 
-    setlinebuf(stdout);
+    if (setvbuf(stdout, NULL, _IOLBF, 0) != 0)
+        return EXIT_FAILURE;
 
     ret = parse_cmdline(argc, argv, &sock_pathname, &pathname, &op, &key,
                         &trans);
