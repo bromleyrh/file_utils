@@ -130,6 +130,7 @@ get_uid(const char *name, uid_t *uid)
             break;
         if (err != ERANGE) {
             error(0, err, "Error looking up user information for %s", name);
+            err = -err;
             goto err;
         }
 
