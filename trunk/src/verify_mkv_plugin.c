@@ -238,7 +238,7 @@ buf_get_fpos(void *ctx, off_t *offset)
 static void
 read_proc()
 {
-    mkv_ctx->err = matroska_read(NULL, mkv_ctx->hdl);
+    mkv_ctx->err = matroska_read(NULL, mkv_ctx->hdl, 0);
     if (mkv_ctx->err == 0)
         mkv_ctx->mkv_open = -1;
 }
