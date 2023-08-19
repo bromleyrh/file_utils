@@ -79,6 +79,7 @@ get_gid(const char *name, gid_t *gid)
             break;
         if (err != ERANGE) {
             error(0, err, "Error looking up group information for %s", name);
+            err = -err;
             goto err;
         }
 
