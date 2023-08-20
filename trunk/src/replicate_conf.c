@@ -277,8 +277,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
 
     err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
     if (!err) {
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return ERR_TAG(errno);
         ctx->uid = atoi(buf);
         free(buf);
@@ -287,8 +286,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
         if (err)
             return ERR_TAG(-err);
         omemset(&s, 0);
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return ERR_TAG(errno);
         ctx->gid = atoi(buf);
         free(buf);
@@ -296,8 +294,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(opt, L"user", &elem);
         if (err)
             return ERR_TAG(-err);
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return ERR_TAG(errno);
         err = get_uid(buf, &ctx->uid);
         free(buf);
@@ -308,8 +305,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
         if (err)
             return ERR_TAG(-err);
         omemset(&s, 0);
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return ERR_TAG(errno);
         if (strcmp(buf, "-") == 0)
             ctx->gid = (gid_t)-1;
