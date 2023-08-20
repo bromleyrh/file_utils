@@ -368,6 +368,8 @@ copy_fn(void *arg)
     clock_gettime(CLOCK_MONOTONIC_RAW, &cctx.starttm);
 
     ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
+    if (ret < 0)
+        ret = ERR_TAG(-ret);
     if (debug) {
         feenableexcept(fexcepts);
         infochr('\n');
@@ -376,7 +378,7 @@ copy_fn(void *arg)
         free((void *)cctx.lastpath);
     if (ret == 0)
         nfilesproc = cctx.filesprocessed;
-    else if (ret == -EPERM) {
+    else if (err_get_code(ret) == -EPERM) {
         error(0, 0, "Permissions error encountered while copying");
         error(0, 0, "It may be necessary to ensure fs.protected_hardlinks is "
                     "set to 0");
