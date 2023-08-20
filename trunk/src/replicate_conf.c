@@ -192,6 +192,7 @@ open_as_real_user(int *fd, const char *path, int flags, ...)
     if (seteuid(prev_euid) == -1) {
         err = errno;
         error(0, err, "Error accessing %s", path);
+        close(ret);
         return ERR_TAG(err);
     }
 
