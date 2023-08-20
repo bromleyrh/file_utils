@@ -3,6 +3,7 @@
  */
 
 #include "common.h"
+#include "debug.h"
 #include "verify_common.h"
 #include "verify_conf.h"
 #include "verify_scan.h"
@@ -365,19 +366,20 @@ set_capabilities()
 
     caps = cap_init();
     if (caps == NULL)
-        return -errno;
+        return ERR_TAG(errno);
 
     if (cap_set_flag(caps, CAP_PERMITTED, ncapvals, capvals, CAP_SET) == -1
         || cap_set_flag(caps, CAP_EFFECTIVE, ncapvals, capvals, CAP_SET) == -1
-        || cap_set_proc(caps) == -1)
+        || cap_set_proc(caps) == -1) {
+        err = ERR_TAG(errno);
         goto err;
+    }
 
     cap_free(caps);
 
     return 0;
 
 err:
-    err = -errno;
     cap_free(caps);
     return err;
 }
@@ -391,7 +393,7 @@ init_privs()
     /* FIXME: needed to mount file systems; prevents invoking user from sending
        signals to verify */
     if (setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
-        return -errno;
+        return ERR_TAG(errno);
 
     return set_capabilities();
 }
@@ -400,18 +402,22 @@ static int
 get_conf_path(const char *pathspec, const char **path)
 {
     const char *ret;
-    int err = -EIO;
+    int err;
     wordexp_t words;
 
-    if (wordexp(pathspec, &words, WRDE_NOCMD | WRDE_UNDEF) != 0)
+    if (wordexp(pathspec, &words, WRDE_NOCMD | WRDE_UNDEF) != 0) {
+        err = ERR_TAG(EIO);
         goto err1;
+    }
 
-    if (words.we_wordc != 1)
+    if (words.we_wordc != 1) {
+        err = ERR_TAG(EIO);
         goto err2;
+    }
 
     ret = strdup(words.we_wordv[0]);
     if (ret == NULL) {
-        err = -errno;
+        err = ERR_TAG(errno);
         goto err2;
     }
 
@@ -440,14 +446,14 @@ get_regex(regex_t *reg, const char *regex)
 
         errbuf = malloc(ERRBUF_INIT_SIZE);
         if (errbuf == NULL)
-            return -EIO;
+            return ERR_TAG(EIO);
 
         errbuf_size = regerror(err, reg, errbuf, ERRBUF_INIT_SIZE);
         if (errbuf_size > ERRBUF_INIT_SIZE) {
             free(errbuf);
             errbuf = malloc(errbuf_size);
             if (errbuf == NULL)
-                return -EIO;
+                return ERR_TAG(EIO);
 
             regerror(err, reg, errbuf, errbuf_size);
         }
@@ -455,7 +461,7 @@ get_regex(regex_t *reg, const char *regex)
 
         free(errbuf);
 
-        return -EIO;
+        return ERR_TAG(EIO);
     }
 
     return 0;
@@ -526,7 +532,7 @@ load_plugins(struct plugin_list *plist)
 
     err = dynamic_array_size(plist->list, &n);
     if (err)
-        return err;
+        return ERR_TAG(-err);
 
     for (i = 0; i < n; i++) {
         char *fns_sym;
@@ -535,19 +541,21 @@ load_plugins(struct plugin_list *plist)
         size_t len, totlen;
 
         err = dynamic_array_get(plist->list, i, &e);
-        if (err)
+        if (err) {
+            err = ERR_TAG(-err);
             goto err1;
+        }
 
         e.hdl = dlopen(e.path, RTLD_LAZY);
         if (e.hdl == NULL) {
+            err = ERR_TAG(EIO);
             fprintf(stderr, "Error opening plugin: %s\n", dlerror());
-            err = -EIO;
             goto err1;
         }
 
         bn = basename_safe(e.path);
         if (bn == NULL) {
-            err = -EINVAL;
+            err = ERR_TAG(EINVAL);
             goto err2;
         }
         len = strlen(bn);
@@ -557,21 +565,21 @@ load_plugins(struct plugin_list *plist)
         totlen = len + sizeof(PLUGIN_FNS_SUFFIX);
         fns_sym = malloc(totlen);
         if (fns_sym == NULL) {
-            err = -errno;
+            err = ERR_TAG(errno);
             goto err2;
         }
         n = snprintf(fns_sym, totlen, "%.*s" PLUGIN_FNS_SUFFIX, len, bn);
         if (n >= (int)totlen) {
-            err = -ENAMETOOLONG;
+            err = ERR_TAG(ENAMETOOLONG);
             free(fns_sym);
             goto err2;
         }
 
         e.fns = dlsym(e.hdl, fns_sym);
         if (e.fns == NULL) {
+            err = ERR_TAG(EIO);
             fprintf(stderr, "Error looking up %s in plugin: %s\n", fns_sym,
                     dlerror());
-            err = -EIO;
             free(fns_sym);
             goto err2;
         }
@@ -579,12 +587,16 @@ load_plugins(struct plugin_list *plist)
         free(fns_sym);
 
         err = (*e.fns->load)(&e.phdl);
-        if (err)
+        if (err) {
+            err = ERR_TAG(-err);
             goto err2;
+        }
 
         err = dynamic_array_insert(plist->list, i, &e);
-        if (err)
+        if (err) {
+            err = ERR_TAG(-err);
             goto err2;
+        }
     }
 
     return 0;
@@ -627,7 +639,7 @@ set_signal_handlers()
 
     for (i = 0; i < ARRAY_SIZE(intsignals); i++) {
         if (sigaction(intsignals[i], &sa, NULL) == -1)
-            return -errno;
+            return ERR_TAG(errno);
     }
 
     return 0;
@@ -652,8 +664,7 @@ input_data_walk_cb(const char *str, void *val, void *ctx)
 
     (void)val;
 
-    fprintf(f, "%s\n", str);
-    return 0;
+    return fprintf(f, "%s\n", str) < 0 ? ERR_TAG(EIO) : 0;
 }
 
 static int
@@ -668,14 +679,16 @@ scan_input_file(const char *path, struct radix_tree **data)
 
     f = fopen(path, "r");
     if (f == NULL) {
-        res = -errno;
-        error(0, errno, "Error opening %s", path);
-        return res;
+        res = errno;
+        error(0, res, "Error opening %s", path);
+        return ERR_TAG(res);
     }
 
     res = radix_tree_new(&ret, sizeof(struct verif_record));
-    if (res != 0)
+    if (res != 0) {
+        res = ERR_TAG(-res);
         goto err1;
+    }
 
     errno = 0;
     for (linenum = 1;; linenum++) {
@@ -684,25 +697,31 @@ scan_input_file(const char *path, struct radix_tree **data)
 
         if (getline(&ln, &n, f) == -1) {
             if (errno != 0) {
-                res = -errno;
+                res = ERR_TAG(errno);
                 goto err2;
             }
             break;
         }
         res = sscanf(ln, "%s\t%s\t%s\t%s", buf1, buf2, buf3, buf4);
         if (res != 4) {
-            if (res != EOF || !ferror(f))
+            if (res != EOF || !ferror(f)) {
+                res = ERR_TAG(EINVAL);
                 goto err3;
-            res = -errno;
+            }
+            res = ERR_TAG(errno);
             goto err2;
         }
         record.size = strtoll(buf1, NULL, 10);
         if (scan_chksum(buf2, record.initsum, 20) != 0
-            || scan_chksum(buf3, record.sum, 20) != 0)
+            || scan_chksum(buf3, record.sum, 20) != 0) {
+            res = ERR_TAG(EINVAL);
             goto err3;
+        }
         res = radix_tree_insert(ret, buf4, &record);
-        if (res != 0)
+        if (res != 0) {
+            res = ERR_TAG(-res);
             goto err2;
+        }
     }
 
     if (ln != NULL)
@@ -714,7 +733,6 @@ scan_input_file(const char *path, struct radix_tree **data)
 
 err3:
     error(0, 0, "Line %d of %s invalid", linenum, path);
-    res = -EINVAL;
 err2:
     if (ln != NULL)
         free(ln);
@@ -727,7 +745,10 @@ err1:
 static int
 print_input_data(FILE *f, struct radix_tree *input_data)
 {
-    return radix_tree_walk(input_data, &input_data_walk_cb, f);
+    int err;
+
+    err = radix_tree_walk(input_data, &input_data_walk_cb, f);
+    return err < 0 ? ERR_TAG(-err) : err;
 }
 
 /*
@@ -743,7 +764,7 @@ exec_dbus_daemon()
 
     proc = popen(DBUS_LAUNCH_BIN, "r");
     if (proc == NULL) {
-        res = -errno;
+        res = ERR_TAG(errno);
         goto err1;
     }
 
@@ -752,7 +773,7 @@ exec_dbus_daemon()
     for (;;) {
         errno = 0;
         if (getline(&line, &n, proc) == -1) {
-            res = errno == 0 ? -EIO : -errno;
+            res = ERR_TAG(errno == 0 ? EIO : errno);
             if (line != NULL)
                 free(line);
             goto err2;
@@ -760,7 +781,7 @@ exec_dbus_daemon()
 
         token = strchr(line, '=');
         if (token == NULL) {
-            res = -EIO;
+            res = ERR_TAG(EIO);
             goto err3;
         }
         if (strncmp(DBUS_SESSION_BUS_ADDRESS_ENV, line, token - line) == 0)
@@ -773,7 +794,7 @@ exec_dbus_daemon()
         line[n-1] = '\0';
 
     if (setenv(DBUS_SESSION_BUS_ADDRESS_ENV, token, 1) == -1) {
-        res = -errno;
+        res = ERR_TAG(errno);
         goto err3;
     }
     infomsgf(DBUS_SESSION_BUS_ADDRESS_ENV " = %s\n", token);
@@ -782,7 +803,7 @@ exec_dbus_daemon()
 
     res = pclose(proc);
     if (res != 0) {
-        res = res > 0 ? -EIO : -errno;
+        res = ERR_TAG(res > 0 ? EIO : errno);
         goto err1;
     }
 
@@ -793,7 +814,7 @@ err3:
 err2:
     pclose(proc);
 err1:
-    error(0, -res, "Error executing " DBUS_LAUNCH_BIN);
+    error(0, -err_get_code(res), "Error executing " DBUS_LAUNCH_BIN);
     return res;
 }
 
@@ -811,16 +832,24 @@ init_dbus(DBusConnection **busconn)
     dbus_error_init(&buserr);
 
     ret = dbus_bus_get(DBUS_BUS_SESSION, &buserr);
-    if (dbus_error_is_set(&buserr))
+    if (dbus_error_is_set(&buserr)) {
+        res = ERR_TAG(EIO);
         goto err2;
-    if (ret == NULL)
+    }
+    if (ret == NULL) {
+        res = ERR_TAG(EIO);
         goto err1;
+    }
 
     res = dbus_bus_request_name(ret, "verify.verify", 0, &buserr);
-    if (dbus_error_is_set(&buserr))
+    if (dbus_error_is_set(&buserr)) {
+        res = ERR_TAG(EIO);
         goto err2;
-    if (res != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER)
+    }
+    if (res != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
+        res = ERR_TAG(EIO);
         goto err1;
+    }
 
     *busconn = ret;
     return 0;
@@ -829,7 +858,7 @@ err2:
     error(0, 0, "Error connecting to session bus: %s", buserr.message);
     dbus_error_free(&buserr);
 err1:
-    return -EIO;
+    return res;
 }
 
 int
@@ -848,14 +877,14 @@ do_verifs(struct verify_ctx *ctx)
             if (wait_for_quit(10))
                 return -EINTR;
         } else if (errno != ENOTTY)
-            return -errno;
+            return ERR_TAG(errno);
         va.dstf = stdout;
     } else {
         va.dstf = fopen(ctx->output_file, "w");
         if (va.dstf == NULL) {
-            err = -errno;
-            error(0, errno, "Error opening %s", ctx->output_file);
-            return err;
+            err = errno;
+            error(0, err, "Error opening %s", ctx->output_file);
+            return ERR_TAG(-err);
         }
     }
 
@@ -876,11 +905,12 @@ do_verifs(struct verify_ctx *ctx)
                   verif->srcpath);
 
         if (verif->check_cmd != NULL) {
-            err = check_file_system(verif->devpath, verif->check_cmd,
-                                    CHECK_CMD_SRC_SPECIFIER);
+            err = -check_file_system(verif->devpath, verif->check_cmd,
+                                     CHECK_CMD_SRC_SPECIFIER);
             if (err) {
-                error(0, -err, "Error checking file system on %s",
+                error(0, err, "Error checking file system on %s",
                       verif->devpath);
+                err = ERR_TAG(err);
                 goto err1;
             }
         }
@@ -888,15 +918,16 @@ do_verifs(struct verify_ctx *ctx)
         va.srcfd = mount_file_system(verif->devpath, verif->srcpath,
                                      verif->srcmntopts, MNT_FS_READ);
         if (va.srcfd < 0) {
-            err = va.srcfd;
-            error(0, -va.srcfd, "Error mounting %s", verif->srcpath);
-            if (err == -EINVAL) {
+            err = -va.srcfd;
+            error(0, err, "Error mounting %s", verif->srcpath);
+            if (err == EINVAL) {
                 error(0, 0, "/etc/fstab definition for device %s on mount "
                             "point",
                       verif->devpath);
                 error(0, 0, "%s must match file system on device",
                       verif->srcpath);
             }
+            err = ERR_TAG(err);
             goto err1;
         }
 
@@ -904,7 +935,7 @@ do_verifs(struct verify_ctx *ctx)
         nfilesproc = 0;
         err = do_verif(&va);
         if (err) {
-            error(0, -err, "Error verifying %s", verif->srcpath);
+            error(0, -err_get_code(err), "Error verifying %s", verif->srcpath);
             goto err2;
         }
         if (nfilesproc < 2) {
@@ -915,15 +946,17 @@ do_verifs(struct verify_ctx *ctx)
                      verif->srcpath, verif->devpath);
         }
 
-        err = unmount_file_system(verif->srcpath, va.srcfd);
+        err = -unmount_file_system(verif->srcpath, va.srcfd);
         if (err) {
-            error(0, -err, "Error unmounting %s", verif->srcpath);
+            error(0, err, "Error unmounting %s", verif->srcpath);
+            err = ERR_TAG(err);
             goto err1;
         }
 
         if (va.dstf != stdout && fsync(fileno(va.dstf)) == -1) {
-            err = -errno;
-            error(0, errno, "Error writing output file %s", ctx->output_file);
+            err = errno;
+            error(0, err, "Error writing output file %s", ctx->output_file);
+            err = ERR_TAG(err);
             goto err1;
         }
 
@@ -934,22 +967,26 @@ do_verifs(struct verify_ctx *ctx)
     if (ctx->input_data != NULL) {
         struct radix_tree_stats s;
 
-        err = radix_tree_stats(ctx->input_data, &s);
+        err = -radix_tree_stats(ctx->input_data, &s);
         if (err) {
-            TRACE(-err, "radix_tree_stats()");
+            TRACE(err, "radix_tree_stats()");
+            err = ERR_TAG(err);
             goto err1;
         }
         if (s.num_info_nodes != 0) {
-            err = -EIO;
             error(0, 0, "Verification error: Files removed:");
-            print_input_data(stderr, ctx->input_data);
+            err = print_input_data(stderr, ctx->input_data);
+            if (err > 0)
+                err_clear(err);
+            err = -EIO;
             goto err1;
         }
     }
 
     if (va.dstf != stdout && fclose(va.dstf) == EOF) {
-        err = -errno;
-        error(0, -errno, "Error closing %s", ctx->output_file);
+        err = errno;
+        error(0, err, "Error closing %s", ctx->output_file);
+        err = ERR_TAG(err);
         return err;
     }
 
@@ -1039,13 +1076,13 @@ main(int argc, char **argv)
 
     ret = init_privs();
     if (ret != 0) {
-        error(0, -ret, "Error setting process privileges");
+        error(0, -err_get_code(ret), "Error setting process privileges");
         goto end2;
     }
 
     if (ctx->base_dir != NULL && chdir(ctx->base_dir) == -1) {
-        ret = -errno;
-        error(0, errno, "Error changing directory to %s", ctx->base_dir);
+        ret = errno;
+        error(0, ret, "Error changing directory to %s", ctx->base_dir);
         goto end2;
     }
 
@@ -1060,7 +1097,7 @@ main(int argc, char **argv)
     if (ctx->input_file != NULL) {
         ret = scan_input_file(ctx->input_file, &ctx->input_data);
         if (ret != 0) {
-            error(0, -ret, "Error reading %s", ctx->input_file);
+            error(0, -err_get_code(ret), "Error reading %s", ctx->input_file);
             goto end2;
         }
     }
@@ -1113,6 +1150,10 @@ end2:
     free_verifs(ctx->verifs, ctx->num_verifs);
 end1:
     free_plugin_list(&plist);
+    if (ret > 0) {
+        err_print(stderr, &ret);
+        return EXIT_FAILURE;
+    }
     return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

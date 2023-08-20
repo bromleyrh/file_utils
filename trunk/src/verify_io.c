@@ -3,6 +3,7 @@
  */
 
 #include "common.h"
+#include "debug.h"
 #include "util.h"
 #include "verify_io.h"
 
@@ -89,7 +90,7 @@ sorted_stats_add(struct io_stats *stats, double ms)
     struct ms *m;
 
     if (oemalloc(&m) == NULL)
-        return -errno;
+        return ERR_TAG(errno);
     m->ms = ms;
     m->count = 1;
 
@@ -101,12 +102,12 @@ sorted_stats_add(struct io_stats *stats, double ms)
 
         if (ret != -EADDRINUSE) {
             free(m);
-            return ret;
+            return ERR_TAG(-ret);
         }
         ret = set_search(stats->ms_sorted, &m, &res);
         free(m);
         if (ret != 1)
-            return ret == 0 ? -EIO : ret;
+            return ERR_TAG(ret == 0 ? EIO : -ret);
         ++res->count;
     }
 
@@ -123,7 +124,7 @@ sorted_stats_remove(struct io_stats *stats, double ms)
     mp = &m;
     ret = set_search(stats->ms_sorted, &mp, &res);
     if (ret != 1)
-        return ret == 0 ? -EIO : ret;
+        return ERR_TAG(ret == 0 ? EIO : -ret);
 
     if (res->count > 1) {
         --res->count;
@@ -132,7 +133,7 @@ sorted_stats_remove(struct io_stats *stats, double ms)
 
     ret = set_delete(stats->ms_sorted, &res);
     if (ret != 0)
-        return ret;
+        return ERR_TAG(-ret);
     free(res);
     --stats->num_uniq_ms;
 
@@ -145,18 +146,18 @@ io_stats_init(struct io_stats *stats, unsigned window_size)
     int err;
 
     if (window_size == 0 || window_size > 4096 / sizeof(double))
-        return -EINVAL;
+        return ERR_TAG(EINVAL);
 
     err = queue_new(&stats->ms_buf, QUEUE_FNS_CIRCULAR_BUF, sizeof(double),
                     NULL);
     if (err)
-        return err;
+        return ERR_TAG(-err);
 
     err = set_new(&stats->ms_sorted, SET_FNS_AVL_TREE, sizeof(struct ms *),
                   &ms_cmp, NULL, &ms_free);
     if (err) {
         queue_free(stats->ms_buf);
-        return err;
+        return ERR_TAG(-err);
     }
 
     stats->window_size = window_size;
@@ -180,13 +181,19 @@ io_stats_add(struct io_stats *stats, double ms)
     if (stats->num_ms >= stats->window_size) {
         double ret;
 
-        if ((err = queue_pop_front(stats->ms_buf, &ret))
-            || (err = sorted_stats_remove(stats, ret)))
+        err = queue_pop_front(stats->ms_buf, &ret);
+        if (err)
+            return ERR_TAG(-err);
+        err = sorted_stats_remove(stats, ret);
+        if (err)
             return err;
         --stats->num_ms;
     }
-    if ((err = queue_push_back(stats->ms_buf, &ms))
-        || (err = sorted_stats_add(stats, ms)))
+    err = queue_push_back(stats->ms_buf, &ms);
+    if (err)
+        return ERR_TAG(-err);
+    err = sorted_stats_add(stats, ms);
+    if (err)
         return err;
     ++stats->num_ms;
 
@@ -237,7 +244,7 @@ io_state_init(struct io_state **state)
     struct io_state *ret;
 
     if (oemalloc(&ret) == NULL)
-        return -errno;
+        return ERR_TAG(errno);
 
     err = io_stats_init(&ret->throughput_stats, STATS_WINDOW_SIZE);
     if (err) {
@@ -265,6 +272,7 @@ io_state_update(struct io_state *state, size_t len, double tp)
 {
     double throughput;
     double min, max;
+    int err;
     struct timespec dt, t2;
 
     if (state->init) {
@@ -296,10 +304,12 @@ io_state_update(struct io_state *state, size_t len, double tp)
     } else
         throughput = tp;
 
-    if (io_stats_add(&state->throughput_stats, throughput) != 0
-        || io_stats_get_median(&state->throughput_stats, &throughput, &min,
-                               &max) != 0)
+    if ((err = io_stats_add(&state->throughput_stats, throughput))
+        || (err = io_stats_get_median(&state->throughput_stats, &throughput,
+                                      &min, &max))) {
+        err_clear(err);
         goto end;
+    }
 /*  infomsgf("\rThroughput: %11.6f, %11.6f, %11.6f MiB/s", min, throughput,
              max);
 */

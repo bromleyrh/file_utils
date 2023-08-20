@@ -3,6 +3,7 @@
  */
 
 #include "common.h"
+#include "debug.h"
 #include "util.h"
 #include "verify_common.h"
 #include "verify_conf.h"
@@ -43,7 +44,7 @@ static int expand_string(char **, char **, size_t *, size_t);
 static int get_gid(const char *, gid_t *);
 static int get_uid(const char *, uid_t *);
 
-static int open_as_real_user(const char *, int, ...);
+static int open_as_real_user(int *, const char *, int, ...);
 static int config_trusted(struct stat *);
 static size_t read_cb(char *, size_t, size_t, void *);
 
@@ -72,7 +73,7 @@ expand_string(char **str, char **dst, size_t *len, size_t minadd)
         newlen = MAX(*len + minadd, *len * 2);
         tmp = do_realloc((void *)*str, newlen + 1);
         if (tmp == NULL)
-            return -errno;
+            return ERR_TAG(errno);
         *str = tmp;
         *dst = tmp + off;
         *len = newlen;
@@ -95,7 +96,7 @@ get_gid(const char *name, gid_t *gid)
 
     buf = do_malloc(bufsize);
     if (buf == NULL)
-        return -errno;
+        return ERR_TAG(errno);
 
     for (;;) {
         char *tmp;
@@ -105,19 +106,20 @@ get_gid(const char *name, gid_t *gid)
             break;
         if (err != ERANGE) {
             error(0, err, "Error looking up group information for %s", name);
+            err = ERR_TAG(err);
             goto err;
         }
 
         bufsize *= 2;
         tmp = do_realloc(buf, bufsize);
         if (tmp == NULL) {
-            err = -errno;
+            err = ERR_TAG(errno);
             goto err;
         }
         buf = tmp;
     }
     if (res == NULL) {
-        err = -ENOENT;
+        err = ERR_TAG(ENOENT);
         goto err;
     }
 
@@ -146,7 +148,7 @@ get_uid(const char *name, uid_t *uid)
 
     buf = do_malloc(bufsize);
     if (buf == NULL)
-        return -errno;
+        return ERR_TAG(errno);
 
     for (;;) {
         char *tmp;
@@ -156,19 +158,20 @@ get_uid(const char *name, uid_t *uid)
             break;
         if (err != ERANGE) {
             error(0, err, "Error looking up user information for %s", name);
+            err = ERR_TAG(err);
             goto err;
         }
 
         bufsize *= 2;
         tmp = do_realloc(buf, bufsize);
         if (tmp == NULL) {
-            err = -errno;
+            err = ERR_TAG(errno);
             goto err;
         }
         buf = tmp;
     }
     if (res == NULL) {
-        err = -ENOENT;
+        err = ERR_TAG(ENOENT);
         goto err;
     }
 
@@ -184,16 +187,17 @@ err:
 }
 
 static int
-open_as_real_user(const char *path, int flags, ...)
+open_as_real_user(int *fd, const char *path, int flags, ...)
 {
-    int ret;
+    int err, ret;
     uid_t prev_euid;
 
     prev_euid = geteuid();
 
     if (seteuid(getuid()) == -1) {
-        error(0, errno, "Error accessing %s", path);
-        return -1;
+        err = errno;
+        error(0, err, "Error accessing %s", path);
+        return ERR_TAG(err);
     }
 
     if (flags & O_CREAT) {
@@ -205,18 +209,21 @@ open_as_real_user(const char *path, int flags, ...)
     } else
         ret = open(path, flags);
     if (ret == -1) {
-        error(0, errno, "Error opening %s", path);
+        err = errno;
+        error(0, err, "Error opening %s", path);
         (void)(prev_euid = seteuid(prev_euid));
-        return -1;
+        return ERR_TAG(err);
     }
 
     if (seteuid(prev_euid) == -1) {
-        error(0, errno, "Error accessing %s", path);
+        err = errno;
+        error(0, err, "Error accessing %s", path);
         close(ret);
-        return -1;
+        return ERR_TAG(err);
     }
 
-    return ret;
+    *fd = ret;
+    return 0;
 }
 
 static int
@@ -260,7 +267,7 @@ read_base_dir_opt(json_val_t opt, void *data)
 
     omemset(&s, 0);
     return awcstombs((char **)&ctx->base_dir, json_val_string_get(opt), &s)
-           == (size_t)-1 ? -errno : 0;
+           == (size_t)-1 ? ERR_TAG(errno) : 0;
 }
 
 static int
@@ -276,18 +283,16 @@ read_creds_opt(json_val_t opt, void *data)
 
     err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
     if (!err) {
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return -errno;
         ctx->uid = atoi(buf);
         free(buf);
 
         err = json_val_object_get_elem_by_key(opt, L"gid", &elem);
         if (err)
-            return err;
+            return ERR_TAG(-err);
         omemset(&s, 0);
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return -errno;
         ctx->gid = atoi(buf);
         free(buf);
@@ -295,8 +300,7 @@ read_creds_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(opt, L"user", &elem);
         if (err)
             return err;
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return -errno;
         err = get_uid(buf, &ctx->uid);
         free(buf);
@@ -305,10 +309,9 @@ read_creds_opt(json_val_t opt, void *data)
 
         err = json_val_object_get_elem_by_key(opt, L"group", &elem);
         if (err)
-            return err;
+            return ERR_TAG(-err);
         omemset(&s, 0);
-        if (awcstombs((char **)&buf, json_val_string_get(elem.value), &s)
-            == (size_t)-1)
+        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
             return -errno;
         if (strcmp(buf, "-") == 0)
             ctx->gid = (gid_t)-1;
@@ -321,7 +324,7 @@ read_creds_opt(json_val_t opt, void *data)
         }
         free(buf);
     } else
-        return err;
+        return ERR_TAG(-err);
 
     return 0;
 }
@@ -365,12 +368,12 @@ read_exclude_opt(json_val_t opt, void *data)
 
         val = json_val_array_get_elem(opt, i);
         if (val == NULL)
-            return -EIO;
+            return ERR_TAG(EIO);
 
         omemset(&s, 0);
         brlen = awcstombs(&regexbr, json_val_string_get(val), &s);
         if (brlen == (size_t)-1)
-            return -errno;
+            return ERR_TAG(errno);
 
         err = expand_string(&pctx->regex, &pctx->regexcurbr, &pctx->regexlen,
                             brlen + 2);
@@ -396,7 +399,7 @@ read_input_file_opt(json_val_t opt, void *data)
 
     omemset(&s, 0);
     return awcstombs((char **)&ctx->input_file, json_val_string_get(opt), &s)
-           == (size_t)-1 ? -errno : 0;
+           == (size_t)-1 ? ERR_TAG(errno) : 0;
 }
 
 static int
@@ -407,7 +410,7 @@ read_output_file_opt(json_val_t opt, void *data)
 
     omemset(&s, 0);
     return awcstombs((char **)&ctx->output_file, json_val_string_get(opt), &s)
-           == (size_t)-1 ? -errno : 0;
+           == (size_t)-1 ? ERR_TAG(errno) : 0;
 }
 
 static int
@@ -443,21 +446,23 @@ read_verifs_opt(json_val_t opt, void *data)
     ctx->num_verifs = json_val_array_get_num_elem(opt);
 
     if (oecalloc(&ctx->verifs, ctx->num_verifs) == NULL)
-        return -errno;
+        return ERR_TAG(errno);
 
     for (i = 0; i < ctx->num_verifs; i++) {
         json_val_t val;
 
         val = json_val_array_get_elem(opt, i);
         if (val == NULL) {
-            err = -EIO;
+            err = ERR_TAG(EIO);
             goto err;
         }
 
         ctx->verifs[i].check_cmd = NULL;
         err = json_oscanf(&ctx->verifs[i], spec, (int)ARRAY_SIZE(spec), 0, val);
-        if (err)
+        if (err) {
+            err = ERR_TAG(-err);
             goto err;
+        }
     }
 
     return 0;
@@ -479,21 +484,27 @@ parse_json_config(const char *path, const struct json_parser *parser,
     struct json_read_cb_ctx ctx;
     struct stat s;
 
-    fd = open_as_real_user(path, O_RDONLY);
-    if (fd == -1)
-        return -1;
+    err = open_as_real_user(&fd, path, O_RDONLY);
+    if (err)
+        return err;
 
     if (fstat(fd, &s) == -1) {
-        error(0, errno, "Error accessing %s", path);
+        err = errno;
+        error(0, err, "Error accessing %s", path);
+        err = ERR_TAG(err);
         goto err;
     }
 
-    if (!config_trusted(&s))
+    if (!config_trusted(&s)) {
+        err = ERR_TAG(EPERM);
         goto err;
+    }
 
     f = fdopen(fd, "r");
     if (f == NULL) {
-        error(0, errno, "Error accessing %s", path);
+        err = errno;
+        error(0, err, "Error accessing %s", path);
+        err = ERR_TAG(err);
         goto err;
     }
 
@@ -501,21 +512,21 @@ parse_json_config(const char *path, const struct json_parser *parser,
     ctx.read_cb = &read_cb;
     ctx.ctx = f;
 
-    err = json_grammar_validate(NULL, &json_read_cb_strip_comments, &ctx,
-                                parser, config);
+    err = -json_grammar_validate(NULL, &json_read_cb_strip_comments, &ctx,
+                                 parser, config);
 
     fclose(f);
 
     if (err) {
-        error(0, -err, "Error parsing %s", path);
-        return -1;
+        error(0, err, "Error parsing %s", path);
+        return ERR_TAG(err);
     }
 
     return 0;
 
 err:
     close(fd);
-    return -1;
+    return err;
 }
 
 static int
@@ -546,11 +557,11 @@ read_json_config(json_val_t config, struct parse_ctx *ctx)
 
         err = json_val_object_get_elem_by_idx(config, i, &elem);
         if (err)
-            return err;
+            return ERR_TAG(-err);
 
         opt = &opts[hash_wcs(elem.key, -1) >> 3 & 63];
         if (opt->opt == NULL || wcscmp(elem.key, opt->opt) != 0)
-            return -EIO;
+            return ERR_TAG(EIO);
 
         err = (*opt->fn)(elem.value, ctx);
         if (err)
@@ -569,7 +580,7 @@ parse_config(const char *path, struct parse_ctx *ctx)
 
     err = json_parser_init(CONFIG_GRAM, CONFIG_ROOT_ID, &parser);
     if (err)
-        return err;
+        return ERR_TAG(-err);
 
     err = parse_json_config(path, parser, &config);
     json_parser_destroy(parser);

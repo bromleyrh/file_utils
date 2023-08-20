@@ -5,6 +5,7 @@
 #include "config.h"
 
 #include "common.h"
+#include "debug.h"
 #include "util.h"
 #include "verify_common.h"
 #include "verify_io.h"
@@ -93,14 +94,14 @@ struct verif_walk_ctx {
 
 volatile sig_atomic_t quit;
 
-static int getsgids(gid_t **);
+static int getsgids(gid_t **, int *);
 static int check_creds(uid_t, gid_t, uid_t, gid_t);
 
 static int print_chksum(FILE *, unsigned char *, unsigned);
 
-static ssize_t get_io_size(int);
+static int get_io_size(ssize_t *, int);
 #ifdef MAP_HUGETLB
-static int64_t get_huge_page_size(void);
+static int get_huge_page_size(int64_t *);
 #endif
 
 static int direct_io_supported(const struct statfs *);
@@ -139,27 +140,28 @@ static int verif_walk_fn(int, int, const char *, const char *, struct stat *,
 static int verif_fn(void *);
 
 static int
-getsgids(gid_t **sgids)
+getsgids(gid_t **sgids, int *nsgids)
 {
-    gid_t *ret;
-    int nsgids, tmp;
+    gid_t *retsgids;
+    int retnsgids, tmp;
 
-    nsgids = getgroups(0, NULL);
-    if (nsgids == -1)
-        return -errno;
+    retnsgids = getgroups(0, NULL);
+    if (retnsgids == -1)
+        return ERR_TAG(errno);
 
-    if (oeallocarray(&ret, nsgids) == NULL)
-        return -errno;
+    if (oeallocarray(&retsgids, retnsgids) == NULL)
+        return ERR_TAG(errno);
 
-    tmp = getgroups(nsgids, ret);
-    if (tmp != nsgids) {
-        tmp = tmp == -1 ? -errno : -EIO;
-        free(ret);
+    tmp = getgroups(retnsgids, retsgids);
+    if (tmp != retnsgids) {
+        tmp = ERR_TAG(tmp == -1 ? errno : EIO);
+        free(retsgids);
         return tmp;
     }
 
-    *sgids = ret;
-    return nsgids;
+    *sgids = retsgids;
+    *nsgids = retnsgids;
+    return 0;
 }
 
 static int
@@ -168,7 +170,7 @@ check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid)
     if (ruid == 0 || ruid == uid)
         return 0;
 
-    return rgid == gid || group_member(gid) ? 0 : -EPERM;
+    return rgid == gid || group_member(gid) ? 0 : ERR_TAG(EPERM);
 }
 
 static int
@@ -178,27 +180,34 @@ print_chksum(FILE *f, unsigned char *sum, unsigned sumlen)
 
     for (i = 0; i < sumlen; i++) {
         if (fprintf(f, "%02x", sum[i]) <= 0)
-            return -EIO;
+            return ERR_TAG(EIO);
     }
 
     return 0;
 }
 
-static ssize_t
-get_io_size(int rootfd)
+static int
+get_io_size(ssize_t *bufsz, int rootfd)
 {
 #ifdef HAVE_XFS_XFS_H
     struct stat s;
 
-    if (1 || !platform_test_xfs_fd(rootfd))
-        return BUFSIZE;
+    if (1 || !platform_test_xfs_fd(rootfd)) {
+        *bufsz = BUFSIZE;
+        return 0;
+    }
 
     /* FIXME: ensure XFS file systems are mounted with "largeio" mount option */
-    return fstat(rootfd, &s) == 0 ? s.st_blksize : -errno;
+    if (fstat(rootfd, &s) == -1)
+        return ERR_TAG(errno);
+
+    *bufsz = s.st_blksize;
+    return 0;
 #else
     (void)rootfd;
 
-    return BUFSIZE;
+    *bufsz = BUFSIZE;
+    return 0;
 #endif
 }
 
@@ -207,12 +216,13 @@ get_io_size(int rootfd)
 #define MEMINFO "/proc/meminfo"
 #define HUGE_PAGE_SIZE_KEY "Hugepagesize:"
 
-static int64_t
-get_huge_page_size()
+static int
+get_huge_page_size(int64_t *huge_page_size)
 {
     char unit_prefix;
     char *ln = NULL;
     FILE *f;
+    int err = 0;
     int64_t ret = 0;
     intmax_t num;
     size_t n;
@@ -226,17 +236,19 @@ get_huge_page_size()
 
     f = fopen(MEMINFO, "r");
     if (f == NULL) {
-        ret = -errno;
-        error(0, errno, "Error opening " MEMINFO);
-        return ret;
+        err = errno;
+        error(0, err, "Error opening " MEMINFO);
+        return ERR_TAG(err);
     }
 
     for (;;) {
         errno = 0;
         if (getline(&ln, &n, f) == -1) {
-            if (errno != 0)
-                ret = errno;
-            goto end;
+            if (errno != 0) {
+                err = ERR_TAG(errno);
+                goto end1;
+            }
+            goto end2;
         }
         if (sscanf(ln, HUGE_PAGE_SIZE_KEY " %jd %cB", &num, &unit_prefix) == 2)
             break;
@@ -244,11 +256,13 @@ get_huge_page_size()
 
     ret = num * prefix_map[(unsigned char)unit_prefix];
 
-end:
+end2:
+    *huge_page_size = ret;
+end1:
     fclose(f);
     if (ln != NULL)
         free(ln);
-    return ret;
+    return err;
 }
 
 #undef MEMINFO
@@ -286,8 +300,9 @@ set_direct_io(int fd)
     fl = fcntl(fd, F_GETFL);
     return fl != -1
            && (fcntl(fd, F_SETFL, fl | O_DIRECT) != -1 || errno == EINVAL)
-           ? 0 : -errno; /* EINVAL from fcntl(F_SETFL, fl | O_DIRECT) means
-                            O_DIRECT not supported by file system */
+           ? 0 : ERR_TAG(errno); /* EINVAL from fcntl(F_SETFL, fl | O_DIRECT)
+                                    means O_DIRECT not supported by file
+                                    system */
 }
 
 static void
@@ -326,9 +341,11 @@ insert_ino(struct verif_record_output *record, struct verif_walk_ctx *wctx)
 {
     int res;
 
-    res = avl_tree_insert(wctx->output_data, record);
-    if (res != 0)
-        TRACE(-res, "avl_tree_insert()");
+    res = -avl_tree_insert(wctx->output_data, record);
+    if (res != 0) {
+        TRACE(res, "avl_tree_insert()");
+        res = ERR_TAG(res);
+    }
 
     return res;
 }
@@ -345,14 +362,15 @@ look_up_ino(struct stat *s, struct verif_record_output *record,
     res = avl_tree_search(wctx->output_data, &tmp, record);
     if (res != 0) {
         if (res < 0) {
-            TRACE(-res, "avl_tree_search()");
-            return res;
+            res = -res;
+            TRACE(res, "avl_tree_search()");
+            return ERR_TAG(res);
         }
         if (record->record.size != s->st_size) {
             TRACE(0, "record->record.size (%" PRIi64 ") != s->st_size (%"
                      PRIi64 ")",
                   record->record.size, s->st_size);
-            return -EIO;
+            return ERR_TAG(EIO);
         }
     }
 
@@ -386,18 +404,25 @@ broadcast_stat(DBusConnection *busconn, double stat, const char *path,
     DBusMessage *msg;
     DBusMessageIter msgargs;
     dbus_uint32_t serial;
+    int err;
 
     msg = dbus_message_new_signal(path, iface, name);
-    if (msg == NULL)
+    if (msg == NULL) {
+        err = ERR_TAG(ENOMEM);
         goto err1;
+    }
 
     dbus_message_iter_init_append(msg, &msgargs);
     if (dbus_message_iter_append_basic(&msgargs, DBUS_TYPE_DOUBLE, &stat)
-        == 0)
+        == 0) {
+        err = ERR_TAG(ENOMEM);
         goto err2;
+    }
 
-    if (dbus_connection_send(busconn, msg, &serial) == 0)
+    if (dbus_connection_send(busconn, msg, &serial) == 0) {
+        err = ERR_TAG(ENOMEM);
         goto err2;
+    }
 
     dbus_message_unref(msg);
 
@@ -406,13 +431,14 @@ broadcast_stat(DBusConnection *busconn, double stat, const char *path,
 err2:
     dbus_message_unref(msg);
 err1:
-    return -ENOMEM;
+    return err;
 }
 
 static int
 verif_chksums_cb(int fd, off_t flen, void *ctx)
 {
     double pcnt, throughput;
+    int err;
     struct timespec curtm, difftm;
     struct verif_walk_ctx *wctx = ctx;
 
@@ -432,10 +458,12 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     if (debug)
         wctx->incomplete_line_output = 1;
 
-    broadcast_stat(wctx->busconn, pcnt, "/verify/signal/progress",
-                   "verify.signal.Progress", "Progress");
-    broadcast_stat(wctx->busconn, throughput, "/verify/signal/throughput",
-                   "verify.signal.Throughput", "Throughput");
+    if ((err = broadcast_stat(wctx->busconn, pcnt, "/verify/signal/progress",
+                              "verify.signal.Progress", "Progress"))
+        || (err = broadcast_stat(wctx->busconn, throughput,
+                                 "/verify/signal/throughput",
+                                 "verify.signal.Throughput", "Throughput")))
+        err_clear(err);
 
     wctx->transfer_size = io_state_update(wctx->io_state,
                                           (size_t)wctx->bytesverified, -1.0);
@@ -466,25 +494,29 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
 
     if (EVP_DigestInit_ex(sumctx, EVP_sha1(), NULL) != 1
         || EVP_DigestInit_ex(initsumctx, EVP_sha1(), NULL) != 1)
-        return -EIO;
+        return ERR_TAG(EIO);
 
     omemset(&aiocb, 0);
     aiocb.aio_nbytes = wctx->transfer_size;
     aiocb.aio_fildes = fd;
     aiocb.aio_buf = buf = buf1;
     if (aio_read(&aiocb) == -1)
-        return -errno;
+        return ERR_TAG(errno);
     aiocbp = &aiocb;
 
     for (;;) {
         char *nextbuf;
 
-        if (aio_suspend(&aiocbp, 1, NULL) == -1)
+        if (aio_suspend(&aiocbp, 1, NULL) == -1) {
+            err = ERR_TAG(errno);
             goto err;
+        }
         len = aio_return(&aiocb);
         if (len < 1) {
-            if (len != 0)
+            if (len != 0) {
+                err = ERR_TAG(errno);
                 goto err;
+            }
             break;
         }
         flen += len;
@@ -502,26 +534,32 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
         aiocb.aio_offset = flen;
         aiocb.aio_buf = nextbuf = buf == buf1 ? buf2 : buf1;
         if (aio_read(&aiocb) == -1)
-            return -errno;
+            return ERR_TAG(errno);
 
         if (initrem > 0) {
             size_t sz = MIN(initrem, (off_t)len);
 
-            if (EVP_DigestUpdate(initsumctx, buf, sz) != 1)
+            if (EVP_DigestUpdate(initsumctx, buf, sz) != 1) {
+                err = ERR_TAG(EIO);
                 goto err;
+            }
             initrem -= sz;
         }
         if (!init_verif && initrem == 0) {
-            if (EVP_DigestFinal_ex(initsumctx, initsum, sumlen) != 1)
+            if (EVP_DigestFinal_ex(initsumctx, initsum, sumlen) != 1) {
+                err = ERR_TAG(EIO);
                 goto err;
+            }
             if (record_in != NULL
                 && (*sumlen != 20
                     || memcmp(initsum, record_in->initsum, *sumlen) != 0))
                 goto verif_err;
             init_verif = 1;
         }
-        if (EVP_DigestUpdate(sumctx, buf, len) != 1)
+        if (EVP_DigestUpdate(sumctx, buf, len) != 1) {
+            err = ERR_TAG(EIO);
             goto err;
+        }
 
         buf = nextbuf;
     }
@@ -532,14 +570,14 @@ verif_chksums(int fd, char *buf1, char *buf2, size_t bufsz,
 
     if (!init_verif) {
         if (EVP_DigestFinal_ex(initsumctx, initsum, sumlen) != 1)
-            return -EIO;
+            return ERR_TAG(EIO);
         if (record_in != NULL
             && (*sumlen != 20
                 || memcmp(initsum, record_in->initsum, *sumlen) != 0))
             return 1;
     }
     if (EVP_DigestFinal_ex(sumctx, sum, sumlen) != 1)
-        return -EIO;
+        return ERR_TAG(EIO);
     if (record_in != NULL
         && (*sumlen != 20 || memcmp(sum, record_in->sum, *sumlen) != 0))
         return 1;
@@ -551,35 +589,37 @@ verif_err:
     return 1;
 
 err:
-    err = errno == 0 ? EIO : errno;
     cancel_aio(&aiocb);
-    return -err;
+    return err;
 }
 
 static int
 output_record(FILE *f, off_t size, unsigned char *initsum, unsigned char *sum,
               unsigned sumlen, const char *prefix, const char *path)
 {
+    int err;
+
     /* print file size */
     if (fprintf(f, "%" PRIu64 "\t", size) <= 0)
-        goto err;
+        return ERR_TAG(EIO);
 
     /* print checksum of first min(file_size, 512) bytes of file */
-    if (print_chksum(f, initsum, sumlen) != 0 || fputc('\t', f) == EOF)
-        goto err;
+    err = print_chksum(f, initsum, sumlen);
+    if (err)
+        return err;
+    if (fputc('\t', f) == EOF)
+        return ERR_TAG(EIO);
 
     /* print checksum of file */
-    if (print_chksum(f, sum, sumlen) != 0)
-        goto err;
+    err = print_chksum(f, sum, sumlen);
+    if (err)
+        return err;
 
     /* print file path */
     if (fprintf(f, "\t%s/%s\n", prefix, path) <= 0)
-        goto err;
+        return ERR_TAG(EIO);
 
-    return fflush(f) == EOF ? -errno : 0;
-
-err:
-    return -EIO;
+    return fflush(f) == EOF ? ERR_TAG(errno) : 0;
 }
 
 static int
@@ -593,18 +633,18 @@ handle_file_start(struct plugin_list *plist, const char *name, const char *path)
 
     err = dynamic_array_size(plist->list, &n);
     if (err)
-        return err;
+        return ERR_TAG(-err);
 
     for (i = 0; i < n; i++) {
         struct plugin e;
 
         err = dynamic_array_get(plist->list, i, &e);
         if (err)
-            return err;
+            return ERR_TAG(-err);
 
         err = (*e.fns->handle_file_start)(e.phdl, name, path);
         if (err)
-            return err;
+            return ERR_TAG(-err);
     }
 
     return 0;
@@ -621,18 +661,18 @@ handle_file_end(struct plugin_list *plist)
 
     err = dynamic_array_size(plist->list, &n);
     if (err)
-        return err;
+        return ERR_TAG(-err);
 
     for (i = 0; i < n; i++) {
         struct plugin e;
 
         err = dynamic_array_get(plist->list, i, &e);
         if (err)
-            return err;
+            return ERR_TAG(-err);
 
         err = (*e.fns->handle_file_end)(e.phdl);
         if (err)
-            return err;
+            return ERR_TAG(-err);
     }
 
     return 0;
@@ -650,19 +690,19 @@ handle_file_data(struct plugin_list *plist, const void *buf, size_t len,
 
     err = dynamic_array_size(plist->list, &n);
     if (err)
-        return err;
+        return ERR_TAG(-err);
 
     for (i = 0; i < n; i++) {
         struct plugin e;
 
         err = dynamic_array_get(plist->list, i, &e);
         if (err)
-            return err;
+            return ERR_TAG(-err);
 
         err = (*e.fns->handle_file_data)(e.phdl, buf, len,
                                          incomplete_line_output);
         if (err)
-            return err;
+            return ERR_TAG(-err);
     }
 
     return 0;
@@ -694,7 +734,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
 
     if (fmtbuf(fullpath, "%s/%s", wctx->prefix, path) != 0) {
         error(0, 0, "Path name too long");
-        return -EIO;
+        return ERR_TAG(EIO);
     }
 
     if (wctx->reg_excl != NULL /* check if excluded */
@@ -720,7 +760,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (mult_links) {
         res = look_up_ino(s, &record, wctx);
         if (res != 0) {
-            if (res < 0)
+            if (res >= ERRDES_MIN)
                 return res;
             res = output_record(wctx->dstf, record.record.size,
                                 record.record.initsum, record.record.sum, 20,
@@ -735,8 +775,9 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
         res = radix_tree_search(wctx->input_data, fullpath, &record_in);
         if (res != 1) {
             if (res != 0) {
-                TRACE(-res, "radix_tree_search()");
-                return res;
+                res = -res;
+                TRACE(res, "radix_tree_search()");
+                return ERR_TAG(res);
             }
             if (!wctx->allow_new) {
                 error(0, 0, "Verification error: %s added", fullpath);
@@ -756,7 +797,7 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     if (wctx->use_direct_io) {
         res = set_direct_io(fd);
         if (res != 0) {
-            error(0, -res, "Error reading %s", fullpath);
+            error(0, -err_get_code(res), "Error reading %s", fullpath);
             return res;
         }
     }
@@ -780,10 +821,10 @@ verif_walk_fn(int fd, int dirfd, const char *name, const char *path,
     }
 
     if (p_record_in != NULL) {
-        res = radix_tree_delete(wctx->input_data, fullpath);
+        res = -radix_tree_delete(wctx->input_data, fullpath);
         if (res != 0) {
-            TRACE(-res, "radix_tree_delete()");
-            return res;
+            TRACE(res, "radix_tree_delete()");
+            return ERR_TAG(res);
         }
     }
 
@@ -802,7 +843,7 @@ end:
     res = posix_fadvise(fd, 0, s->st_size, POSIX_FADV_DONTNEED);
     if (res != 0) {
         error(0, res, "Error writing %s", fullpath);
-        return -res;
+        return ERR_TAG(res);
     }
     return handle_file_end(wctx->plist);
 
@@ -818,22 +859,26 @@ verif_fn(void *arg)
     int err;
     int fexcepts = 0;
     int hugetlbfl, nhugep;
-    int64_t fullbufsize;
+    int64_t fullbufsize = 0;
     ssize_t bufsz;
     struct statfs s;
     struct verif_args *vargs = arg;
     struct verif_walk_ctx wctx;
 
-    bufsz = get_io_size(vargs->srcfd);
-    if (bufsz < 1) {
-        err = bufsz == 0 ? EIO : -bufsz;
+    err = get_io_size(&bufsz, vargs->srcfd);
+    if (err)
+        goto stat_err;
+    if (bufsz <= 0) {
+        err = ERR_TAG(EIO);
         goto stat_err;
     }
     wctx.bufsz = bufsz * 2;
 
 #ifdef MAP_HUGETLB
-    fullbufsize = get_huge_page_size();
-    if (fullbufsize <= 0) {
+    err = get_huge_page_size(&fullbufsize);
+    if (err || fullbufsize == 0) {
+        if (err)
+            err_clear(err);
         hugetlbfl = 0;
         fullbufsize = wctx.bufsz;
     } else {
@@ -848,7 +893,7 @@ verif_fn(void *arg)
 #endif
 
     if (fstatfs(vargs->srcfd, &s) == -1) {
-        err = errno;
+        err = ERR_TAG(errno);
         goto stat_err;
     }
     wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
@@ -859,30 +904,31 @@ verif_fn(void *arg)
     wctx.buf1 = mmap(NULL, wctx.bufsz, PROT_READ | PROT_WRITE,
                      MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
     if (wctx.buf1 == MAP_FAILED) {
-        err = errno;
+        err = ERR_TAG(errno);
         goto alloc_err2;
     }
     wctx.buf2 = wctx.buf1 + wctx.bufsz / 2;
 
     wctx.sumctx = new_evp_md_ctx();
     if (wctx.sumctx == NULL)
-        return ENOMEM;
+        return ERR_TAG(ENOMEM);
     wctx.initsumctx = new_evp_md_ctx();
     if (wctx.initsumctx == NULL) {
         free_evp_md_ctx(wctx.sumctx);
-        return ENOMEM;
+        return ERR_TAG(ENOMEM);
     }
 
     if (EVP_DigestInit(wctx.sumctx, EVP_sha1()) != 1
         || EVP_DigestInit(wctx.initsumctx, EVP_sha1()) != 1) {
         TRACE(0, "EVP_DigestInit()");
-        err = EIO;
+        err = ERR_TAG(EIO);
         goto end1;
     }
 
-    err = -avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
-                        &verif_record_cmp, 0, NULL, NULL, NULL);
+    err = avl_tree_new(&wctx.output_data, sizeof(struct verif_record_output),
+                       &verif_record_cmp, 0, NULL, NULL, NULL);
     if (err) {
+        err = ERR_TAG(-err);
         free_evp_md_ctx(wctx.sumctx);
         free_evp_md_ctx(wctx.initsumctx);
         munmap(wctx.buf1, fullbufsize);
@@ -904,7 +950,7 @@ verif_fn(void *arg)
         fexcepts = fedisableexcept(FE_ALL_EXCEPT);
         if (fexcepts == -1) {
             TRACE(0, "fedisableexcept()");
-            err = EIO;
+            err = ERR_TAG(EIO);
             goto end2;
         }
     }
@@ -918,7 +964,9 @@ verif_fn(void *arg)
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &wctx.starttm);
 
-    err = -dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR, &wctx);
+    err = dir_walk_fd(vargs->srcfd, &verif_walk_fn, DIR_WALK_ALLOW_ERR, &wctx);
+    if (err < 0)
+        err = ERR_TAG(-err);
 
     io_state_free(wctx.io_state);
 
@@ -935,18 +983,17 @@ end1:
     return err;
 
 alloc_err2:
-    if (err != ENOMEM || hugetlbfl == 0)
-        goto alloc_err1;
-    error(0, 0, "Couldn't allocate memory (check " NR_HUGEPAGES " is at least "
-          "%d)", nhugep);
-    return err;
-
+    if (err_get_code(err) == -ENOMEM && hugetlbfl != 0) {
+        error(0, 0, "Couldn't allocate memory (check " NR_HUGEPAGES " is at "
+              "least %d)", nhugep);
+        return err;
+    }
 alloc_err1:
-    error(0, err, "Couldn't allocate memory");
+    error(0, -err_get_code(err), "Couldn't allocate memory");
     return err;
 
 stat_err:
-    error(0, err, "Error getting file system statistics");
+    error(0, -err_get_code(err), "Error getting file system statistics");
     return err;
 }
 
@@ -954,7 +1001,7 @@ int
 do_verif(struct verif_args *verif_args)
 {
     gid_t egid, *sgids = NULL;
-    int nsgids;
+    int nsgids = 0;
     int ret, tmp;
     uid_t euid;
 
@@ -964,40 +1011,42 @@ do_verif(struct verif_args *verif_args)
         return ret;
     }
 
-    nsgids = getsgids(&sgids);
-    if (nsgids == -1) {
-        error(0, -nsgids, "Error getting groups");
-        return -nsgids;
+    ret = getsgids(&sgids, &nsgids);
+    if (ret != 0) {
+        error(0, -err_get_code(ret), "Error getting groups");
+        return ret;
     }
     if (setgroups(0, NULL) == -1) {
         ret = errno;
-        error(0, errno, "Error setting groups");
+        error(0, ret, "Error setting groups");
         free(sgids);
-        return ret;
+        return ERR_TAG(ret);
     }
 
     egid = getegid();
     if (verif_args->gid != (gid_t)-1 && setegid(verif_args->gid) == -1) {
         ret = errno;
         error(0, ret, "Error changing group");
+        ret = ERR_TAG(ret);
         goto err1;
     }
     euid = geteuid();
     if (verif_args->uid != (uid_t)-1 && seteuid(verif_args->uid) == -1) {
         ret = errno;
         error(0, ret, "Error changing user");
+        ret = ERR_TAG(ret);
         goto err2;
     }
 
     DEBUG_PRINT("Performing verification");
 
-    ret = -verif_fn(verif_args);
+    ret = verif_fn(verif_args);
     if (ret != 0)
         goto err3;
 
     ret = seteuid(euid) == 0 && setegid(egid) == 0
           && setgroups(nsgids, sgids) == 0
-          ? 0 : -errno;
+          ? 0 : ERR_TAG(errno);
 
     free(sgids);
 
