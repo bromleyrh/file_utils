@@ -106,8 +106,8 @@ track_data_cmp(const void *k1, const void *k2, void *ctx)
 }
 
 static int
-metadata_cb(const char *id, matroska_metadata_t *val, size_t len, int flags,
-            void *ctx)
+metadata_cb(const char *id, matroska_metadata_t *val, size_t len, size_t hdrlen,
+            int flags, void *ctx)
 {
     const char *ename;
     int block;
@@ -115,6 +115,7 @@ metadata_cb(const char *id, matroska_metadata_t *val, size_t len, int flags,
 
     (void)val;
     (void)len;
+    (void)hdrlen;
     (void)flags;
 
     ename = strstr(id, ENAME_SEP);
