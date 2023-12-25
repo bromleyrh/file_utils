@@ -65,7 +65,7 @@ static matroska_metadata_output_cb_t metadata_cb;
 
 static matroska_bitstream_output_cb_t bitstream_cb;
 
-static int buf_open(void **, void *);
+static int buf_open(void **, int, void *);
 static int buf_close(void *);
 static int buf_read(void *, void *, ssize_t *);
 static int buf_get_fpos(void *, off_t *);
@@ -193,9 +193,11 @@ bitstream_cb(uint64_t trackno, const void *buf, size_t len, size_t framelen,
 }
 
 static int
-buf_open(void **ctx, void *args)
+buf_open(void **ctx, int ro, void *args)
 {
     struct mkv_ctx *mctx = args;
+
+    (void)ro;
 
     mctx->file_off = 0;
     mctx->state = 0;
