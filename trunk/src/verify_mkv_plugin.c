@@ -61,9 +61,9 @@ static struct mkv_ctx *mkv_ctx;
 
 static int track_data_cmp(const void *, const void *, void *);
 
-static matroska_metadata_cb_t metadata_cb;
+static matroska_metadata_output_cb_t metadata_cb;
 
-static matroska_bitstream_cb_t bitstream_cb;
+static matroska_bitstream_output_cb_t bitstream_cb;
 
 static int buf_open(void **, void *);
 static int buf_close(void *);
@@ -355,10 +355,13 @@ handle_file_data(void *hdl, const void *buf, size_t count,
     read_ctx = &ctx->read_ctx;
 
     if (ctx->hdl == NULL) {
+        matroska_bitstream_cb_t cb;
+        matroska_metadata_cb_t metacb;
         stack_t *read_stk;
 
-        err = matroska_open(&ctx->hdl, &io_fns, &metadata_cb, &bitstream_cb,
-                            ctx, ctx);
+        metacb.output_cb = &metadata_cb;
+        cb.output_cb = &bitstream_cb;
+        err = matroska_open(&ctx->hdl, &io_fns, &metacb, &cb, 0, ctx, ctx);
         if (err)
             return err;
 
