@@ -871,7 +871,7 @@ do_verifs(struct verify_ctx *ctx)
 
     if (strcmp("-", ctx->output_file) == 0) {
         errno = 0;
-        if (isatty(fileno(stdout))) {
+        if (isatty(STDOUT_FILENO)) {
             infomsg("Warning: Standard output is a terminal device: waiting 10 "
                     "seconds\n");
             if (wait_for_quit(10))

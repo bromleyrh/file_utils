@@ -167,7 +167,7 @@ main(int argc, char **argv)
         return EXIT_FAILURE;
 
     errno = 0;
-    if (isatty(fileno(stdout))) {
+    if (isatty(STDOUT_FILENO)) {
         int rem;
 
         infomsg("Warning: Standard output is a terminal device: waiting 10 "
