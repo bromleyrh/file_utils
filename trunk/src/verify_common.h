@@ -68,13 +68,13 @@ struct plugin_list {
     struct dynamic_array *list;
 };
 
-#define TRACE(err, fmt, ...) \
-    trace(__FILE__, __FUNCTION__, __LINE__, err, fmt, ##__VA_ARGS__)
+#define TRACE(err, ...) \
+    trace(__FILE__, __FUNCTION__, __LINE__, err, __VA_ARGS__)
 
-#define DEBUG_PRINT(fmt, ...) \
-    debug_print(1, fmt, ##__VA_ARGS__)
-#define DEBUG_PRINT_NO_NL(fmt, ...) \
-    debug_print(0, fmt, ##__VA_ARGS__)
+#define DEBUG_PRINT(...) \
+    debug_print(1, __VA_ARGS__)
+#define DEBUG_PRINT_NO_NL(...) \
+    debug_print(0, __VA_ARGS__)
 
 void trace(const char *file, const char *func, int line, int err,
            const char *fmt, ...);
