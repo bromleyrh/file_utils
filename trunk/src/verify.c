@@ -361,7 +361,7 @@ set_capabilities()
         CAP_SETUID,
         CAP_SYS_ADMIN
     };
-    static const int ncapvals = (int)ARRAY_SIZE(capvals);
+    static const int ncapvals = ARRAY_SIZE(capvals);
 
     caps = cap_init();
     if (caps == NULL)

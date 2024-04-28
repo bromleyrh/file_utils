@@ -71,7 +71,7 @@ expand_string(char **str, char **dst, size_t *len, size_t minadd)
         size_t newlen;
 
         newlen = MAX(*len + minadd, *len * 2);
-        tmp = do_realloc((void *)*str, newlen + 1);
+        tmp = do_realloc(*str, newlen + 1);
         if (tmp == NULL)
             return ERR_TAG(errno);
         *str = tmp;
@@ -90,7 +90,7 @@ get_gid(const char *name, gid_t *gid)
     size_t bufsize;
     struct group grp, *res;
 
-    bufsize = (size_t)sysconf(_SC_GETGR_R_SIZE_MAX);
+    bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
@@ -142,7 +142,7 @@ get_uid(const char *name, uid_t *uid)
     size_t bufsize;
     struct passwd pwd, *res;
 
-    bufsize = (size_t)sysconf(_SC_GETPW_R_SIZE_MAX);
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
@@ -342,7 +342,7 @@ read_debug_opt(json_val_t opt, void *data)
 static int
 read_detect_hard_links_opt(json_val_t opt, void *data)
 {
-    struct parse_ctx *pctx = (struct parse_ctx *)data;
+    struct parse_ctx *pctx = data;
 
     pctx->ctx.detect_hard_links = json_val_boolean_get(opt);
 

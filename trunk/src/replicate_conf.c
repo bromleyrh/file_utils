@@ -64,7 +64,7 @@ get_gid(const char *name, gid_t *gid)
     size_t bufsize;
     struct group grp, *res;
 
-    bufsize = (size_t)sysconf(_SC_GETGR_R_SIZE_MAX);
+    bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
@@ -116,7 +116,7 @@ get_uid(const char *name, uid_t *uid)
     size_t bufsize;
     struct passwd pwd, *res;
 
-    bufsize = (size_t)sysconf(_SC_GETPW_R_SIZE_MAX);
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
     if (bufsize == (size_t)-1)
         bufsize = 1024;
 
