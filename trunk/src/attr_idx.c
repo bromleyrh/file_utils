@@ -38,8 +38,8 @@ enum op {
 struct opts {
     enum attrtype   type;
     enum op         op;
-    const char      *index_file;
-    const char      **names;
+    char            *index_file;
+    char            **names;
 };
 
 struct index_ctx {
@@ -72,7 +72,7 @@ static int walk_index(struct btree *);
 static int gen_index(const char *);
 static int list_index(const char *);
 static int check_index(const char *);
-static int apply_from_index(const char *, const char **);
+static int apply_from_index(const char *, char **);
 
 static int
 parse_cmdline(int argc, char **argv, struct opts *opts)
@@ -102,7 +102,7 @@ parse_cmdline(int argc, char **argv, struct opts *opts)
             error(0, 0, "Must specify list of file names");
             return -1;
         }
-        opts->names = (const char **)&argv[optind];
+        opts->names = &argv[optind];
     }
 
     return 0;
@@ -362,7 +362,7 @@ check_index(const char *index_file)
 }
 
 static int
-apply_from_index(const char *index_file, const char **names)
+apply_from_index(const char *index_file, char **names)
 {
     int fd;
     int i;
@@ -469,7 +469,7 @@ main(int argc, char **argv)
 
 end:
     if (opts.index_file != NULL)
-        free((void *)opts.index_file);
+        free(opts.index_file);
     return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

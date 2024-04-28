@@ -59,7 +59,7 @@ err:
 int
 blkdev_format(const char *path, const char *cmd, const char *dest_specifier)
 {
-    const char *fullcmd;
+    char *fullcmd;
     int err;
 
     debug_print("Formatting device %s", path);
@@ -71,7 +71,7 @@ blkdev_format(const char *path, const char *cmd, const char *dest_specifier)
     debug_print("Running \"%s\"", fullcmd);
     err = run_cmd(fullcmd);
 
-    free((void *)fullcmd);
+    free(fullcmd);
 
     return err;
 }

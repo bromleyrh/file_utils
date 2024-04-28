@@ -55,8 +55,8 @@ struct dest {
 typedef unsigned __fsword_t;
 
 #endif
-static const char **srcs;
-static const char *dst;
+static char **srcs;
+static char *dst;
 static int dstdir;
 static int hugetlbfs;
 static int numsrcs;
@@ -71,7 +71,7 @@ static int set_sigbus_handler(void);
 static int parse_cmdline(int, char **);
 
 static int is_on_fs_of_type(const char *, __fsword_t);
-static int get_dest_info(const char *);
+static int get_dest_info(char *);
 
 static off_t get_hugepage_size(int);
 static off_t get_page_offset(off_t, int);
@@ -136,7 +136,7 @@ parse_cmdline(int argc, char **argv)
     }
 
     numsrcs = argc - numopts - 2;
-    srcs = (const char **)&argv[1+numopts];
+    srcs = &argv[1+numopts];
     dst = argv[argc-1];
 
     return 0;
@@ -156,7 +156,7 @@ is_on_fs_of_type(const char *pathname, __fsword_t fstype)
 }
 
 static int
-get_dest_info(const char *pathname)
+get_dest_info(char *pathname)
 {
     const char *dirpath;
     int dst_on_hugetlbfs;
@@ -177,7 +177,7 @@ get_dest_info(const char *pathname)
         size_t slen = strlen(pathname);
 
         if (pathname[slen-1] == '/')
-            *((char *)pathname+slen-1) = '\0';
+            *(pathname+slen-1) = '\0';
     }
 
     dirpath = dstdir ? pathname : dirname(strdupa(pathname));
@@ -425,20 +425,20 @@ copy_mode(int fd1, int fd2)
 static int
 do_link(int fd, const char *name)
 {
-    const char *path;
+    char *path;
 
-    if (asprintf((char **)&path, "/proc/self/fd/%d", fd) == -1) {
+    if (asprintf(&path, "/proc/self/fd/%d", fd) == -1) {
         error(0, 0, "Out of memory");
         return -1;
     }
 
     if (linkat(AT_FDCWD, path, AT_FDCWD, name, AT_SYMLINK_FOLLOW) == -1) {
         error(0, errno, "Couldn't link %s", name);
-        free((void *)path);
+        free(path);
         return -1;
     }
 
-    free((void *)path);
+    free(path);
 
     return 0;
 }
@@ -447,14 +447,14 @@ do_link(int fd, const char *name)
 static int
 copy(int n)
 {
-    const char *srcfile, *dstfile;
+    char *srcfile, *dstfile;
     int fd1, fd2;
 
     srcfile = srcs[n];
 
     if (dstdir) {
-        if (asprintf((char **)&dstfile, "%s/%s", dst,
-                     basename(strdupa(srcfile))) == -1) {
+        if (asprintf(&dstfile, "%s/%s", dst, basename(strdupa(srcfile)))
+            == -1) {
             error(0, 0, "Out of memory");
             return -1;
         }

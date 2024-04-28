@@ -84,7 +84,7 @@ do_splice(int fd_in, int fd_out)
 int
 main(int argc, char **argv)
 {
-    const char **files;
+    char **files;
     int fd_in;
     int fl_out;
     int i;
@@ -92,7 +92,7 @@ main(int argc, char **argv)
 
     if (argc < 2)
         error(EXIT_FAILURE, 0, "Must specify file");
-    files = (const char **)&argv[1];
+    files = &argv[1];
 
     if (fstat(STDOUT_FILENO, &s_out) == -1)
         error(EXIT_FAILURE, errno, "Couldn't get file stats");

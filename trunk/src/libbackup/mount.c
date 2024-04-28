@@ -330,7 +330,7 @@ unmount_file_system(const char *path, int rootfd)
 int
 check_file_system(const char *path, const char *cmd, const char *src_specifier)
 {
-    const char *fullcmd;
+    char *fullcmd;
     int err;
 
     debug_print("Checking file system on %s", path);
@@ -342,7 +342,7 @@ check_file_system(const char *path, const char *cmd, const char *src_specifier)
     debug_print("Running \"%s\"", fullcmd);
     err = run_cmd(fullcmd);
 
-    free((void *)fullcmd);
+    free(fullcmd);
 
     return err;
 }

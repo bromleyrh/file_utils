@@ -54,7 +54,7 @@ static struct set *uid_set;
 
 static void print_usage(const char *);
 static void print_version(void);
-static int parse_cmdline(int, char **, const char **, const char ***);
+static int parse_cmdline(int, char **, const char **, char ***);
 
 static int set_time_variables(void);
 
@@ -85,7 +85,7 @@ static int check_uid(struct set *, struct stat *);
 static int process_files_cb(int, int, const char *, const char *, struct stat *,
                             int, void *);
 
-static int process_files(const char **, struct radix_tree *);
+static int process_files(char **, struct radix_tree *);
 
 static void
 print_usage(const char *progname)
@@ -113,8 +113,7 @@ print_version()
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **manifest_path,
-              const char ***paths)
+parse_cmdline(int argc, char **argv, const char **manifest_path, char ***paths)
 {
     int ret = -1;
 
@@ -162,7 +161,7 @@ parse_cmdline(int argc, char **argv, const char **manifest_path,
         return -1;
     }
     *manifest_path = argv[optind];
-    *paths = (const char **)&argv[optind+1];
+    *paths = &argv[optind+1];
 
     return 0;
 
@@ -185,8 +184,8 @@ set_time_variables()
 static int
 gid_cmp(const void *elem1, const void *elem2)
 {
-    gid_t gid1 = *(gid_t *)elem1;
-    gid_t gid2 = *(gid_t *)elem2;
+    gid_t gid1 = *(const gid_t *)elem1;
+    gid_t gid2 = *(const gid_t *)elem2;
 
     return (gid1 > gid2) - (gid1 < gid2);
 }
@@ -194,8 +193,8 @@ gid_cmp(const void *elem1, const void *elem2)
 static int
 mode_cmp(const void *elem1, const void *elem2)
 {
-    mode_t mode1 = *(mode_t *)elem1;
-    mode_t mode2 = *(mode_t *)elem2;
+    mode_t mode1 = *(const mode_t *)elem1;
+    mode_t mode2 = *(const mode_t *)elem2;
 
     return (mode1 > mode2) - (mode1 < mode2);
 }
@@ -203,8 +202,8 @@ mode_cmp(const void *elem1, const void *elem2)
 static int
 uid_cmp(const void *elem1, const void *elem2)
 {
-    uid_t uid1 = *(uid_t *)elem1;
-    uid_t uid2 = *(uid_t *)elem2;
+    uid_t uid1 = *(const uid_t *)elem1;
+    uid_t uid2 = *(const uid_t *)elem2;
 
     return (uid1 > uid2) - (uid1 < uid2);
 }
@@ -658,7 +657,7 @@ process_files_cb(int fd, int dirfd, const char *name, const char *path,
 }
 
 static int
-process_files(const char **paths, struct radix_tree *data)
+process_files(char **paths, struct radix_tree *data)
 {
     int err;
     struct ctx pctx;
@@ -690,7 +689,8 @@ process_files(const char **paths, struct radix_tree *data)
 int
 main(int argc, char **argv)
 {
-    const char *manifest_path, **paths;
+    char **paths;
+    const char *manifest_path;
     int ret, status = EXIT_FAILURE;
     struct radix_tree *data;
 
