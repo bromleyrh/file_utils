@@ -120,6 +120,10 @@ struct db_obj_free_id {
     uint8_t     flags;
 } __attribute__((packed));
 
+static int get_str_arg(char **);
+
+static void print_usage(const char *);
+
 static int parse_cmdline(int, char **, char **, char **, enum op *,
                          struct key *, int *);
 
