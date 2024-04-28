@@ -287,7 +287,7 @@ parse_cmdline(int argc, char **argv, const char **sock_pathname,
             key->type = KEY_EXTERNAL;
             break;
         case 'n':
-            key->id = strtoull(optarg, NULL, 10);
+            key->id = strtoumax(optarg, NULL, 10);
             key->type = KEY_INTERNAL;
             break;
         case 'S':
