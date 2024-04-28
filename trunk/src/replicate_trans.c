@@ -300,7 +300,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         cctx->bytescopied += dcpctx->off - cctx->lastoff;
     cctx->lastoff = dcpctx->off;
 
-    pcnt = (double)100 * cctx->bytescopied / cctx->fsbytesused;
+    pcnt = 100.0 * cctx->bytescopied / cctx->fsbytesused;
     if (debug) {
         double throughput;
         struct timespec curtm, difftm;

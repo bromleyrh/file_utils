@@ -449,7 +449,7 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     wctx->bytesverified += flen - wctx->lastoff;
     wctx->lastoff = flen;
 
-    pcnt = (double)100 * wctx->bytesverified / wctx->fsbytesused;
+    pcnt = 100.0 * wctx->bytesverified / wctx->fsbytesused;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
     timespec_diff(&curtm, &wctx->starttm, &difftm);
