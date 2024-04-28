@@ -767,7 +767,7 @@ used_id_set(uint64_t *used_id, uint64_t base, uint64_t id, int val)
 
     idx = id - base;
     wordidx = idx / NBWD;
-    mask = 1ull << idx % NBWD;
+    mask = UINT64_C(1) << idx % NBWD;
 
     if (val)
         used_id[wordidx] |= mask;
