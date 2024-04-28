@@ -68,8 +68,7 @@ struct plugin_list {
     struct dynamic_array *list;
 };
 
-#define TRACE(err, ...) \
-    trace(__FILE__, __FUNCTION__, __LINE__, err, __VA_ARGS__)
+#define TRACE(err, ...) trace(__FILE__, __func__, __LINE__, err, __VA_ARGS__)
 
 #define DEBUG_PRINT(...) \
     debug_print(1, __VA_ARGS__)

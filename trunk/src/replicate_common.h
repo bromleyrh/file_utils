@@ -39,8 +39,7 @@ extern int tracing;
 extern uid_t ruid;
 extern gid_t rgid;
 
-#define TRACE(err, ...) \
-    trace(__FILE__, __FUNCTION__, __LINE__, err, __VA_ARGS__)
+#define TRACE(err, ...) trace(__FILE__, __func__, __LINE__, err, __VA_ARGS__)
 
 void trace(const char *file, const char *func, int line, int err,
            const char *fmt, ...);
