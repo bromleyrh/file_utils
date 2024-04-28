@@ -80,10 +80,9 @@ static int init_privs(void);
 
 static void print_usage(const char *);
 static void print_version(void);
-static int parse_cmdline(int, char **, const char **, int *,
-                         struct plugin_list *);
+static int parse_cmdline(int, char **, char **, int *, struct plugin_list *);
 
-static int get_conf_path(const char *, const char **);
+static int get_conf_path(const char *, char **);
 
 static int get_regex(regex_t *, const char *);
 
@@ -122,13 +121,13 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
 #ifdef ENABLE_TRACE
         infomsg(sep);
 
-        bt = (const char **)get_backtrace(&n);
+        bt = get_backtrace(&n);
         if (bt != NULL) {
             int i;
 
             for (i = n - 1; i > 2; i--)
                 infomsgf("%s()\n", bt[i]);
-            free_backtrace((char **)bt);
+            free_backtrace(bt);
         }
 
 #endif
@@ -239,10 +238,10 @@ print_version()
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new,
+parse_cmdline(int argc, char **argv, char **confpath, int *allow_new,
               struct plugin_list *plist)
 {
-    const char *cfpath = NULL;
+    char *cfpath = NULL;
     int ret;
 
     static const struct option longopts[] = {
@@ -257,7 +256,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *allow_new,
         break;
     case 'c':
         if (cfpath != NULL)
-            free((void *)cfpath);
+            free(cfpath);
         cfpath = strdup(optarg);
         if (cfpath == NULL) {
             error(0, errno, "Couldn't allocate memory");
@@ -299,7 +298,7 @@ exit_success:
     ret = -2;
 exit:
     if (cfpath != NULL)
-        free((void *)cfpath);
+        free(cfpath);
     free_plugin_list(plist);
     return ret;
 }
@@ -399,9 +398,9 @@ init_privs()
 }
 
 static int
-get_conf_path(const char *pathspec, const char **path)
+get_conf_path(const char *pathspec, char **path)
 {
-    const char *ret;
+    char *ret;
     int err;
     wordexp_t words;
 
@@ -1025,7 +1024,7 @@ free_verifs(struct verif *verifs, int num)
     int i;
 
     for (i = 0; i < num; i++)
-        free((void *)verifs[i].srcpath);
+        free(verifs[i].srcpath);
 
     free(verifs);
 }
@@ -1033,7 +1032,7 @@ free_verifs(struct verif *verifs, int num)
 int
 main(int argc, char **argv)
 {
-    const char *confpath = NULL;
+    char *confpath = NULL;
     int ret;
     regex_t reg_excl;
     struct parse_ctx pctx;
@@ -1070,7 +1069,7 @@ main(int argc, char **argv)
     pctx.regexlen = 0;
 
     ret = parse_config(confpath, &pctx);
-    free((void *)confpath);
+    free(confpath);
     if (ret != 0)
         goto end1;
 
@@ -1088,7 +1087,7 @@ main(int argc, char **argv)
 
     if (pctx.regex != NULL) {
         ret = get_regex(&reg_excl, pctx.regex);
-        free((void *)pctx.regex);
+        free(pctx.regex);
         if (ret != 0)
             goto end2;
         ctx->reg_excl = &reg_excl;
@@ -1141,12 +1140,12 @@ end3:
     radix_tree_free(ctx->input_data);
 end2:
     if (ctx->base_dir != NULL)
-        free((void *)ctx->base_dir);
+        free(ctx->base_dir);
     if (ctx->reg_excl != NULL)
         regfree(ctx->reg_excl);
     if (ctx->input_file != NULL)
-        free((void *)ctx->input_file);
-    free((void *)ctx->output_file);
+        free(ctx->input_file);
+    free(ctx->output_file);
     free_verifs(ctx->verifs, ctx->num_verifs);
 end1:
     free_plugin_list(&plist);

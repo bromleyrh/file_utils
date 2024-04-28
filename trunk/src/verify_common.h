@@ -29,23 +29,23 @@ extern uid_t ruid;
 extern gid_t rgid;
 
 struct verif {
-    const char *devpath;
-    const char *srcpath;
-    const char *srcmntopts;
-    const char *check_cmd;
+    const char  *devpath;
+    char        *srcpath;
+    const char  *srcmntopts;
+    const char  *check_cmd;
 };
 
 struct verify_ctx {
     struct verif        *verifs;
     int                 num_verifs;
     DBusConnection      *busconn;
-    const char          *base_dir;
+    char                *base_dir;
     regex_t             *reg_excl;
     int                 detect_hard_links;
-    const char          *input_file;
+    char                *input_file;
     int                 allow_new;
     struct radix_tree   *input_data;
-    const char          *output_file;
+    char                *output_file;
     uid_t               uid;
     gid_t               gid;
     struct plugin_list  *plist;

@@ -47,7 +47,7 @@ struct copy_ctx {
     dev_t           lastdev;
     ino_t           lastino;
     uint64_t        filesprocessed;
-    const char      *lastpath;
+    char            *lastpath;
     const char      *hookbin;
     int             hookfd;
     mode_t          hookumask;
@@ -290,7 +290,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
                 return ret;
             if (debug)
                 infomsgf(" (copied %s)\n", cctx->lastpath);
-            free((void *)cctx->lastpath);
+            free(cctx->lastpath);
         }
         cctx->bytescopied += dcpctx->off;
         cctx->lastdev = s->st_dev;
@@ -375,7 +375,7 @@ copy_fn(void *arg)
         infochr('\n');
     }
     if (cctx.lastpath != NULL)
-        free((void *)cctx.lastpath);
+        free(cctx.lastpath);
     if (ret == 0)
         nfilesproc = cctx.filesprocessed;
     else if (err_get_code(ret) == -EPERM) {

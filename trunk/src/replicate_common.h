@@ -13,11 +13,11 @@
 #define FORMAT_CMD_DEST_SPECIFIER "$dest"
 
 struct transfer {
-    const char  *srcpath;
+    char        *srcpath;
     const char  *srcmntopts;
-    const char  *dstpath;
+    char        *dstpath;
     const char  *dstmntpath;
-    const char  *format_cmd;
+    char        *format_cmd;
     const char  *hook;
     int         force_write;
     int         setro;

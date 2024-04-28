@@ -72,9 +72,9 @@ static int init_privs(void);
 
 static void print_usage(const char *);
 static void print_version(void);
-static int parse_cmdline(int, char **, const char **, int *);
+static int parse_cmdline(int, char **, char **, int *);
 
-static int get_conf_path(const char *, const char **);
+static int get_conf_path(const char *, char **);
 
 static void int_handler(int);
 static void end_handler(int);
@@ -100,7 +100,7 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
 {
     if (debug && tracing) {
 #ifdef ENABLE_TRACE
-        const char **bt;
+        char **bt;
         int n;
         static const char sep[] = "--------------------------------\n";
 #endif
@@ -111,13 +111,13 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
 #ifdef ENABLE_TRACE
         infomsg(sep);
 
-        bt = (const char **)get_backtrace(&n);
+        bt = get_backtrace(&n);
         if (bt != NULL) {
             int i;
 
             for (i = n - 1; i > 2; i--)
                 infomsgf("%s()\n", bt[i]);
-            free_backtrace((char **)bt);
+            free_backtrace(bt);
         }
 
 #endif
@@ -285,9 +285,9 @@ print_version()
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
+parse_cmdline(int argc, char **argv, char **confpath, int *sessid)
 {
-    const char *cfpath = NULL;
+    char *cfpath = NULL;
     int ret;
 
     static const struct option longopts[] = {
@@ -299,7 +299,7 @@ parse_cmdline(int argc, char **argv, const char **confpath, int *sessid)
     GET_LONG_OPTIONS(argc, argv, "c:dhs:.", longopts) {
     case 'c':
         if (cfpath != NULL)
-            free((void *)cfpath);
+            free(cfpath);
         cfpath = strdup(optarg);
         if (cfpath == NULL) {
             error(0, errno, "Couldn't allocate memory");
@@ -338,14 +338,14 @@ exit_success:
     ret = -2;
 exit:
     if (cfpath != NULL)
-        free((void *)cfpath);
+        free(cfpath);
     return ret;
 }
 
 static int
-get_conf_path(const char *pathspec, const char **path)
+get_conf_path(const char *pathspec, char **path)
 {
-    const char *ret;
+    char *ret;
     int err;
     wordexp_t words;
 
@@ -577,7 +577,7 @@ static int
 get_sess_path(const char *sesspath, const char *path, char *fullpath,
               size_t len)
 {
-    const char *newpath;
+    char *newpath;
     int ret;
 
     newpath = strsub(path, "/", "_");
@@ -586,7 +586,7 @@ get_sess_path(const char *sesspath, const char *path, char *fullpath,
 
     ret = snprintf(fullpath, len, "%s/%s", sesspath, newpath);
 
-    free((void *)newpath);
+    free(newpath);
 
     return ret >= (int)len ? ERR_TAG(ENAMETOOLONG) : 0;
 }
@@ -885,9 +885,9 @@ free_transfers(struct transfer *transfers, int num)
     for (i = 0; i < num; i++) {
         struct transfer *transfer = &transfers[i];
 
-        free((void *)transfer->srcpath);
-        free((void *)transfer->dstpath);
-        free((void *)transfer->format_cmd);
+        free(transfer->srcpath);
+        free(transfer->dstpath);
+        free(transfer->format_cmd);
     }
 
     free(transfers);
@@ -896,7 +896,7 @@ free_transfers(struct transfer *transfers, int num)
 int
 main(int argc, char **argv)
 {
-    const char *confpath = NULL;
+    char *confpath = NULL;
     int ret;
     int sessid;
     struct replicate_ctx ctx;
@@ -926,7 +926,7 @@ main(int argc, char **argv)
     }
 
     ret = parse_config(confpath, &ctx);
-    free((void *)confpath);
+    free(confpath);
     if (ret != 0)
         goto end1;
 

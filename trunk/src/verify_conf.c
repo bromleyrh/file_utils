@@ -266,7 +266,7 @@ read_base_dir_opt(json_val_t opt, void *data)
     struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
-    return awcstombs((char **)&ctx->base_dir, json_val_string_get(opt), &s)
+    return awcstombs(&ctx->base_dir, json_val_string_get(opt), &s)
            == (size_t)-1 ? ERR_TAG(errno) : 0;
 }
 
@@ -398,7 +398,7 @@ read_input_file_opt(json_val_t opt, void *data)
     struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
-    return awcstombs((char **)&ctx->input_file, json_val_string_get(opt), &s)
+    return awcstombs(&ctx->input_file, json_val_string_get(opt), &s)
            == (size_t)-1 ? ERR_TAG(errno) : 0;
 }
 
@@ -409,7 +409,7 @@ read_output_file_opt(json_val_t opt, void *data)
     struct verify_ctx *ctx = data;
 
     omemset(&s, 0);
-    return awcstombs((char **)&ctx->output_file, json_val_string_get(opt), &s)
+    return awcstombs(&ctx->output_file, json_val_string_get(opt), &s)
            == (size_t)-1 ? ERR_TAG(errno) : 0;
 }
 

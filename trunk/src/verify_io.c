@@ -69,8 +69,8 @@ static int io_stats_get_median(struct io_stats *, double *, double *, double *);
 static int
 ms_cmp(const void *k1, const void *k2)
 {
-    struct ms *ms1 = *(struct ms **)k1;
-    struct ms *ms2 = *(struct ms **)k2;
+    struct ms *ms1 = *(struct ms *const *)k1;
+    struct ms *ms2 = *(struct ms *const *)k2;
 
     return (ms1->ms > ms2->ms) - (ms1->ms < ms2->ms);
 }
@@ -78,7 +78,7 @@ ms_cmp(const void *k1, const void *k2)
 static void
 ms_free(const void *k)
 {
-    struct ms *ms = *(struct ms **)k;
+    struct ms *ms = *(struct ms *const *)k;
 
     free(ms);
 }

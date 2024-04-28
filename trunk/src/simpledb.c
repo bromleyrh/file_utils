@@ -63,7 +63,7 @@ enum key_type {
 struct key {
     enum key_type   type;
     uint64_t        id;
-    const char      *key;
+    char            *key;
 };
 
 struct db_key_ctx {
@@ -120,7 +120,7 @@ struct db_obj_free_id {
     uint8_t     flags;
 } __attribute__((packed));
 
-static int parse_cmdline(int, char **, const char **, const char **, enum op *,
+static int parse_cmdline(int, char **, char **, char **, enum op *,
                          struct key *, int *);
 
 static int uint64_cmp(uint64_t, uint64_t);
@@ -164,7 +164,7 @@ static uint64_t free_id_find(uint64_t *, uint64_t);
 static int get_id(struct db_ctx *, uint64_t *);
 static int release_id(struct db_ctx *, uint64_t, uint64_t);
 
-static int do_read_data(const char **, size_t *, int);
+static int do_read_data(char **, size_t *, int);
 static int do_write_data(const char *, size_t, int);
 
 static int resize_msg_buf(char **, size_t, size_t *, int);
@@ -202,10 +202,10 @@ static int do_op(struct db_ctx *, enum op, struct key *, void **, size_t *,
                  uint64_t *, int, int, int);
 
 static int
-get_str_arg(const char **str)
+get_str_arg(char **str)
 {
     if (*str != NULL)
-        free((void *)*str);
+        free(*str);
 
     *str = strdup(optarg);
 
@@ -242,8 +242,8 @@ print_usage(const char *prognm)
 }
 
 static int
-parse_cmdline(int argc, char **argv, const char **sock_pathname,
-              const char **pathname, enum op *op, struct key *key, int *trans)
+parse_cmdline(int argc, char **argv, char **sock_pathname, char **pathname,
+              enum op *op, struct key *key, int *trans)
 {
     static const enum op ops[256] = {
         [(unsigned char)'a'] = OP_ABORT_TRANS,
@@ -934,7 +934,7 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
 }
 
 static int
-do_read_data(const char **data, size_t *datalen, int fd)
+do_read_data(char **data, size_t *datalen, int fd)
 {
     char *ret, *tmp;
     int err;
@@ -972,7 +972,7 @@ do_read_data(const char **data, size_t *datalen, int fd)
         tmp = do_realloc(ret, len);
         if (tmp == NULL)
             goto err;
-        *data = (const char *)tmp;
+        *data = tmp;
     } else {
         free(ret);
         *data = NULL;
@@ -1695,7 +1695,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
             key->id = *(uint64_t *)msg;
             free(msg);
         } else {
-            free((void *)key->key);
+            free(key->key);
             key->key = msg;
         }
         /* fallthrough */
@@ -1732,7 +1732,7 @@ static int
 do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
           uint64_t *id, int datafd, int notrans)
 {
-    const char *d = NULL;
+    char *d = NULL;
     int alloc_id = 0;
     int err;
     size_t dlen = 0;
@@ -1827,7 +1827,7 @@ static int
 do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
           int datafd, int notrans)
 {
-    const char *d = NULL;
+    char *d = NULL;
     int err;
     size_t dlen = 0;
     struct db_key k;
@@ -1880,7 +1880,7 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
     }
 
     if (data == NULL && datafd >= 0)
-        free((void *)d);
+        free(d);
 
     if (!notrans) {
         err = do_db_hl_trans_commit(dbctx);
@@ -1898,7 +1898,7 @@ err2:
         do_db_hl_trans_abort(dbctx);
 err1:
     if (data == NULL && datafd >= 0)
-        free((void *)d);
+        free(d);
     return err;
 }
 
@@ -2509,7 +2509,8 @@ do_op(struct db_ctx *dbctx, enum op op, struct key *key, void **data,
 int
 main(int argc, char **argv)
 {
-    const char *pathname = NULL, *sock_pathname = NULL;
+    char *pathname_buf = NULL, *sock_pathname_buf = NULL;
+    const char *pathname, *sock_pathname;
     enum op op = 0;
     int ret;
     int trans = 0;
@@ -2522,14 +2523,13 @@ main(int argc, char **argv)
     if (setvbuf(stdout, NULL, _IOLBF, 0) != 0)
         return EXIT_FAILURE;
 
-    ret = parse_cmdline(argc, argv, &sock_pathname, &pathname, &op, &key,
-                        &trans);
+    ret = parse_cmdline(argc, argv, &sock_pathname_buf, &pathname_buf, &op,
+                        &key, &trans);
     if (ret != 0)
         return ret == -2 ? EXIT_SUCCESS : EXIT_FAILURE;
-    if (sock_pathname == NULL)
-        sock_pathname = default_sock_pathname;
-    if (pathname == NULL)
-        pathname = default_pathname;
+    sock_pathname = sock_pathname_buf == NULL
+                    ? default_sock_pathname : sock_pathname_buf;
+    pathname = pathname_buf == NULL ? default_pathname : pathname_buf;
 
     if (op == OP_INIT_TRANS) {
         ret = do_init_trans(sock_pathname, pathname);
@@ -2581,9 +2581,9 @@ main(int argc, char **argv)
 
 end:
     if (pathname != default_pathname)
-        free((void *)pathname);
+        free(pathname_buf);
     if (sock_pathname != default_sock_pathname)
-        free((void *)sock_pathname);
+        free(sock_pathname_buf);
     if (key.key != NULL)
         free((void *)key.key);
     return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
