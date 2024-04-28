@@ -473,9 +473,9 @@ static int
 input_data_walk_cb(const char *str, void *val, void *ctx)
 {
     char outstr[PATH_MAX + 256];
-    FILE *f = (FILE *)ctx;
+    FILE *f = ctx;
     size_t len, tmp;
-    struct md_record *record = (struct md_record *)val;
+    struct md_record *record = val;
 
     len = timestamp_to_str(outstr, sizeof(outstr), "a:" TM_FMT_OUT,
                            &record->atim);

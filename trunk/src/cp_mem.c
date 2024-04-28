@@ -203,7 +203,7 @@ get_hugepage_size(int fd)
     if (fstat(fd, &sb) == -1)
         return -1;
 
-    return (off_t)sb.st_blksize;
+    return sb.st_blksize;
 }
 
 static inline off_t
@@ -260,9 +260,8 @@ dest_buf_reposition(off_t offset, off_t bufsize, struct dest *dst)
         munmap(dst->buf.buf, dst->buf.size);
     dst->buf.off = offset;
     dst->buf.size = bufsize;
-    dst->buf.buf = (char *)mmap(0, dst->buf.off - pgoff + dst->buf.size,
-                                PROT_READ | PROT_WRITE, MAP_SHARED, dst->fd,
-                                pgoff);
+    dst->buf.buf = mmap(0, dst->buf.off - pgoff + dst->buf.size,
+                        PROT_READ | PROT_WRITE, MAP_SHARED, dst->fd, pgoff);
     if (dst->buf.buf == MAP_FAILED)
         goto err;
     dst->buf.buf += dst->buf.off - pgoff;

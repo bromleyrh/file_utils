@@ -155,7 +155,7 @@ main(int argc, char **argv)
         {.file = "osort", .argv = cmd2},
         {.file = "fastcat", .argv = cmd3}
     };
-    static const int ncmds = (int)ARRAY_SIZE(cmds);
+    static const int ncmds = ARRAY_SIZE(cmds);
 
     ret = parse_cmdline(argc, argv, conf_path, template_path);
     if (ret != 0)
