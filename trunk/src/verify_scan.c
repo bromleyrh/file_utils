@@ -467,8 +467,8 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
                                  "verify.signal.Throughput", "Throughput")))
         err_clear(err);
 
-    wctx->transfer_size = io_state_update(wctx->io_state,
-                                          (size_t)wctx->bytesverified, -1.0);
+    wctx->transfer_size = io_state_update(wctx->io_state, wctx->bytesverified,
+                                          -1.0);
 
     return quit ? -EINTR : 0;
 }
