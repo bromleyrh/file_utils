@@ -454,7 +454,7 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
     clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
     timespec_diff(&curtm, &wctx->starttm, &difftm);
     throughput = wctx->bytesverified
-                 / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
+                 / (difftm.tv_sec + difftm.tv_nsec * 1e-9)
                  / (1024 * 1024);
     DEBUG_PRINT_NO_NL("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
     if (debug)

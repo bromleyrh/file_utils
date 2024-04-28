@@ -299,7 +299,7 @@ io_state_update(struct io_state *state, size_t len, double tp)
         clock_gettime(CLOCK_MONOTONIC_RAW, &t2);
         timespec_diff(&t2, &state->t1, &dt);
         throughput = state->totlen
-                     / (dt.tv_sec + dt.tv_nsec * 0.000000001)
+                     / (dt.tv_sec + dt.tv_nsec * 1e-9)
                      / (1024 * 1024);
     } else
         throughput = tp;

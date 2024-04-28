@@ -308,7 +308,7 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
         clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
         timespec_diff(&curtm, &cctx->starttm, &difftm);
         throughput = cctx->bytescopied
-                     / (difftm.tv_sec + difftm.tv_nsec * 0.000000001)
+                     / (difftm.tv_sec + difftm.tv_nsec * 1e-9)
                      / (1024 * 1024);
         infomsgf("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
     }
