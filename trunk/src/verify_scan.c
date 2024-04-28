@@ -228,10 +228,10 @@ get_huge_page_size(int64_t *huge_page_size)
     size_t n;
 
     static const int64_t prefix_map[256] = {
-        ['k'] = (int64_t)1 << 10,
-        ['M'] = (int64_t)1 << 20,
-        ['G'] = (int64_t)1 << 30,
-        ['T'] = (int64_t)1 << 40
+        ['k'] = INT64_C(1) << 10,
+        ['M'] = INT64_C(1) << 20,
+        ['G'] = INT64_C(1) << 30,
+        ['T'] = INT64_C(1) << 40
     };
 
     f = fopen(MEMINFO, "r");
