@@ -91,7 +91,7 @@ parse_cmdline(int argc, char **argv, struct opts *opts)
     case 'o':
         if (optarg[1] != '\0')
             return -1;
-        opts->op = opmap[(int)*optarg];
+        opts->op = opmap[(unsigned char)*optarg];
         break;
     default:
         return -1;
