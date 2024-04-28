@@ -1307,6 +1307,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         struct iovec iov[2];
         struct key key;
         uint64_t id;
+        void *bufp;
 
         sockfd2 = accept(sockfd1, NULL, NULL);
         if (sockfd2 == -1) {
@@ -1366,9 +1367,11 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         }
 
         if (!err) {
-            err = do_op(dbctx, op, &key, (void **)&buf, &len, &id, -1, -1, 1);
+            err = do_op(dbctx, op, &key, &bufp, &len, &id, -1, -1, 1);
             switch (-err) {
             case 0:
+                buf = bufp;
+                /* fallthrough */
             case EADDRINUSE:
             case EADDRNOTAVAIL:
             case ENOENT:

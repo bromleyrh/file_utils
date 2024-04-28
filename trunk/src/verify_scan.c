@@ -313,7 +313,9 @@ cancel_aio(struct aiocb *cb)
     ret = aio_cancel(cb->aio_fildes, cb);
 
     if (ret == AIO_NOTCANCELED) {
-        while (aio_suspend((const struct aiocb **)&cb, 1, NULL) == -1) {
+        const struct aiocb *cbp = cb;
+
+        while (aio_suspend(&cbp, 1, NULL) == -1) {
             if (errno != EAGAIN && errno != EINTR)
                 break;
         }
