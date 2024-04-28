@@ -187,9 +187,9 @@ EOF
          [libjson_cppflags=$libjson_CFLAGS
           libjson_link_dep=$libjson_LIBS]
      )
-     PKG_CHECK_MODULES([libmatroskalite], [libmatroskalite],
-         [libmatroskalite_cppflags=$libmatroskalite_CFLAGS
-          libmatroskalite_link_dep=$libmatroskalite_LIBS]
+     PKG_CHECK_MODULES([libmatroska], [libmatroska],
+         [libmatroska_cppflags=$libmatroska_CFLAGS
+          libmatroska_link_dep=$libmatroska_LIBS]
      )
      PKG_CHECK_MODULES([openssl], [openssl],
          [openssl_cppflags=$openssl_CFLAGS
@@ -198,12 +198,12 @@ EOF
 
      AC_SUBST([dbus_cppflags])
      AC_SUBST([libjson_cppflags])
-     AC_SUBST([libmatroskalite_cppflags])
+     AC_SUBST([libmatroska_cppflags])
      AC_SUBST([openssl_cppflags])
 
      AC_SUBST([dbus_link_dep])
      AC_SUBST([libjson_link_dep])
-     AC_SUBST([libmatroskalite_link_dep])
+     AC_SUBST([libmatroska_link_dep])
      AC_SUBST([openssl_link_dep])
     ]
 )

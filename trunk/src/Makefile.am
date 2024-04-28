@@ -42,10 +42,10 @@ src_libdirectio_la_LDFLAGS = -lc -ldl \
 	-version-info @ldio_cur@:@ldio_rev@:@ldio_age@
 
 src_libverify_mkv_plugin_la_SOURCES = src/verify_mkv_plugin.c
-src_libverify_mkv_plugin_la_CFLAGS = $(AM_CFLAGS) @libmatroskalite_cppflags@
+src_libverify_mkv_plugin_la_CFLAGS = $(AM_CFLAGS) @libmatroska_cppflags@
 src_libverify_mkv_plugin_la_LDFLAGS = \
 	-version-info @lvmp_cur@:@lvmp_rev@:@lvmp_age@
-src_libverify_mkv_plugin_la_LIBADD = @libmatroskalite_link_dep@
+src_libverify_mkv_plugin_la_LIBADD = @libmatroska_link_dep@
 
 include src/libbackup/Makefile.am
 
