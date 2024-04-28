@@ -34,7 +34,7 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 
-#define NBWD (sizeof(uint64_t) * NBBY)
+#define NBWD (sizeof(uint64_t) * CHAR_BIT)
 
 enum op {
     OP_INIT_TRANS = 1,
