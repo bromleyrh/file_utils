@@ -272,30 +272,46 @@ read_copy_creds_opt(json_val_t opt, void *data)
     json_object_elem_t elem;
     mbstate_t s;
     struct replicate_ctx *ctx = data;
+    wchar_t *str;
 
     omemset(&s, 0);
 
     err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
     if (!err) {
-        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
-            return ERR_TAG(errno);
+        str = json_val_string_get(elem.value);
+        if (str == NULL)
+            return ERR_TAG(ENOMEM);
+        err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
+        free(str);
+        if (err)
+            return err;
         ctx->uid = atoi(buf);
         free(buf);
 
         err = json_val_object_get_elem_by_key(opt, L"gid", &elem);
         if (err)
             return ERR_TAG(-err);
+        str = json_val_string_get(elem.value);
+        if (str == NULL)
+            return ERR_TAG(ENOMEM);
         omemset(&s, 0);
-        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
-            return ERR_TAG(errno);
+        err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
+        free(str);
+        if (err)
+            return err;
         ctx->gid = atoi(buf);
         free(buf);
     } else if (err == -EINVAL) {
         err = json_val_object_get_elem_by_key(opt, L"user", &elem);
         if (err)
             return ERR_TAG(-err);
-        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
-            return ERR_TAG(errno);
+        str = json_val_string_get(elem.value);
+        if (str == NULL)
+            return ERR_TAG(ENOMEM);
+        err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
+        free(str);
+        if (err)
+            return err;
         err = get_uid(buf, &ctx->uid);
         free(buf);
         if (err)
@@ -304,9 +320,14 @@ read_copy_creds_opt(json_val_t opt, void *data)
         err = json_val_object_get_elem_by_key(opt, L"group", &elem);
         if (err)
             return ERR_TAG(-err);
+        str = json_val_string_get(elem.value);
+        if (str == NULL)
+            return ERR_TAG(ENOMEM);
         omemset(&s, 0);
-        if (awcstombs(&buf, json_val_string_get(elem.value), &s) == (size_t)-1)
-            return ERR_TAG(errno);
+        err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
+        free(str);
+        if (err)
+            return err;
         if (strcmp(buf, "-") == 0)
             ctx->gid = (gid_t)-1;
         else {
