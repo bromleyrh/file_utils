@@ -393,15 +393,22 @@ read_exclude_opt(json_val_t opt, void *data)
         json_val_t val;
         mbstate_t s;
         size_t brlen;
+        wchar_t *str;
 
         val = json_val_array_get_elem(opt, i);
         if (val == NULL)
             return ERR_TAG(EIO);
 
+        str = json_string_get_value(val);
+        if (str == NULL)
+            return ERR_TAG(ENOMEM);
+
         omemset(&s, 0);
-        brlen = awcstombs(&regexbr, json_val_string_get(val), &s);
-        if (brlen == (size_t)-1)
-            return ERR_TAG(errno);
+        brlen = awcstombs(&regexbr, str, &s);
+        err = brlen == (size_t)-1 ? ERR_TAG(errno) : 0;
+        free(str);
+        if (err)
+            return err;
 
         err = expand_string(&pctx->regex, &pctx->regexcurbr, &pctx->regexlen,
                             brlen + 2);
