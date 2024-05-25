@@ -282,17 +282,17 @@ read_creds_opt(json_value_t opt, void *data)
 {
     char *buf;
     int err;
-    json_kv_pair_t elem;
+    json_kv_pair_t elm;
     mbstate_t s;
     struct verify_ctx *ctx = data;
     wchar_t *str;
 
     omemset(&s, 0);
 
-    err = json_object_get(opt, L"uid", &elem);
+    err = json_object_get(opt, L"uid", &elm);
     if (!err) {
-        str = json_string_get_value(elem.v);
-        json_value_put(elem.v);
+        str = json_string_get_value(elm.v);
+        json_value_put(elm.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
@@ -302,11 +302,11 @@ read_creds_opt(json_value_t opt, void *data)
         ctx->uid = atoi(buf);
         free(buf);
 
-        err = json_object_get(opt, L"gid", &elem);
+        err = json_object_get(opt, L"gid", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elem.v);
-        json_value_put(elem.v);
+        str = json_string_get_value(elm.v);
+        json_value_put(elm.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         omemset(&s, 0);
@@ -320,8 +320,8 @@ read_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"user", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elem.v);
-        json_value_put(elem.v);
+        str = json_string_get_value(elm.v);
+        json_value_put(elm.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
@@ -333,11 +333,11 @@ read_creds_opt(json_value_t opt, void *data)
         if (err)
             return err;
 
-        err = json_object_get(opt, L"group", &elem);
+        err = json_object_get(opt, L"group", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elem.v);
-        json_value_put(elem.v);
+        str = json_string_get_value(elm.v);
+        json_value_put(elm.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         omemset(&s, 0);
@@ -612,20 +612,20 @@ read_json_config(json_value_t config, struct parse_ctx *ctx)
     numopt = json_object_get_size(config);
     for (i = 0; i < numopt; i++) {
         const struct ent *opt;
-        json_kv_pair_t elem;
+        json_kv_pair_t elm;
 
-        err = json_object_get_at(config, i, &elem);
+        err = json_object_get_at(config, i, &elm);
         if (err)
             return ERR_TAG(-err);
 
-        opt = &opts[hash_wcs(elem.k, -1) >> 3 & 63];
-        if (opt->opt == NULL || wcscmp(elem.k, opt->opt) != 0) {
-            json_value_put(elem.v);
+        opt = &opts[hash_wcs(elm.k, -1) >> 3 & 63];
+        if (opt->opt == NULL || wcscmp(elm.k, opt->opt) != 0) {
+            json_value_put(elm.v);
             return ERR_TAG(EIO);
         }
 
-        err = (*opt->fn)(elem.v, ctx);
-        json_value_put(elem.v);
+        err = (*opt->fn)(elm.v, ctx);
+        json_value_put(elm.v);
         if (err)
             return err;
     }
