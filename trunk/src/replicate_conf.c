@@ -279,7 +279,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
     err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
     if (!err) {
         str = json_val_string_get(elem.value);
-        json_val_free(elem.value);
+        json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
@@ -293,7 +293,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
         if (err)
             return ERR_TAG(-err);
         str = json_val_string_get(elem.value);
-        json_val_free(elem.value);
+        json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         omemset(&s, 0);
@@ -308,7 +308,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
         if (err)
             return ERR_TAG(-err);
         str = json_val_string_get(elem.value);
-        json_val_free(elem.value);
+        json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
@@ -324,7 +324,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
         if (err)
             return ERR_TAG(-err);
         str = json_val_string_get(elem.value);
-        json_val_free(elem.value);
+        json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         omemset(&s, 0);
@@ -467,12 +467,12 @@ read_json_config(json_value_t config, struct replicate_ctx *ctx)
 
         opt = &opts[hash_wcs(elem.key, -1) >> 6 & 7];
         if (opt->opt == NULL || wcscmp(elem.key, opt->opt) != 0) {
-            json_val_free(elem.value);
+            json_value_put(elem.value);
             return ERR_TAG(EIO);
         }
 
         err = (*opt->fn)(elem.value, ctx);
-        json_val_free(elem.value);
+        json_value_put(elem.value);
         if (err)
             return err;
     }
@@ -553,7 +553,7 @@ parse_config(const char *path, struct replicate_ctx *ctx)
 
     err = read_json_config(config, ctx);
 
-    json_val_free(config);
+    json_value_put(config);
 
     return err;
 }
