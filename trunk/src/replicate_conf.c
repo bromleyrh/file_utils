@@ -11,10 +11,10 @@
 
 #include <json.h>
 
-#include <json/filters.h>
 #include <json/grammar.h>
 #include <json/grammar_parse.h>
 #include <json/native.h>
+#include <json/scanner.h>
 
 #include <backup.h>
 
