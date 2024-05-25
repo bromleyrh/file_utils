@@ -289,7 +289,7 @@ read_creds_opt(json_value_t opt, void *data)
 
     omemset(&s, 0);
 
-    err = json_val_object_get_elem_by_key(opt, L"uid", &elem);
+    err = json_object_get(opt, L"uid", &elem);
     if (!err) {
         str = json_val_string_get(elem.value);
         json_value_put(elem.value);
@@ -302,7 +302,7 @@ read_creds_opt(json_value_t opt, void *data)
         ctx->uid = atoi(buf);
         free(buf);
 
-        err = json_val_object_get_elem_by_key(opt, L"gid", &elem);
+        err = json_object_get(opt, L"gid", &elem);
         if (err)
             return ERR_TAG(-err);
         str = json_val_string_get(elem.value);
@@ -333,7 +333,7 @@ read_creds_opt(json_value_t opt, void *data)
         if (err)
             return err;
 
-        err = json_val_object_get_elem_by_key(opt, L"group", &elem);
+        err = json_object_get(opt, L"group", &elem);
         if (err)
             return ERR_TAG(-err);
         str = json_val_string_get(elem.value);
@@ -608,12 +608,12 @@ read_json_config(json_value_t config, struct parse_ctx *ctx)
         [15]    = {L"verifs",               &read_verifs_opt}
     };
 
-    numopt = json_val_object_get_num_elem(config);
+    numopt = json_object_get_size(config);
     for (i = 0; i < numopt; i++) {
         const struct ent *opt;
         json_kv_pair_t elem;
 
-        err = json_val_object_get_elem_by_idx(config, i, &elem);
+        err = json_object_get_at(config, i, &elem);
         if (err)
             return ERR_TAG(-err);
 
