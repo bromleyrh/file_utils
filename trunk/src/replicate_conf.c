@@ -43,7 +43,7 @@ static int get_uid(const char *, uid_t *);
 
 static int open_as_real_user(int *, const char *, int, ...);
 static int config_trusted(struct stat *);
-static size_t read_cb(char *, size_t, size_t, void *);
+static size_t read_cb(void *, size_t, size_t, void *);
 
 static int format_cmd_filter(void *, void *, void *);
 
@@ -221,7 +221,7 @@ config_trusted(struct stat *s)
 }
 
 static size_t
-read_cb(char *buf, size_t off, size_t len, void *ctx)
+read_cb(void *buf, size_t off, size_t len, void *ctx)
 {
     FILE *f = ctx;
     size_t ret;
