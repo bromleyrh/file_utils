@@ -406,7 +406,7 @@ read_transfers_opt(json_value_t opt, void *data)
          TRANSFER_PARAM(setro)}
     };
 
-    ctx->num_transfers = json_val_array_get_num_elem(opt);
+    ctx->num_transfers = json_array_get_size(opt);
 
     if (oecalloc(&ctx->transfers, ctx->num_transfers) == NULL)
         return ERR_TAG(errno);
@@ -415,7 +415,7 @@ read_transfers_opt(json_value_t opt, void *data)
         json_value_t val;
         struct transfer *transfer = &ctx->transfers[i];
 
-        val = json_val_array_get_elem(opt, i);
+        val = json_array_get_at(opt, i);
         if (val == NULL) {
             err = ERR_TAG(EIO);
             goto err;
