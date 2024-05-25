@@ -278,7 +278,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
 
     err = json_object_get(opt, L"uid", &elem);
     if (!err) {
-        str = json_val_string_get(elem.value);
+        str = json_string_get_value(elem.value);
         json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
@@ -292,7 +292,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"gid", &elem);
         if (err)
             return ERR_TAG(-err);
-        str = json_val_string_get(elem.value);
+        str = json_string_get_value(elem.value);
         json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
@@ -307,7 +307,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"user", &elem);
         if (err)
             return ERR_TAG(-err);
-        str = json_val_string_get(elem.value);
+        str = json_string_get_value(elem.value);
         json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
@@ -323,7 +323,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"group", &elem);
         if (err)
             return ERR_TAG(-err);
-        str = json_val_string_get(elem.value);
+        str = json_string_get_value(elem.value);
         json_value_put(elem.value);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
