@@ -353,7 +353,7 @@ read_debug_opt(json_value_t opt, void *data)
 {
     (void)data;
 
-    debug = backup_debug = json_val_boolean_get(opt);
+    debug = backup_debug = json_boolean_get(opt);
 
     return 0;
 }
@@ -363,7 +363,7 @@ read_keep_cache_opt(json_value_t opt, void *data)
 {
     struct replicate_ctx *ctx = data;
 
-    ctx->keep_cache = json_val_boolean_get(opt);
+    ctx->keep_cache = json_boolean_get(opt);
 
     return 0;
 }
@@ -373,7 +373,7 @@ read_log_opt(json_value_t opt, void *data)
 {
     (void)data;
 
-    log_transfers = json_val_boolean_get(opt);
+    log_transfers = json_boolean_get(opt);
 
     return 0;
 }
