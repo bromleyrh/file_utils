@@ -278,8 +278,8 @@ read_copy_creds_opt(json_value_t opt, void *data)
 
     err = json_object_get(opt, L"uid", &elem);
     if (!err) {
-        str = json_string_get_value(elem.value);
-        json_value_put(elem.value);
+        str = json_string_get_value(elem.v);
+        json_value_put(elem.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
@@ -292,8 +292,8 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"gid", &elem);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elem.value);
-        json_value_put(elem.value);
+        str = json_string_get_value(elem.v);
+        json_value_put(elem.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         omemset(&s, 0);
@@ -307,8 +307,8 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"user", &elem);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elem.value);
-        json_value_put(elem.value);
+        str = json_string_get_value(elem.v);
+        json_value_put(elem.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
@@ -323,8 +323,8 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"group", &elem);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elem.value);
-        json_value_put(elem.value);
+        str = json_string_get_value(elem.v);
+        json_value_put(elem.v);
         if (str == NULL)
             return ERR_TAG(ENOMEM);
         omemset(&s, 0);
@@ -465,14 +465,14 @@ read_json_config(json_value_t config, struct replicate_ctx *ctx)
         if (err)
             return ERR_TAG(-err);
 
-        opt = &opts[hash_wcs(elem.key, -1) >> 6 & 7];
-        if (opt->opt == NULL || wcscmp(elem.key, opt->opt) != 0) {
-            json_value_put(elem.value);
+        opt = &opts[hash_wcs(elem.k, -1) >> 6 & 7];
+        if (opt->opt == NULL || wcscmp(elem.k, opt->opt) != 0) {
+            json_value_put(elem.v);
             return ERR_TAG(EIO);
         }
 
-        err = (*opt->fn)(elem.value, ctx);
-        json_value_put(elem.value);
+        err = (*opt->fn)(elem.v, ctx);
+        json_value_put(elem.v);
         if (err)
             return err;
     }
