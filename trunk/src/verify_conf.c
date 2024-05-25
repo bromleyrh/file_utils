@@ -262,12 +262,19 @@ read_cb(char *buf, size_t off, size_t len, void *ctx)
 static int
 read_base_dir_opt(json_val_t opt, void *data)
 {
+    int err;
     mbstate_t s;
     struct verify_ctx *ctx = data;
+    wchar_t *str;
+
+    str = json_val_string_get(opt);
+    if (str == NULL)
+        return ERR_TAG(ENOMEM);
 
     omemset(&s, 0);
-    return awcstombs(&ctx->base_dir, json_val_string_get(opt), &s)
-           == (size_t)-1 ? ERR_TAG(errno) : 0;
+    err = awcstombs(&ctx->base_dir, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
+    free(str);
+    return err;
 }
 
 static int
