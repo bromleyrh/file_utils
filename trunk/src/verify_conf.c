@@ -399,9 +399,9 @@ read_exclude_opt(json_value_t opt, void *data)
         size_t brlen;
         wchar_t *str;
 
-        val = json_array_get_at(opt, i);
-        if (val == NULL)
-            return ERR_TAG(EIO);
+        err = json_array_get_at(opt, i, &val);
+        if (err)
+            return ERR_TAG(-err);
 
         str = json_string_get_value(val);
         json_value_put(val);
@@ -509,9 +509,9 @@ read_verifs_opt(json_value_t opt, void *data)
     for (i = 0; i < ctx->num_verifs; i++) {
         json_value_t val;
 
-        val = json_array_get_at(opt, i);
-        if (val == NULL) {
-            err = ERR_TAG(EIO);
+        err = json_array_get_at(opt, i, &val);
+        if (err) {
+            err = ERR_TAG(-err);
             goto err;
         }
 
