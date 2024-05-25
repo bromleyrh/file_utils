@@ -431,12 +431,20 @@ read_exclude_opt(json_val_t opt, void *data)
 static int
 read_input_file_opt(json_val_t opt, void *data)
 {
+    int err;
     mbstate_t s;
     struct verify_ctx *ctx = data;
+    wchar_t *str;
+
+    str = json_val_string_get(opt);
+    if (str == NULL)
+        return ERR_TAG(ENOMEM);
 
     omemset(&s, 0);
-    return awcstombs(&ctx->input_file, json_val_string_get(opt), &s)
-           == (size_t)-1 ? ERR_TAG(errno) : 0;
+    err = awcstombs(&ctx->input_file, str, &s) == (size_t)-1
+          ? ERR_TAG(errno) : 0;
+    free(str);
+    return err;
 }
 
 static int
