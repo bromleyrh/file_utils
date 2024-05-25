@@ -570,8 +570,9 @@ parse_json_config(const char *path, const struct json_parser *parser,
     ctx.read_cb = &read_cb;
     ctx.ctx = f;
 
-    err = -json_parse_text_with_syntax(NULL, &json_in_filter_discard_comments,
-                                       &ctx, parser, config);
+    err = -json_parse_text_with_syntax(config, NULL,
+                                       &json_in_filter_discard_comments, &ctx,
+                                       parser);
 
     fclose(f);
 
