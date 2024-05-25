@@ -423,7 +423,7 @@ read_transfers_opt(json_value_t opt, void *data)
 
         transfer->force_write = 1;
         transfer->setro = 0;
-        err = json_oscanf(transfer, spec, (int)ARRAY_SIZE(spec), 0, val);
+        err = json_unpack(transfer, spec, (int)ARRAY_SIZE(spec), 0, val);
         if (err) {
             err = ERR_TAG(-err);
             goto err;
