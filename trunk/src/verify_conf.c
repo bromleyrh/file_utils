@@ -639,7 +639,7 @@ parse_config(const char *path, struct parse_ctx *ctx)
     json_value_t config;
     struct json_parser *parser;
 
-    err = json_parser_init(CONFIG_GRAM, CONFIG_ROOT_ID, &parser);
+    err = json_parser_generate(CONFIG_GRAM, CONFIG_ROOT_ID, &parser);
     if (err)
         return ERR_TAG(-err);
 
