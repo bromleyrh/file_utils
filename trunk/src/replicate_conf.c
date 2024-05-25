@@ -45,7 +45,7 @@ static int open_as_real_user(int *, const char *, int, ...);
 static int config_trusted(struct stat *);
 static size_t read_cb(void *, size_t, size_t, void *);
 
-static int format_cmd_filter(void *, void *, void *);
+static int format_cmd_filter(const void *, void *, void *);
 
 static int read_copy_creds_opt(json_value_t, void *);
 static int read_debug_opt(json_value_t, void *);
@@ -234,10 +234,10 @@ read_cb(void *buf, size_t off, size_t len, void *ctx)
 }
 
 static int
-format_cmd_filter(void *src, void *dst, void *arg)
+format_cmd_filter(const void *src, void *dst, void *arg)
 {
     char *tmp;
-    const char *format_cmd = *(const char **)src;
+    const char *format_cmd = *(const char *const *)src;
 
     (void)arg;
 
