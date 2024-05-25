@@ -43,7 +43,7 @@ static int get_uid(const char *, uid_t *);
 
 static int open_as_real_user(int *, const char *, int, ...);
 static int config_trusted(struct stat *);
-static size_t read_cb(void *, size_t, size_t, void *);
+static size_t rd_cb(void *, size_t, size_t, void *);
 
 static int format_cmd_filter(void *, const void *, void *);
 
@@ -221,7 +221,7 @@ config_trusted(struct stat *s)
 }
 
 static size_t
-read_cb(void *buf, size_t off, size_t len, void *ctx)
+rd_cb(void *buf, size_t off, size_t len, void *ctx)
 {
     FILE *f = ctx;
     size_t ret;
@@ -515,7 +515,7 @@ parse_json_config(const char *path, const struct json_parser *parser,
     }
 
     json_in_filter_ctx_init(&ctx);
-    ctx.rd_cb = &read_cb;
+    ctx.rd_cb = &rd_cb;
     ctx.ctx = f;
 
     err = -json_parse_text_with_syntax(config, NULL,
