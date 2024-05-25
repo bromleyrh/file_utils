@@ -518,7 +518,7 @@ parse_json_config(const char *path, const struct json_parser *parser,
     ctx.read_cb = &read_cb;
     ctx.ctx = f;
 
-    err = -json_grammar_validate(NULL, &json_read_cb_strip_comments, &ctx,
+    err = -json_grammar_validate(NULL, &json_in_filter_discard_comments, &ctx,
                                  parser, config);
 
     fclose(f);
