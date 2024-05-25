@@ -267,9 +267,9 @@ read_base_dir_opt(json_value_t opt, void *data)
     struct verify_ctx *ctx = data;
     wchar_t *str;
 
-    str = json_string_get_value(opt);
-    if (str == NULL)
-        return ERR_TAG(ENOMEM);
+    err = json_string_get_value(opt, &str);
+    if (err)
+        return ERR_TAG(-err);
 
     omemset(&s, 0);
     err = awcstombs(&ctx->base_dir, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
@@ -291,10 +291,10 @@ read_creds_opt(json_value_t opt, void *data)
 
     err = json_object_get(opt, L"uid", &elm);
     if (!err) {
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
         if (err)
@@ -305,10 +305,10 @@ read_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"gid", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         omemset(&s, 0);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
@@ -320,10 +320,10 @@ read_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"user", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
         if (err)
@@ -336,10 +336,10 @@ read_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"group", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         omemset(&s, 0);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
@@ -403,10 +403,10 @@ read_exclude_opt(json_value_t opt, void *data)
         if (err)
             return ERR_TAG(-err);
 
-        str = json_string_get_value(val);
+        err = json_string_get_value(val, &str);
         json_value_put(val);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
 
         omemset(&s, 0);
         brlen = awcstombs(&regexbr, str, &s);
@@ -441,9 +441,9 @@ read_input_file_opt(json_value_t opt, void *data)
     struct verify_ctx *ctx = data;
     wchar_t *str;
 
-    str = json_string_get_value(opt);
-    if (str == NULL)
-        return ERR_TAG(ENOMEM);
+    err = json_string_get_value(opt, &str);
+    if (err)
+        return ERR_TAG(-err);
 
     omemset(&s, 0);
     err = awcstombs(&ctx->input_file, str, &s) == (size_t)-1
@@ -460,9 +460,9 @@ read_output_file_opt(json_value_t opt, void *data)
     struct verify_ctx *ctx = data;
     wchar_t *str;
 
-    str = json_string_get_value(opt);
-    if (str == NULL)
-        return ERR_TAG(ENOMEM);
+    err = json_string_get_value(opt, &str);
+    if (err)
+        return ERR_TAG(-err);
 
     omemset(&s, 0);
     err = awcstombs(&ctx->output_file, str, &s) == (size_t)-1
