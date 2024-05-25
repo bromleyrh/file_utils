@@ -48,18 +48,18 @@ static int open_as_real_user(int *, const char *, int, ...);
 static int config_trusted(struct stat *);
 static size_t read_cb(char *, size_t, size_t, void *);
 
-static int read_base_dir_opt(json_val_t, void *);
-static int read_creds_opt(json_val_t, void *);
-static int read_debug_opt(json_val_t, void *);
-static int read_detect_hard_links_opt(json_val_t, void *);
-static int read_exclude_opt(json_val_t, void *);
-static int read_input_file_opt(json_val_t, void *);
-static int read_output_file_opt(json_val_t, void *);
-static int read_verifs_opt(json_val_t, void *);
+static int read_base_dir_opt(json_value_t, void *);
+static int read_creds_opt(json_value_t, void *);
+static int read_debug_opt(json_value_t, void *);
+static int read_detect_hard_links_opt(json_value_t, void *);
+static int read_exclude_opt(json_value_t, void *);
+static int read_input_file_opt(json_value_t, void *);
+static int read_output_file_opt(json_value_t, void *);
+static int read_verifs_opt(json_value_t, void *);
 
 static int parse_json_config(const char *, const struct json_parser *,
-                             json_val_t *);
-static int read_json_config(json_val_t, struct parse_ctx *);
+                             json_value_t *);
+static int read_json_config(json_value_t, struct parse_ctx *);
 
 static int
 expand_string(char **str, char **dst, size_t *len, size_t minadd)
@@ -260,7 +260,7 @@ read_cb(char *buf, size_t off, size_t len, void *ctx)
 }
 
 static int
-read_base_dir_opt(json_val_t opt, void *data)
+read_base_dir_opt(json_value_t opt, void *data)
 {
     int err;
     mbstate_t s;
@@ -278,7 +278,7 @@ read_base_dir_opt(json_val_t opt, void *data)
 }
 
 static int
-read_creds_opt(json_val_t opt, void *data)
+read_creds_opt(json_value_t opt, void *data)
 {
     char *buf;
     int err;
@@ -362,7 +362,7 @@ read_creds_opt(json_val_t opt, void *data)
 }
 
 static int
-read_debug_opt(json_val_t opt, void *data)
+read_debug_opt(json_value_t opt, void *data)
 {
     (void)data;
 
@@ -372,7 +372,7 @@ read_debug_opt(json_val_t opt, void *data)
 }
 
 static int
-read_detect_hard_links_opt(json_val_t opt, void *data)
+read_detect_hard_links_opt(json_value_t opt, void *data)
 {
     struct parse_ctx *pctx = data;
 
@@ -382,7 +382,7 @@ read_detect_hard_links_opt(json_val_t opt, void *data)
 }
 
 static int
-read_exclude_opt(json_val_t opt, void *data)
+read_exclude_opt(json_value_t opt, void *data)
 {
     int err;
     int first;
@@ -394,7 +394,7 @@ read_exclude_opt(json_val_t opt, void *data)
 
     for (i = 0; i < numexcl; i++) {
         char *regexbr;
-        json_val_t val;
+        json_value_t val;
         mbstate_t s;
         size_t brlen;
         wchar_t *str;
@@ -434,7 +434,7 @@ read_exclude_opt(json_val_t opt, void *data)
 }
 
 static int
-read_input_file_opt(json_val_t opt, void *data)
+read_input_file_opt(json_value_t opt, void *data)
 {
     int err;
     mbstate_t s;
@@ -453,7 +453,7 @@ read_input_file_opt(json_val_t opt, void *data)
 }
 
 static int
-read_output_file_opt(json_val_t opt, void *data)
+read_output_file_opt(json_value_t opt, void *data)
 {
     int err;
     mbstate_t s;
@@ -472,7 +472,7 @@ read_output_file_opt(json_val_t opt, void *data)
 }
 
 static int
-read_log_opt(json_val_t opt, void *data)
+read_log_opt(json_value_t opt, void *data)
 {
     (void)data;
 
@@ -484,7 +484,7 @@ read_log_opt(json_val_t opt, void *data)
 #define VERIF_PARAM(param) offsetof(struct verif, param)
 
 static int
-read_verifs_opt(json_val_t opt, void *data)
+read_verifs_opt(json_value_t opt, void *data)
 {
     int err;
     int i;
@@ -507,7 +507,7 @@ read_verifs_opt(json_val_t opt, void *data)
         return ERR_TAG(errno);
 
     for (i = 0; i < ctx->num_verifs; i++) {
-        json_val_t val;
+        json_value_t val;
 
         val = json_val_array_get_elem(opt, i);
         if (val == NULL) {
@@ -534,7 +534,7 @@ err:
 
 static int
 parse_json_config(const char *path, const struct json_parser *parser,
-                  json_val_t *config)
+                  json_value_t *config)
 {
     FILE *f;
     int err;
@@ -588,14 +588,14 @@ err:
 }
 
 static int
-read_json_config(json_val_t config, struct parse_ctx *ctx)
+read_json_config(json_value_t config, struct parse_ctx *ctx)
 {
     int err;
     int i, numopt;
 
     static const struct ent {
         const wchar_t   *opt;
-        int             (*fn)(json_val_t, void *);
+        int             (*fn)(json_value_t, void *);
     } opts[64] = {
         [27]    = {L"base_dir",             &read_base_dir_opt},
         [11]    = {L"creds",                &read_creds_opt},
@@ -636,7 +636,7 @@ int
 parse_config(const char *path, struct parse_ctx *ctx)
 {
     int err;
-    json_val_t config;
+    json_value_t config;
     struct json_parser *parser;
 
     err = json_parser_init(CONFIG_GRAM, CONFIG_ROOT_ID, &parser);
