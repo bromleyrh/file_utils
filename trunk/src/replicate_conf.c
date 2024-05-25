@@ -11,7 +11,7 @@
 
 #include <json.h>
 
-#include <json/native.h>
+#include <json/packing.h>
 #include <json/parser.h>
 #include <json/parser_generator.h>
 #include <json/scanner.h>
