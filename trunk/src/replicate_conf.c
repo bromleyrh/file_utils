@@ -278,10 +278,10 @@ read_copy_creds_opt(json_value_t opt, void *data)
 
     err = json_object_get(opt, L"uid", &elm);
     if (!err) {
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
         if (err)
@@ -292,10 +292,10 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"gid", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         omemset(&s, 0);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
@@ -307,10 +307,10 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"user", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
         if (err)
@@ -323,10 +323,10 @@ read_copy_creds_opt(json_value_t opt, void *data)
         err = json_object_get(opt, L"group", &elm);
         if (err)
             return ERR_TAG(-err);
-        str = json_string_get_value(elm.v);
+        err = json_string_get_value(elm.v, &str);
         json_value_put(elm.v);
-        if (str == NULL)
-            return ERR_TAG(ENOMEM);
+        if (err)
+            return ERR_TAG(-err);
         omemset(&s, 0);
         err = awcstombs(&buf, str, &s) == (size_t)-1 ? ERR_TAG(errno) : 0;
         free(str);
