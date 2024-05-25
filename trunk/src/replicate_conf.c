@@ -415,9 +415,9 @@ read_transfers_opt(json_value_t opt, void *data)
         json_value_t val;
         struct transfer *transfer = &ctx->transfers[i];
 
-        val = json_array_get_at(opt, i);
-        if (val == NULL) {
-            err = ERR_TAG(EIO);
+        err = json_array_get_at(opt, i, &val);
+        if (err) {
+            err = ERR_TAG(-err);
             goto err;
         }
 
