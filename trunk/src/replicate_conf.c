@@ -388,22 +388,22 @@ read_transfers_opt(json_value_t opt, void *data)
     struct replicate_ctx *ctx = data;
 
     static const struct json_unpack_mapping spec[] = {
-        {L"src", JSON_STRING_T, 1, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(srcpath)},
-        {L"srcmntopts", JSON_STRING_T, 0, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(srcmntopts)},
-        {L"dest", JSON_STRING_T, 1, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(dstpath)},
-        {L"dstpath", JSON_STRING_T, 1, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(dstmntpath)},
-        {L"format_cmd", JSON_STRING_T, 1, 0, 1, &format_cmd_filter, NULL, NULL,
-         TRANSFER_PARAM(format_cmd)},
-        {L"force_write", JSON_BOOLEAN_T, 0, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(force_write)},
-        {L"hook", JSON_STRING_T, 0, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(hook)},
-        {L"setro", JSON_BOOLEAN_T, 0, 0, 1, NULL, NULL, NULL,
-         TRANSFER_PARAM(setro)}
+        {JSON_STRING_T, L"src", NULL, NULL, NULL, TRANSFER_PARAM(srcpath), 0, 1,
+         1},
+        {JSON_STRING_T, L"srcmntopts", NULL, NULL, NULL,
+         TRANSFER_PARAM(srcmntopts), 0, 0, 1},
+        {JSON_STRING_T, L"dest", NULL, NULL, NULL, TRANSFER_PARAM(dstpath), 0,
+         1, 1},
+        {JSON_STRING_T, L"dstpath", NULL, NULL, NULL,
+         TRANSFER_PARAM(dstmntpath), 0, 1, 1},
+        {JSON_STRING_T, L"format_cmd", &format_cmd_filter, NULL, NULL,
+         TRANSFER_PARAM(format_cmd), 0, 1, 1},
+        {JSON_BOOLEAN_T, L"force_write", NULL, NULL, NULL,
+         TRANSFER_PARAM(force_write), 0, 0, 1},
+        {JSON_STRING_T, L"hook", NULL, NULL, NULL, TRANSFER_PARAM(hook), 0, 0,
+         1},
+        {JSON_BOOLEAN_T, L"setro", NULL, NULL, NULL, TRANSFER_PARAM(setro), 0,
+         0, 1}
     };
 
     ctx->num_transfers = json_array_get_size(opt);
