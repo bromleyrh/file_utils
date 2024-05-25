@@ -366,7 +366,7 @@ read_debug_opt(json_value_t opt, void *data)
 {
     (void)data;
 
-    debug = backup_debug = json_val_boolean_get(opt);
+    debug = backup_debug = json_boolean_get(opt);
 
     return 0;
 }
@@ -376,7 +376,7 @@ read_detect_hard_links_opt(json_value_t opt, void *data)
 {
     struct parse_ctx *pctx = data;
 
-    pctx->ctx.detect_hard_links = json_val_boolean_get(opt);
+    pctx->ctx.detect_hard_links = json_boolean_get(opt);
 
     return 0;
 }
@@ -476,7 +476,7 @@ read_log_opt(json_value_t opt, void *data)
 {
     (void)data;
 
-    log_verifs = json_val_boolean_get(opt);
+    log_verifs = json_boolean_get(opt);
 
     return 0;
 }
