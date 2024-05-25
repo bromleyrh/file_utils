@@ -47,14 +47,14 @@ static size_t read_cb(char *, size_t, size_t, void *);
 
 static int format_cmd_filter(void *, void *, void *);
 
-static int read_copy_creds_opt(json_val_t, void *);
-static int read_debug_opt(json_val_t, void *);
-static int read_keep_cache_opt(json_val_t, void *);
-static int read_transfers_opt(json_val_t, void *);
+static int read_copy_creds_opt(json_value_t, void *);
+static int read_debug_opt(json_value_t, void *);
+static int read_keep_cache_opt(json_value_t, void *);
+static int read_transfers_opt(json_value_t, void *);
 
 static int parse_json_config(const char *, const struct json_parser *,
-                             json_val_t *);
-static int read_json_config(json_val_t, struct replicate_ctx *);
+                             json_value_t *);
+static int read_json_config(json_value_t, struct replicate_ctx *);
 
 static int
 get_gid(const char *name, gid_t *gid)
@@ -265,7 +265,7 @@ format_cmd_filter(void *src, void *dst, void *arg)
 }
 
 static int
-read_copy_creds_opt(json_val_t opt, void *data)
+read_copy_creds_opt(json_value_t opt, void *data)
 {
     char *buf;
     int err;
@@ -349,7 +349,7 @@ read_copy_creds_opt(json_val_t opt, void *data)
 }
 
 static int
-read_debug_opt(json_val_t opt, void *data)
+read_debug_opt(json_value_t opt, void *data)
 {
     (void)data;
 
@@ -359,7 +359,7 @@ read_debug_opt(json_val_t opt, void *data)
 }
 
 static int
-read_keep_cache_opt(json_val_t opt, void *data)
+read_keep_cache_opt(json_value_t opt, void *data)
 {
     struct replicate_ctx *ctx = data;
 
@@ -369,7 +369,7 @@ read_keep_cache_opt(json_val_t opt, void *data)
 }
 
 static int
-read_log_opt(json_val_t opt, void *data)
+read_log_opt(json_value_t opt, void *data)
 {
     (void)data;
 
@@ -381,7 +381,7 @@ read_log_opt(json_val_t opt, void *data)
 #define TRANSFER_PARAM(param) offsetof(struct transfer, param)
 
 static int
-read_transfers_opt(json_val_t opt, void *data)
+read_transfers_opt(json_value_t opt, void *data)
 {
     int err;
     int i;
@@ -412,7 +412,7 @@ read_transfers_opt(json_val_t opt, void *data)
         return ERR_TAG(errno);
 
     for (i = 0; i < ctx->num_transfers; i++) {
-        json_val_t val;
+        json_value_t val;
         struct transfer *transfer = &ctx->transfers[i];
 
         val = json_val_array_get_elem(opt, i);
@@ -440,14 +440,14 @@ err:
 #undef TRANSFER_PARAM
 
 static int
-read_json_config(json_val_t config, struct replicate_ctx *ctx)
+read_json_config(json_value_t config, struct replicate_ctx *ctx)
 {
     int err;
     int i, numopt;
 
     static const struct ent {
         const wchar_t   *opt;
-        int             (*fn)(json_val_t, void *);
+        int             (*fn)(json_value_t, void *);
     } opts[16] = {
         [2] = {L"copy_creds",   &read_copy_creds_opt},
         [7] = {L"debug",        &read_debug_opt},
@@ -482,7 +482,7 @@ read_json_config(json_val_t config, struct replicate_ctx *ctx)
 
 static int
 parse_json_config(const char *path, const struct json_parser *parser,
-                  json_val_t *config)
+                  json_value_t *config)
 {
     FILE *f;
     int err;
@@ -539,7 +539,7 @@ int
 parse_config(const char *path, struct replicate_ctx *ctx)
 {
     int err;
-    json_val_t config;
+    json_value_t config;
     struct json_parser *parser;
 
     err = json_parser_init(CONFIG_GRAM, CONFIG_ROOT_ID, &parser);
