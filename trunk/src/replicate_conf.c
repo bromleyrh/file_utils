@@ -387,7 +387,7 @@ read_transfers_opt(json_value_t opt, void *data)
     int i;
     struct replicate_ctx *ctx = data;
 
-    static const struct json_scan_spec spec[] = {
+    static const struct json_unpack_mapping spec[] = {
         {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
          TRANSFER_PARAM(srcpath)},
         {L"srcmntopts", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
