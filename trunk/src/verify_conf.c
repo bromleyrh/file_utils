@@ -491,13 +491,13 @@ read_verifs_opt(json_value_t opt, void *data)
     struct verify_ctx *ctx = data;
 
     static const struct json_unpack_mapping spec[] = {
-        {L"dev", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
+        {L"dev", JSON_STRING_T, 0, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(devpath)},
-        {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
+        {L"src", JSON_STRING_T, 1, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(srcpath)},
-        {L"srcmntopts", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
+        {L"srcmntopts", JSON_STRING_T, 0, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(srcmntopts)},
-        {L"check_cmd", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
+        {L"check_cmd", JSON_STRING_T, 0, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(check_cmd)}
     };
 
