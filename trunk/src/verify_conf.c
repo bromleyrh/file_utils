@@ -412,8 +412,10 @@ read_exclude_opt(json_val_t opt, void *data)
 
         err = expand_string(&pctx->regex, &pctx->regexcurbr, &pctx->regexlen,
                             brlen + 2);
-        if (err)
+        if (err) {
+            free(regexbr);
             return err;
+        }
         if (first)
             first = 0;
         else
