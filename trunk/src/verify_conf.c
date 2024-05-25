@@ -516,7 +516,7 @@ read_verifs_opt(json_value_t opt, void *data)
         }
 
         ctx->verifs[i].check_cmd = NULL;
-        err = json_oscanf(&ctx->verifs[i], spec, (int)ARRAY_SIZE(spec), 0, val);
+        err = json_unpack(&ctx->verifs[i], spec, (int)ARRAY_SIZE(spec), 0, val);
         if (err) {
             err = ERR_TAG(-err);
             goto err;
