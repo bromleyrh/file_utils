@@ -566,7 +566,7 @@ parse_json_config(const char *path, const struct json_parser *parser,
         goto err;
     }
 
-    json_read_cb_ctx_init(&ctx);
+    json_in_filter_ctx_init(&ctx);
     ctx.read_cb = &read_cb;
     ctx.ctx = f;
 
