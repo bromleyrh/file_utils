@@ -490,7 +490,7 @@ read_verifs_opt(json_value_t opt, void *data)
     int i;
     struct verify_ctx *ctx = data;
 
-    static const struct json_scan_spec spec[] = {
+    static const struct json_unpack_mapping spec[] = {
         {L"dev", JSON_TYPE_STRING, 0, 0, 1, NULL, NULL, NULL,
          VERIF_PARAM(devpath)},
         {L"src", JSON_TYPE_STRING, 1, 0, 1, NULL, NULL, NULL,
