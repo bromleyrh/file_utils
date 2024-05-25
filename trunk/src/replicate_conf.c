@@ -269,7 +269,7 @@ read_copy_creds_opt(json_value_t opt, void *data)
 {
     char *buf;
     int err;
-    json_object_elem_t elem;
+    json_kv_pair_t elem;
     mbstate_t s;
     struct replicate_ctx *ctx = data;
     wchar_t *str;
@@ -459,7 +459,7 @@ read_json_config(json_value_t config, struct replicate_ctx *ctx)
     numopt = json_val_object_get_num_elem(config);
     for (i = 0; i < numopt; i++) {
         const struct ent *opt;
-        json_object_elem_t elem;
+        json_kv_pair_t elem;
 
         err = json_val_object_get_elem_by_idx(config, i, &elem);
         if (err)
