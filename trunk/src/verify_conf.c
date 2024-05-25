@@ -389,7 +389,7 @@ read_exclude_opt(json_value_t opt, void *data)
     int i, numexcl;
     struct parse_ctx *pctx = data;
 
-    numexcl = json_val_array_get_num_elem(opt);
+    numexcl = json_array_get_size(opt);
     first = pctx->regexlen == 0;
 
     for (i = 0; i < numexcl; i++) {
@@ -399,7 +399,7 @@ read_exclude_opt(json_value_t opt, void *data)
         size_t brlen;
         wchar_t *str;
 
-        val = json_val_array_get_elem(opt, i);
+        val = json_array_get_at(opt, i);
         if (val == NULL)
             return ERR_TAG(EIO);
 
@@ -501,7 +501,7 @@ read_verifs_opt(json_value_t opt, void *data)
          VERIF_PARAM(check_cmd)}
     };
 
-    ctx->num_verifs = json_val_array_get_num_elem(opt);
+    ctx->num_verifs = json_array_get_size(opt);
 
     if (oecalloc(&ctx->verifs, ctx->num_verifs) == NULL)
         return ERR_TAG(errno);
@@ -509,7 +509,7 @@ read_verifs_opt(json_value_t opt, void *data)
     for (i = 0; i < ctx->num_verifs; i++) {
         json_value_t val;
 
-        val = json_val_array_get_elem(opt, i);
+        val = json_array_get_at(opt, i);
         if (val == NULL) {
             err = ERR_TAG(EIO);
             goto err;
