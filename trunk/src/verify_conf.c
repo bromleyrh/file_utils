@@ -539,7 +539,7 @@ parse_json_config(const char *path, const struct json_parser *parser,
     FILE *f;
     int err;
     int fd;
-    struct json_read_cb_ctx ctx;
+    struct json_in_filter_ctx ctx;
     struct stat s;
 
     err = open_as_real_user(&fd, path, O_RDONLY);
