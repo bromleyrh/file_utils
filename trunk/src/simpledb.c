@@ -783,8 +783,8 @@ free_id_find(uint64_t *used_id, uint64_t base)
 {
     int idx;
     int maxidx;
-    uint64_t id;
     static const uint64_t filled = ~UINT64_C(0);
+    uint64_t id;
     uint64_t word;
 
     maxidx = FREE_ID_RANGE_SZ / NBWD - 1;
