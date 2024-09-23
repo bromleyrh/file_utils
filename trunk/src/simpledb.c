@@ -2589,7 +2589,7 @@ end:
     if (sock_pathname != default_sock_pathname)
         free(sock_pathname_buf);
     if (key.key != NULL)
-        free((void *)key.key);
+        free(key.key);
     return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
