@@ -32,7 +32,7 @@ static _Thread_local int asserttmp;
 
 #define stderrchr(c) fputc(c, stderr)
 #define stderrmsg(msg) fputs(msg, stderr)
-#define stderrmsgf(format, ...) fprintf(stderr, format, ##__VA_ARGS__)
+#define stderrmsgf(...) fprintf(stderr, __VA_ARGS__)
 
 #define infochr stderrchr
 #define infomsg stderrmsg
@@ -45,18 +45,19 @@ static _Thread_local int asserttmp;
 #include <error.h>
 #elif defined(HAVE_ERRC) && defined(HAVE_WARNC)
 #include <err.h>
-#define error(eval, code, format, ...) \
+#define error(eval, code, ...) \
     do { \
         if ((eval) == 0) \
-            warnc(code, format, ##__VA_ARGS__); \
+            warnc(code, __VA_ARGS__); \
         else \
-            errc(eval, code, format, ##__VA_ARGS__); \
+            errc(eval, code, __VA_ARGS__); \
     } while (0)
 #else
 #include <stdlib.h>
-#define error(eval, code, format, ...) \
+#define error(eval, code, ...) \
     do { \
-        fprintf(stderr, format ": error code %d\n", ##__VA_ARGS__, code); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, ": error code %d\n", code); \
         if (eval != 0) \
             exit(eval); \
     } while (0)
