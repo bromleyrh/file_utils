@@ -20,6 +20,10 @@ void *do_reallocarray(void *ptr, size_t nmemb, size_t size);
 #define oereallocarray(oldptr, ptr, nmemb) \
     (*(ptr) = do_reallocarray(oldptr, nmemb, sizeof(**(ptr))))
 
+int strerror_rp(int errnum, char *strerrbuf, size_t buflen);
+
+char *strperror_r(int errnum, char *strerrbuf, size_t buflen);
+
 #endif
 
 /* vi: set expandtab sw=4 ts=4: */

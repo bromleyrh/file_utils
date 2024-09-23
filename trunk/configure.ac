@@ -116,6 +116,8 @@ AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
 )
 AC_SUBST([stack_protector])
 
+AC_CHECK_FUNCS_ONCE([strerror_l])
+
 AX_FUNC_ERROR
 
 cat >src/replicate_fs.h <<EOF

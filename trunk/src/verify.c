@@ -136,7 +136,7 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
             char errbuf[128];
 
             fillbuf(fmtbuf, "%s(), %s:%d: %s (%s)\n", func, file, line, fmt,
-                    strerror_r(err, errbuf, sizeof(errbuf)));
+                    strperror_r(err, errbuf, sizeof(errbuf)));
         } else
             fillbuf(fmtbuf, "%s(), %s:%d: %s\n", func, file, line, fmt);
 

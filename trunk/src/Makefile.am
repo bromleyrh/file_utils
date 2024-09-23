@@ -99,7 +99,7 @@ src_open_pipes_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
 src_open_pipes_CFLAGS = $(AM_CFLAGS)
 
 src_replicate_SOURCES = src/debug.c src/replicate.c src/replicate_conf.c \
-	src/replicate_trans.c
+	src/replicate_trans.c src/util.c
 src_replicate_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \
 	@libutil_cppflags@ $(trace_cppflags)
@@ -119,7 +119,7 @@ src_sparse_scan_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_sparse_scan_CFLAGS = $(AM_CFLAGS)
 src_sparse_scan_LDADD = @libutil_link_dep@
 
-src_verify_SOURCES = src/debug.c src/verify.c src/verify_conf.c \
+src_verify_SOURCES = src/debug.c src/util.c src/verify.c src/verify_conf.c \
 	src/verify_io.c src/verify_scan.c
 src_verify_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \
