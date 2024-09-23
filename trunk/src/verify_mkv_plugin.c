@@ -228,7 +228,7 @@ buf_read(void *ctx, void *buf, ssize_t *nbytes)
         && swapcontext(&mctx->read_ctx, &mctx->verify_ctx) == -1)
         return -errno;
 
-    toread = MIN(*nbytes, mctx->sz - mctx->off);
+    toread = MIN((size_t)*nbytes, mctx->sz - mctx->off);
     memcpy(buf, mctx->buf + mctx->off, toread);
     mctx->off += toread;
     mctx->file_off += toread;
