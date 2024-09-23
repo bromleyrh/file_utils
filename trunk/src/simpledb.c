@@ -27,7 +27,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
