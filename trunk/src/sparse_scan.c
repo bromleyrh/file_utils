@@ -6,7 +6,9 @@
 
 #define _GNU_SOURCE
 
+#define MIN_MAX_MACROS
 #include "common.h"
+#undef MIN_MAX_MACROS
 
 #include <option_parsing.h>
 #include <strings_ext.h>
@@ -25,7 +27,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
