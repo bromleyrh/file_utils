@@ -27,6 +27,15 @@ static _Thread_local int asserttmp;
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+#ifdef MIN_MAX_MACROS
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+#endif
+
 #define PL(val) PL_SUF(val, "", "s")
 #define PL_SUF(val, s, p) val, (val) == 1 ? (s) : (p)
 

@@ -6,6 +6,10 @@
 
 #include "verify_plugin.h"
 
+#define MIN_MAX_MACROS
+#include "common.h"
+#undef MIN_MAX_MACROS
+
 #include <matroska.h>
 
 #include <avl_tree.h>
@@ -19,7 +23,6 @@
 #include <string.h>
 #include <ucontext.h>
 
-#include <sys/param.h>
 #include <sys/types.h>
 
 struct track_data {

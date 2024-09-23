@@ -2,10 +2,13 @@
  * verify_io.c
  */
 
-#include "common.h"
 #include "debug.h"
 #include "util.h"
 #include "verify_io.h"
+
+#define MIN_MAX_MACROS
+#include "common.h"
+#undef MIN_MAX_MACROS
 
 #include <time_ext.h>
 
@@ -18,8 +21,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
-#include <sys/param.h>
 
 #define MIN_TRANSFER_SIZE (512 * 1024)
 #define MAX_TRANSFER_SIZE (2 * 1024 * 1024)

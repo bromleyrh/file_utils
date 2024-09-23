@@ -7,6 +7,7 @@
 #include "verify_common.h"
 #include "verify_conf.h"
 #include "verify_scan.h"
+#include "util.h"
 
 #include <dbus/dbus.h>
 

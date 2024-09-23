@@ -2,12 +2,15 @@
  * verify_conf.c
  */
 
-#include "common.h"
 #include "debug.h"
 #include "util.h"
 #include "verify_common.h"
 #include "verify_conf.h"
 #include "verify_gram.h"
+
+#define MIN_MAX_MACROS
+#include "common.h"
+#undef MIN_MAX_MACROS
 
 #include <backup.h>
 
@@ -33,7 +36,6 @@
 #include <unistd.h>
 
 #include <sys/mman.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 

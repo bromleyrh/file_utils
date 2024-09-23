@@ -4,12 +4,15 @@
 
 #include "config.h"
 
-#include "common.h"
 #include "debug.h"
 #include "util.h"
 #include "verify_common.h"
 #include "verify_io.h"
 #include "verify_scan.h"
+
+#define MIN_MAX_MACROS
+#include "common.h"
+#undef MIN_MAX_MACROS
 
 #include <backup.h>
 
@@ -47,7 +50,6 @@
 #include <linux/magic.h>
 
 #include <sys/mman.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/vfs.h>
