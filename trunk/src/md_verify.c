@@ -500,7 +500,7 @@ input_data_walk_cb(const char *str, void *val, void *ctx)
 static int
 print_input_data(FILE *f, struct radix_tree *input_data)
 {
-    return radix_tree_walk(input_data, &input_data_walk_cb, (void *)f);
+    return radix_tree_walk(input_data, &input_data_walk_cb, f);
 }
 
 static int
