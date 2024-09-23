@@ -95,7 +95,7 @@ main(int argc, char **argv)
     files = &argv[1];
 
     if (fstat(STDOUT_FILENO, &s_out) == -1)
-        error(EXIT_FAILURE, errno, "Couldn't get file stats");
+        error(EXIT_FAILURE, errno, "Couldn't get file status");
 
     fl_out = fcntl(STDOUT_FILENO, F_GETFL);
     if (fl_out == -1 || fcntl(STDOUT_FILENO, F_SETFL, fl_out & ~O_APPEND) == -1)
@@ -116,7 +116,7 @@ main(int argc, char **argv)
         }
 
         if (fstat(fd_in, &s_in) == -1) {
-            error(0, errno, "Couldn't get file stats of %s", path);
+            error(0, errno, "Couldn't get file status of %s", path);
             goto err;
         }
 
