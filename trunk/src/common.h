@@ -9,7 +9,7 @@
 
 #include <stdio.h>
 
-/* for eliminating false negatives from static analysis tools */
+/* for eliminating false positives from static analysis tools */
 #ifdef ASSERT_MACROS
 #include <assert.h>
 #include <errno.h>
