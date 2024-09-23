@@ -11,6 +11,7 @@
 #include "common.h"
 
 #include <files/acc_ctl.h>
+#include <files/util.h>
 
 #include <option_parsing.h>
 #include <strings_ext.h>
@@ -158,6 +159,7 @@ is_on_fs_of_type(const char *pathname, __fsword_t fstype)
 static int
 get_dest_info(char *pathname)
 {
+    char buf[PATH_MAX];
     const char *dirpath;
     int dst_on_hugetlbfs;
 
@@ -180,7 +182,7 @@ get_dest_info(char *pathname)
             *(pathname+slen-1) = '\0';
     }
 
-    dirpath = dstdir ? pathname : dirname(strdupa(pathname));
+    dirpath = dstdir ? pathname : dirname_safe(pathname, buf, sizeof(buf));
 
     dst_on_hugetlbfs = is_on_fs_of_type(dirpath, HUGETLBFS_MAGIC);
     if (dst_on_hugetlbfs == -1)
@@ -452,8 +454,7 @@ copy(int n)
     srcfile = srcs[n];
 
     if (dstdir) {
-        if (asprintf(&dstfile, "%s/%s", dst, basename(strdupa(srcfile)))
-            == -1) {
+        if (asprintf(&dstfile, "%s/%s", dst, basename_safe(srcfile)) == -1) {
             error(0, 0, "Out of memory");
             return -1;
         }
@@ -474,7 +475,9 @@ copy(int n)
     if (hugetlbfs)
         fd2 = open(dstfile, O_CREAT | O_RDWR, ACC_MODE_DEFAULT);
     else {
-        fd2 = open(dirname(strdupa(dstfile)), O_RDWR | O_TMPFILE,
+        char buf[PATH_MAX];
+
+        fd2 = open(dirname_safe(dstfile, buf, sizeof(buf)), O_RDWR | O_TMPFILE,
                    ACC_MODE_DEFAULT);
     }
 #else
