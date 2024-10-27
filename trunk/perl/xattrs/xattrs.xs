@@ -42,7 +42,7 @@ static int do_fremovexattr(int, const char *, int);
 static int
 err_to_retval(int err)
 {
-    return (err == -1) ? errno : err;
+    return err == -1 ? errno : err;
 }
 
 static int
