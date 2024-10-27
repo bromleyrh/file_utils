@@ -91,8 +91,9 @@ src_mkmanifest_CFLAGS = $(AM_CFLAGS)
 src_mkmanifest_LDADD = @libutil_link_dep@
 
 src_open_SOURCES = src/open.c
-src_open_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
+src_open_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_open_CFLAGS = $(AM_CFLAGS)
+src_open_LDADD = @libutil_link_dep@
 
 src_open_pipes_SOURCES = src/open_pipes.c
 src_open_pipes_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
