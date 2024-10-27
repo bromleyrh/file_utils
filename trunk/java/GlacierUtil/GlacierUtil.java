@@ -164,7 +164,7 @@ abstract class GlacierUtilSupercmd extends GlacierUtilCmd {
     }
   
     @Override public final boolean doParseCmdline() {
-        return (getSubcmd() && finishParseCmdline());
+        return getSubcmd() && finishParseCmdline();
     }
 }
 
