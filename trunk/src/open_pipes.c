@@ -2,9 +2,9 @@
  * open_pipes.c
  */
 
-#define _GNU_SOURCE
-
 #include "common.h"
+
+#include <files/util.h>
 
 #include <errno.h>
 #include <error.h>
@@ -36,12 +36,12 @@ do_dup2(int oldfd, int newfd)
 }
 
 static const char *
-usage()
+usage(const char *progname)
 {
     static char buf[64];
 
     snprintf(buf, sizeof(buf), "Usage: %s [-d FD ... --] command [args]",
-             program_invocation_short_name);
+             basename_safe(progname));
 
     return buf;
 }
@@ -53,12 +53,12 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
     int npipefds;
 
     if (argc < 2) {
-        error(0, 0, "%s", usage());
+        error(0, 0, "%s", usage(argv[0]));
         return -1;
     }
 
     if (strcmp(argv[1], "-h") == 0) {
-        printf("%s\n", usage());
+        printf("%s\n", usage(argv[0]));
         return -2;
     }
 
@@ -73,7 +73,7 @@ parse_cmdline(int argc, char **argv, char ***cmd, struct pipe_data *pd)
     }
 
     if (i == argc - 1) {
-        error(0, 0, "%s", usage());
+        error(0, 0, "%s", usage(argv[0]));
         return -1;
     }
     *cmd = &argv[++i];

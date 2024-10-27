@@ -95,8 +95,9 @@ src_open_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
 src_open_CFLAGS = $(AM_CFLAGS)
 
 src_open_pipes_SOURCES = src/open_pipes.c
-src_open_pipes_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
+src_open_pipes_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_open_pipes_CFLAGS = $(AM_CFLAGS)
+src_open_pipes_LDADD = @libutil_link_dep@
 
 src_replicate_SOURCES = src/debug.c src/replicate.c src/replicate_conf.c \
 	src/replicate_trans.c src/util.c
