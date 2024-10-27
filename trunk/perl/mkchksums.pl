@@ -56,8 +56,8 @@ sub do_set {
 
     close($f);
 
-    ($err != 0) and print_err($err, $_,
-                              "Error setting $attrname extended attribute");
+    $err != 0 and print_err($err, $_,
+                            "Error setting $attrname extended attribute");
 }
 
 sub do_print {
@@ -86,7 +86,7 @@ sub do_verify {
 
     close($f);
 
-    ($sum eq $sumcalc)
+    $sum eq $sumcalc
     or print_err(EIO, $_, "$attrname checksum ($sum) does not match calculated "
                           . "checksum");
 }
@@ -95,8 +95,8 @@ sub do_remove {
     -f or return;
 
     my $err = xattrs::removexattr($_, $attrname, 0);
-    ($err != 0) and print_err($err, $_,
-                              "Error removing $attrname extended attribute");
+    $err != 0 and print_err($err, $_,
+                            "Error removing $attrname extended attribute");
 }
 
 (my $mode, my $rootdir) = parse_cmdline();
