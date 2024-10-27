@@ -2,8 +2,6 @@
  * mkmanifest.c
  */
 
-#define _GNU_SOURCE
-
 #include "common.h"
 
 #include <option_parsing.h>
