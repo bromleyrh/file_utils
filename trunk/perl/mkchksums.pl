@@ -46,7 +46,7 @@ sub print_err {
 }
 
 sub do_set {
-    (-f and open(my $f, "<", $_)) or return;
+    -f and open(my $f, "<", $_) or return;
 
     my $sha1ctx = Digest::SHA->new("sha1");
     $sha1ctx->addfile($f);
@@ -72,7 +72,7 @@ sub do_print {
 }
 
 sub do_verify {
-    (-f and open(my $f, "<", $_)) or return;
+    -f and open(my $f, "<", $_) or return;
 
     my $err = xattrs::fgetxattr(fileno($f), $attrname, my $sum, 0);
     ($err != 0) and do {
