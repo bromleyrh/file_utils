@@ -2,8 +2,6 @@
  * md_verify.c
  */
 
-#define _GNU_SOURCE
-
 #define ASSERT_MACROS
 #include "common.h"
 #undef ASSERT_MACROS
@@ -51,6 +49,8 @@ static int verbose;
 static struct set *gid_set;
 static struct set *mode_set;
 static struct set *uid_set;
+
+char *_strptime(const char *, const char *, struct tm *);
 
 static void print_usage(const char *);
 static void print_version(void);
@@ -377,7 +377,7 @@ scan_timestamp(char *str, char *key, struct timespec *ts)
     memmove(ns, tz, strlen(tz) + 1);
 
     omemset(&tm, 0);
-    ret = strptime(ret + strlen(key), " " TM_FMT, &tm);
+    ret = _strptime(ret + strlen(key), " " TM_FMT, &tm);
     if (ret == NULL)
         return NULL;
     tm.tm_isdst = -1;

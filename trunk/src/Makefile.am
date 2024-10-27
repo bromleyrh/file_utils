@@ -80,7 +80,7 @@ src_fastcp_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_fastcp_CFLAGS = $(AM_CFLAGS)
 src_fastcp_LDADD = @libutil_link_dep@
 
-src_md_verify_SOURCES = src/md_verify.c
+src_md_verify_SOURCES = src/md_verify.c src/strptime.c
 src_md_verify_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_md_verify_CFLAGS = $(AM_CFLAGS)
 src_md_verify_LDADD = @libutil_link_dep@
