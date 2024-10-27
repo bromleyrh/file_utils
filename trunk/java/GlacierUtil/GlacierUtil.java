@@ -146,7 +146,7 @@ abstract class GlacierUtilSupercmd extends GlacierUtilCmd {
     }
 
     private boolean getSubcmd() {
-        if ((args == null) || (args.length == 0)) {
+        if (args == null || args.length == 0) {
             System.err.print("\"" + cmdname + "\" command requires subcommand "
                              + "argument\n");
             return false;
@@ -177,7 +177,7 @@ final class Format extends GlacierUtilCmd {
     }
 
     @Override public boolean doParseCmdline() {
-        if ((args == null) || (args.length == 0)) {
+        if (args == null || args.length == 0) {
             System.err.print("Must specify file\n");
             return false;
         }
