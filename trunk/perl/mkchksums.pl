@@ -41,7 +41,7 @@ sub parse_cmdline {
 sub print_err {
     (my $err, my $filename, my $errmsg) = @_;
 
-    print("$filename: $errmsg: " . POSIX::strerror(($err < 0) ? -$err : $err)
+    print("$filename: $errmsg: " . POSIX::strerror($err < 0 ? -$err : $err)
           . "\n");
 }
 
