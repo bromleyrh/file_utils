@@ -2,8 +2,6 @@
  * fastcp.c
  */
 
-#define _GNU_SOURCE
-
 #include <option_parsing.h>
 #include <strings_ext.h>
 
