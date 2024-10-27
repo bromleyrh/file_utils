@@ -95,13 +95,13 @@ ctor()
 {
     infomsg("libdirectio loaded\n");
 
-    orig_open = dlsym(RTLD_NEXT, "open");
+    orig_open = (int (*)(const char *, int, ...))dlsym(RTLD_NEXT, "open");
     if (orig_open == NULL) {
         errmsgf("Missing open() symbol\n");
         exit(EXIT_FAILURE);
     }
 
-    orig_open64 = dlsym(RTLD_NEXT, "open64");
+    orig_open64 = (int (*)(const char *, int, ...))dlsym(RTLD_NEXT, "open64");
     if (orig_open64 == NULL) {
         errmsgf("Missing open64() symbol\n");
         exit(EXIT_FAILURE);
