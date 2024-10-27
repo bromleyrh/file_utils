@@ -316,7 +316,7 @@ do_read(int fd, void *buf, size_t count)
     assert(count > 0);
 
     for (bytesread = 0; bytesread < count; bytesread += ret) {
-        ret = read(fd, buf + bytesread, count - bytesread);
+        ret = read(fd, (char *)buf + bytesread, count - bytesread);
         if (ret > 0)
             continue;
         if (ret == 0)
