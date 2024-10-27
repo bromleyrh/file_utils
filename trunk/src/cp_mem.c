@@ -347,11 +347,12 @@ do_write(struct dest *dst, const void *buf, size_t count)
             blockbytes = count - byteswritten;
         else {
             blockbytes = dst->blksize;
-            if (memcchr(buf + byteswritten, '\0', dst->blksize) == NULL)
+            if (memcchr((const char *)buf + byteswritten, '\0', dst->blksize)
+                == NULL)
                 continue;
         }
-        if (do_memcpy(dst->buf.buf + byteswritten, buf + byteswritten,
-                      blockbytes) == -1)
+        if (do_memcpy(dst->buf.buf + byteswritten,
+                      (const char *)buf + byteswritten, blockbytes) == -1)
             return -1;
     }
 
