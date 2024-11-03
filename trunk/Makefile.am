@@ -68,6 +68,14 @@ CLEANFILES =
 include scripts/Makefile.am
 include src/Makefile.am
 
+.PHONY: check-exec check-noexec
+
+check-exec:
+	TESTS_SKIP=0 $(MAKE) check
+
+check-noexec:
+	TESTS_SKIP=1 $(MAKE) check
+
 if LINUX
 install-exec-hook:
 	ln -fs open "$(bindir)/delete_input"
