@@ -1370,6 +1370,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         }
 
         if (!err) {
+            bufp = buf;
             err = do_op(dbctx, op, &key, &bufp, &len, &id, -1, -1, 1);
             switch (-err) {
             case 0:
