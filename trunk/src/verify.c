@@ -111,7 +111,7 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
 {
     if (debug && tracing) {
 #ifdef ENABLE_TRACE
-        const char **bt;
+        char **bt;
         int n;
         static const char sep[] = "--------------------------------\n";
 #endif
