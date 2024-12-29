@@ -4,6 +4,7 @@
 
 #define _WITH_DPRINTF
 
+#include "simpledb_obj.h"
 #include "util.h"
 
 #define ASSERT_MACROS
@@ -11,6 +12,7 @@
 #undef ASSERT_MACROS
 
 #include <dbm_high_level.h>
+#include <packing.h>
 #include <strings_ext.h>
 
 #include <assert.h>
@@ -57,8 +59,6 @@ enum key_type {
 
 #define ROOT_ID 1
 
-#define KEY_MAX 255
-
 struct key {
     enum key_type   type;
     uint64_t        id;
@@ -90,12 +90,6 @@ enum db_obj_type {
     TYPE_EXTERNAL,      /* look up by key */
     TYPE_FREE_ID        /* look up by id */
 };
-
-struct db_key {
-    uint32_t    type;
-    uint64_t    id;
-    uint8_t     key[KEY_MAX+1];
-} __attribute__((packed));
 
 #define FMT_VERSION 1
 
@@ -325,6 +319,7 @@ db_key_cmp(const void *k1, const void *k2, void *key_ctx)
     const struct db_key *key1 = k1;
     const struct db_key *key2 = k2;
     int cmp;
+    uint32_t type;
 
     if (key_ctx != NULL) {
         struct db_key_ctx *ctx = key_ctx;
@@ -333,13 +328,17 @@ db_key_cmp(const void *k1, const void *k2, void *key_ctx)
         ctx->last_key_valid = 1;
     }
 
-    cmp = uint64_cmp(key1->type, key2->type);
-    if (cmp != 0 || key1->type == TYPE_HEADER)
+    type = unpack_u32(db_key, key1, type);
+
+    cmp = uint64_cmp(type, unpack_u32(db_key, key2, type));
+    if (cmp != 0 || type == TYPE_HEADER)
         return cmp;
 
-    return key1->type == TYPE_EXTERNAL
-           ? strcmp((const char *)key1->key, (const char *)key2->key)
-           : uint64_cmp(key1->id, key2->id);
+    return type == TYPE_EXTERNAL
+           ? strcmp(packed_memb_addr(db_key, key1, key),
+                    packed_memb_addr(db_key, key2, key))
+           : uint64_cmp(unpack_u64(db_key, key1, id),
+                        unpack_u64(db_key, key2, id));
 }
 
 static int
@@ -349,12 +348,12 @@ db_walk_cb(const void *key, const void *data, size_t datasize, void *ctx)
     int datafd = (intptr_t)ctx;
     int ret;
 
-    switch (k->type) {
+    switch (unpack_u32(db_key, k, type)) {
     case TYPE_INTERNAL:
-        ret = dprintf(datafd, "%" PRIu64 "\n", k->id);
+        ret = dprintf(datafd, "%" PRIu64 "\n", unpack_u64(db_key, k, id));
         break;
     case TYPE_EXTERNAL:
-        ret = dprintf(datafd, "%s\n", k->key);
+        ret = dprintf(datafd, "%s\n", (char *)packed_memb_addr(db_key, k, key));
         break;
     default:
         return 0;
@@ -734,7 +733,7 @@ open_or_create(struct db_ctx **dbctx, const char *pathname)
             return err;
         }
 
-        k.type = TYPE_HEADER;
+        pack_u32(db_key, &k, type, TYPE_HEADER);
         hdr.version = FMT_VERSION;
         hdr.numobj = 0;
         err = do_db_hl_insert(ret, &k, &hdr, sizeof(hdr));
@@ -743,8 +742,8 @@ open_or_create(struct db_ctx **dbctx, const char *pathname)
             goto err;
         }
 
-        k.type = TYPE_FREE_ID;
-        k.id = ROOT_ID;
+        pack_u32(db_key, &k, type, TYPE_FREE_ID);
+        pack_u64(db_key, &k, id, ROOT_ID);
         omemset(&freeid.used_id, 0);
         freeid.flags = FREE_ID_LAST_USED;
         err = do_db_hl_insert(ret, &k, &freeid, sizeof(freeid));
@@ -832,14 +831,15 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     struct db_key k;
     struct db_obj_free_id freeid;
     struct db_obj_header hdr;
+    uint64_t k_id;
     uint64_t ret;
 
     res = do_db_hl_iter_new(&iter, dbctx);
     if (res != 0)
         return res;
 
-    k.type = TYPE_FREE_ID;
-    k.id = 0;
+    pack_u32(db_key, &k, type, TYPE_FREE_ID);
+    pack_u64(db_key, &k, id, 0);
     res = do_db_hl_iter_search(iter, &k);
     if (res < 0) {
         do_db_hl_iter_free(iter);
@@ -850,33 +850,36 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     do_db_hl_iter_free(iter);
     if (res != 0)
         return res == -EADDRNOTAVAIL ? -ENOSPC : res;
-    if (k.type != TYPE_FREE_ID)
+    if (unpack_u32(db_key, &k, type) != TYPE_FREE_ID)
         return -ENOSPC;
 
-    ret = free_id_find(freeid.used_id, k.id);
+    k_id = unpack_u64(db_key, &k, id);
+
+    ret = free_id_find(freeid.used_id, k_id);
     if (ret == 0) {
         if (!(freeid.flags & FREE_ID_LAST_USED))
             return -EILSEQ;
-        if (ULONG_MAX - k.id < FREE_ID_RANGE_SZ)
+        if (ULONG_MAX - k_id < FREE_ID_RANGE_SZ)
             return -ENOSPC;
 
         res = do_db_hl_delete(dbctx, &k);
         if (res != 0)
             return res;
 
-        k.id += FREE_ID_RANGE_SZ;
+        k_id += FREE_ID_RANGE_SZ;
+        pack_u64(db_key, &k, id, k_id);
         omemset(&freeid.used_id, 0);
-        used_id_set(freeid.used_id, k.id, k.id, 1);
+        used_id_set(freeid.used_id, k_id, k_id, 1);
         freeid.flags = FREE_ID_LAST_USED;
         res = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
         if (res != 0)
             return res;
 
-        *id = k.id;
+        *id = k_id;
         return 0;
     }
 
-    used_id_set(freeid.used_id, k.id, ret, 1);
+    used_id_set(freeid.used_id, k_id, ret, 1);
     res = memcchr(freeid.used_id, 0xff, sizeof(freeid.used_id)) == NULL
           && !(freeid.flags & FREE_ID_LAST_USED)
           ? do_db_hl_delete(dbctx, &k)
@@ -884,7 +887,7 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     if (res != 0)
         return res;
 
-    k.type = TYPE_HEADER;
+    pack_u32(db_key, &k, type, TYPE_HEADER);
     res = do_db_hl_look_up(dbctx, &k, NULL, &hdr, NULL, 0);
     if (res != 1)
         return res == 0 ? -EILSEQ : res;
@@ -905,9 +908,12 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
     struct db_key k;
     struct db_obj_free_id freeid;
     struct db_obj_header hdr;
+    uint64_t k_id;
 
-    k.type = TYPE_FREE_ID;
-    k.id = (id - root_id) / FREE_ID_RANGE_SZ * FREE_ID_RANGE_SZ + root_id;
+    k_id = (id - root_id) / FREE_ID_RANGE_SZ * FREE_ID_RANGE_SZ + root_id;
+
+    pack_u32(db_key, &k, type, TYPE_FREE_ID);
+    pack_u64(db_key, &k, id, k_id);
     res = do_db_hl_look_up(dbctx, &k, &k, &freeid, NULL, 0);
     if (res != 1) {
         if (res != 0)
@@ -915,19 +921,19 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
 
         /* insert new free ID information object */
         omemset(&freeid.used_id, 0xff);
-        used_id_set(freeid.used_id, k.id, id, 0);
+        used_id_set(freeid.used_id, k_id, id, 0);
         freeid.flags = 0;
         res = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
         if (res != 0)
             return res;
     } else {
-        used_id_set(freeid.used_id, k.id, id, 0);
+        used_id_set(freeid.used_id, k_id, id, 0);
         res = do_db_hl_replace(dbctx, &k, &freeid, sizeof(freeid));
         if (res != 0)
             return res;
     }
 
-    k.type = TYPE_HEADER;
+    pack_u32(db_key, &k, type, TYPE_HEADER);
     res = do_db_hl_look_up(dbctx, &k, NULL, &hdr, NULL, 0);
     if (res != 1)
         return res == 0 ? -EILSEQ : res;
@@ -1741,6 +1747,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
     int err;
     size_t dlen = 0;
     struct db_key k;
+    uint32_t type;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -1772,7 +1779,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
 
     switch (key->type) {
     case KEY_INTERNAL:
-        k.type = TYPE_INTERNAL;
+        type = TYPE_INTERNAL;
         if (key->id == 0) {
             err = get_id(dbctx, &key->id);
             if (err) {
@@ -1781,15 +1788,17 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
             }
             alloc_id = 1;
         }
-        k.id = key->id;
+        pack_u64(db_key, &k, id, key->id);
         break;
     case KEY_EXTERNAL:
-        k.type = TYPE_EXTERNAL;
-        strlcpy((char *)k.key, key->key, sizeof(k.key));
+        type = TYPE_EXTERNAL;
+        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                packed_memb_size(db_key, key));
         break;
     default:
         abort();
     }
+    pack_u32(db_key, &k, type, type);
 
     err = do_db_hl_insert(dbctx, &k, d, dlen);
     if (err) {
@@ -1811,9 +1820,9 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
 
     if (alloc_id) {
         if (id == NULL)
-            printf("%" PRIu64 "\n", k.id);
+            printf("%" PRIu64 "\n", key->id);
         else
-            *id = k.id;
+            *id = key->id;
     }
 
     return 0;
@@ -1835,6 +1844,7 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
     int err;
     size_t dlen = 0;
     struct db_key k;
+    uint32_t type;
 
     if (key->type == 0 || (key->type == KEY_INTERNAL && key->id == 0)) {
         error(0, 0, "Must specify key");
@@ -1866,16 +1876,18 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
 
     switch (key->type) {
     case KEY_INTERNAL:
-        k.type = TYPE_INTERNAL;
-        k.id = key->id;
+        type = TYPE_INTERNAL;
+        pack_u64(db_key, &k, id, key->id);
         break;
     case KEY_EXTERNAL:
-        k.type = TYPE_EXTERNAL;
-        strlcpy((char *)k.key, key->key, sizeof(k.key));
+        type = TYPE_EXTERNAL;
+        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                packed_memb_size(db_key, key));
         break;
     default:
         abort();
     }
+    pack_u32(db_key, &k, type, type);
 
     err = do_db_hl_replace(dbctx, &k, d, dlen);
     if (err) {
@@ -1914,6 +1926,7 @@ do_look_up(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
     int res;
     size_t dlen;
     struct db_key k;
+    uint32_t type;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -1926,16 +1939,18 @@ do_look_up(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
 
     switch (key->type) {
     case KEY_INTERNAL:
-        k.type = TYPE_INTERNAL;
-        k.id = key->id;
+        type = TYPE_INTERNAL;
+        pack_u64(db_key, &k, id, key->id);
         break;
     case KEY_EXTERNAL:
-        k.type = TYPE_EXTERNAL;
-        strlcpy((char *)k.key, key->key, sizeof(k.key));
+        type = TYPE_EXTERNAL;
+        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                packed_memb_size(db_key, key));
         break;
     default:
         abort();
     }
+    pack_u32(db_key, &k, type, type);
 
     res = do_db_hl_look_up(dbctx, &k, NULL, NULL, &dlen, 0);
     if (res != 1) {
@@ -1989,6 +2004,7 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
     size_t dlen;
     struct db_iter *iter;
     struct db_key k;
+    uint32_t type;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -2007,16 +2023,18 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
 
     switch (key->type) {
     case KEY_INTERNAL:
-        k.type = TYPE_INTERNAL;
-        k.id = key->id;
+        type = TYPE_INTERNAL;
+        pack_u64(db_key, &k, id, key->id);
         break;
     case KEY_EXTERNAL:
-        k.type = TYPE_EXTERNAL;
-        strlcpy((char *)k.key, key->key, sizeof(k.key));
+        type = TYPE_EXTERNAL;
+        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                packed_memb_size(db_key, key));
         break;
     default:
         abort();
     }
+    pack_u32(db_key, &k, type, type);
 
     res = do_db_hl_iter_search(iter, &k);
     if (res < 0) {
@@ -2029,7 +2047,8 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, -res, "Error reading database file");
         goto err1;
     }
-    if (k.type != TYPE_INTERNAL && k.type != TYPE_EXTERNAL) {
+    type = unpack_u32(db_key, &k, type);
+    if (type != TYPE_INTERNAL && type != TYPE_EXTERNAL) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
         goto err1;
@@ -2050,12 +2069,12 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
     do_db_hl_iter_free(iter);
 
     if (data == NULL && datafd >= 0) {
-        switch (k.type) {
+        switch (type) {
         case TYPE_INTERNAL:
-            printf("%" PRIu64 "\n", k.id);
+            printf("%" PRIu64 "\n", unpack_u64(db_key, &k, id));
             break;
         case TYPE_EXTERNAL:
-            printf("%s\n", k.key);
+            printf("%s\n", (char *)packed_memb_addr(db_key, &k, key));
             break;
         default:
             abort();
@@ -2069,9 +2088,9 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         }
     } else {
         if (key->type == KEY_INTERNAL)
-            key->id = k.id;
+            key->id = unpack_u64(db_key, &k, id);
         else {
-            key->key = strdup((const char *)k.key);
+            key->key = strdup(packed_memb_addr(db_key, &k, key));
             if (key->key == NULL)
                 return MINUS_ERRNO;
         }
@@ -2097,6 +2116,7 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
     size_t dlen;
     struct db_iter *iter;
     struct db_key k;
+    uint32_t type;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -2115,16 +2135,18 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
 
     switch (key->type) {
     case KEY_INTERNAL:
-        k.type = TYPE_INTERNAL;
-        k.id = key->id;
+        type = TYPE_INTERNAL;
+        pack_u64(db_key, &k, id, key->id);
         break;
     case KEY_EXTERNAL:
-        k.type = TYPE_EXTERNAL;
-        strlcpy((char *)k.key, key->key, sizeof(k.key));
+        type = TYPE_EXTERNAL;
+        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                packed_memb_size(db_key, key));
         break;
     default:
         abort();
     }
+    pack_u32(db_key, &k, type, type);
 
     res = do_db_hl_iter_search(iter, &k);
     if (res != 1) {
@@ -2147,7 +2169,8 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, -res, "Error reading database file");
         goto err1;
     }
-    if (k.type != TYPE_INTERNAL && k.type != TYPE_EXTERNAL) {
+    type = unpack_u32(db_key, &k, type);
+    if (type != TYPE_INTERNAL && type != TYPE_EXTERNAL) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
         goto err1;
@@ -2168,12 +2191,12 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
     do_db_hl_iter_free(iter);
 
     if (data == NULL && datafd >= 0) {
-        switch (k.type) {
+        switch (type) {
         case TYPE_INTERNAL:
-            printf("%" PRIu64 "\n", k.id);
+            printf("%" PRIu64 "\n", unpack_u64(db_key, &k, id));
             break;
         case TYPE_EXTERNAL:
-            printf("%s\n", k.key);
+            printf("%s\n", (char *)packed_memb_addr(db_key, &k, key));
             break;
         default:
             abort();
@@ -2187,9 +2210,9 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         }
     } else {
         if (key->type == KEY_INTERNAL)
-            key->id = k.id;
+            key->id = unpack_u64(db_key, &k, id);
         else {
-            key->key = strdup((const char *)k.key);
+            key->key = strdup(packed_memb_addr(db_key, &k, key));
             if (key->key == NULL)
                 return MINUS_ERRNO;
         }
@@ -2210,6 +2233,7 @@ static int
 do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
 {
     char *d;
+    char *keybuf;
     int res;
     size_t dlen;
     size_t keylen;
@@ -2227,8 +2251,10 @@ do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
         return res;
     }
 
-    k.type = TYPE_EXTERNAL;
-    strlcpy((char *)k.key, key->key, sizeof(k.key));
+    keybuf = (char *)packed_memb_addr(db_key, &k, key);
+
+    pack_u32(db_key, &k, type, TYPE_EXTERNAL);
+    strlcpy(keybuf, key->key, packed_memb_size(db_key, key));
     res = do_db_hl_iter_search(iter, &k);
     if (res < 0) {
         error(0, -res, "Error reading database file");
@@ -2241,7 +2267,7 @@ do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
         if (res != 0)
             goto err1;
 
-        if (strncmp(key->key, (const char *)k.key, keylen) != 0)
+        if (strncmp(key->key, keybuf, keylen) != 0)
             break;
 
         d = do_malloc(dlen);
@@ -2254,7 +2280,7 @@ do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
         if (res != 0)
             goto err1;
 
-        res = dprintf(datafd, "%s\n", k.key);
+        res = dprintf(datafd, "%s\n", keybuf);
         if (res == -1) {
             res = MINUS_ERRNO;
             goto err2;
@@ -2293,6 +2319,7 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
     size_t dlen;
     struct db_iter *iter;
     struct db_key k;
+    uint32_t type;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -2311,16 +2338,18 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
 
     switch (key->type) {
     case KEY_INTERNAL:
-        k.type = TYPE_INTERNAL;
-        k.id = key->id;
+        type = TYPE_INTERNAL;
+        pack_u64(db_key, &k, id, key->id);
         break;
     case KEY_EXTERNAL:
-        k.type = TYPE_EXTERNAL;
-        strlcpy((char *)k.key, key->key, sizeof(k.key));
+        type = TYPE_EXTERNAL;
+        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                packed_memb_size(db_key, key));
         break;
     default:
         abort();
     }
+    pack_u32(db_key, &k, type, type);
 
     res = do_db_hl_iter_search(iter, &k);
     if (res != 1) {
@@ -2343,7 +2372,8 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         error(0, -res, "Error reading database file");
         goto err1;
     }
-    if (k.type != TYPE_INTERNAL && k.type != TYPE_EXTERNAL) {
+    type = unpack_u32(db_key, &k, type);
+    if (type != TYPE_INTERNAL && type != TYPE_EXTERNAL) {
         error(0, 0, "Key not found");
         res = -EADDRNOTAVAIL;
         goto err1;
@@ -2364,12 +2394,12 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
     do_db_hl_iter_free(iter);
 
     if (data == NULL && datafd >= 0) {
-        switch (k.type) {
+        switch (type) {
         case TYPE_INTERNAL:
-            printf("%" PRIu64 "\n", k.id);
+            printf("%" PRIu64 "\n", unpack_u64(db_key, &k, id));
             break;
         case TYPE_EXTERNAL:
-            printf("%s\n", k.key);
+            printf("%s\n", (char *)packed_memb_addr(db_key, &k, key));
             break;
         default:
             abort();
@@ -2383,9 +2413,9 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         }
     } else {
         if (key->type == KEY_INTERNAL)
-            key->id = k.id;
+            key->id = unpack_u64(db_key, &k, id);
         else {
-            key->key = strdup((const char *)k.key);
+            key->key = strdup(packed_memb_addr(db_key, &k, key));
             if (key->key == NULL)
                 return MINUS_ERRNO;
         }
@@ -2407,6 +2437,7 @@ do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
 {
     int err;
     struct db_key k;
+    uint32_t type;
 
     if (key->type == 0) {
         error(0, 0, "Must specify key");
@@ -2419,16 +2450,18 @@ do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
 
     switch (key->type) {
     case KEY_INTERNAL:
-        k.type = TYPE_INTERNAL;
-        k.id = key->id;
+        type = TYPE_INTERNAL;
+        pack_u64(db_key, &k, id, key->id);
         break;
     case KEY_EXTERNAL:
-        k.type = TYPE_EXTERNAL;
-        strlcpy((char *)k.key, key->key, sizeof(k.key));
+        type = TYPE_EXTERNAL;
+        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                packed_memb_size(db_key, key));
         break;
     default:
         abort();
     }
+    pack_u32(db_key, &k, type, type);
 
     if (!notrans) {
         err = do_db_hl_trans_new(dbctx);
@@ -2444,8 +2477,8 @@ do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
         goto err;
     }
 
-    if (k.type == TYPE_INTERNAL) {
-        err = release_id(dbctx, ROOT_ID, k.id);
+    if (type == TYPE_INTERNAL) {
+        err = release_id(dbctx, ROOT_ID, key->id);
         if (err) {
             error(0, -err, "Error deleting from database file");
             goto err;

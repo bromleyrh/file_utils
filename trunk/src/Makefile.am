@@ -7,7 +7,7 @@
 if LINUX
 
 EXTRA_DIST += src/replicate.conf.sample src/replicate.spec \
-	src/verify.conf.sample src/verify.spec
+	src/simpledb_obj.idl src/verify.conf.sample src/verify.spec
 
 noinst_HEADERS += src/common.h src/debug.h src/replicate_common.h \
 	src/replicate_conf.h src/replicate_gram.h src/replicate_trans.h src/util.h \
@@ -17,11 +17,14 @@ noinst_HEADERS += src/common.h src/debug.h src/replicate_common.h \
 replicate_gram_macro = CONFIG_GRAM
 verify_gram_macro = CONFIG_GRAM
 
-gen_files = src/replicate_gram.h src/verify_gram.h
+gen_files = src/replicate_gram.h src/simpledb_obj.h src/verify_gram.h
 
 BUILT_SOURCES += $(gen_files)
 
 CLEANFILES += $(gen_files)
+
+src/simpledb_obj.h: src/simpledb_obj.idl
+	idlc <$^ >$@
 
 src/replicate_gram.h: src/replicate.spec
 	scripts/spec_to_h.pl src/replicate.spec $(replicate_gram_macro) >$@
