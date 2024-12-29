@@ -5,7 +5,10 @@
 #ifndef _SIMPLEDB_OBJ_H
 #define _SIMPLEDB_OBJ_H
 
+#include <limits.h>
 #include <stdint.h>
+
+#define NBWD (sizeof(uint64_t) * CHAR_BIT)
 
 #define KEY_MAX 255
 
@@ -20,6 +23,14 @@ PACKED_STRUCT(`db_obj_header',
     `uint64_t', `version',  `1',
     `uint64_t', `numobj',   `1',
     `uint8_t',  `reserved', `112')
+
+#define FREE_ID_RANGE_SZ 2048
+
+#define FREE_ID_LAST_USED 1 /* values in all following ranges are free */
+
+PACKED_STRUCT(`db_obj_free_id',
+    `uint64_t', `used_id', `FREE_ID_RANGE_SZ / NBWD',
+    `uint8_t',  `flags',   `1')
 
 #endif
 

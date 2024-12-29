@@ -91,19 +91,10 @@ enum db_obj_type {
     TYPE_FREE_ID        /* look up by id */
 };
 
-#define FREE_ID_RANGE_SZ 2048
-
-#define FREE_ID_LAST_USED 1 /* values in all following ranges are free */
-
 #define DEFAULT_PATHNAME "db.db"
 #define DEFAULT_SOCK_PATHNAME "db.socket"
 
 #define MAX_READ 4096
-
-struct db_obj_free_id {
-    uint64_t    used_id[FREE_ID_RANGE_SZ/NBWD];
-    uint8_t     flags;
-} __attribute__((packed));
 
 static int get_str_arg(char **);
 
@@ -736,8 +727,9 @@ open_or_create(struct db_ctx **dbctx, const char *pathname)
 
         pack_u32(db_key, &k, type, TYPE_FREE_ID);
         pack_u64(db_key, &k, id, ROOT_ID);
-        omemset(&freeid.used_id, 0);
-        freeid.flags = FREE_ID_LAST_USED;
+        memset(packed_memb_addr(db_obj_free_id, &freeid, used_id), 0,
+               packed_memb_size(db_obj_free_id, used_id));
+        pack_u8(db_obj_free_id, &freeid, flags, FREE_ID_LAST_USED);
         err = do_db_hl_insert(ret, &k, &freeid, sizeof(freeid));
         if (err) {
             error(0, -err, "Error creating database file %s", pathname);
@@ -823,6 +815,7 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     struct db_key k;
     struct db_obj_free_id freeid;
     struct db_obj_header hdr;
+    uint64_t *freeid_used_id;
     uint64_t k_id;
     uint64_t ret;
 
@@ -846,10 +839,12 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
         return -ENOSPC;
 
     k_id = unpack_u64(db_key, &k, id);
+    freeid_used_id = (uint64_t *)packed_memb_addr(db_obj_free_id, &freeid,
+                                                  used_id);
 
-    ret = free_id_find(freeid.used_id, k_id);
+    ret = free_id_find(freeid_used_id, k_id);
     if (ret == 0) {
-        if (!(freeid.flags & FREE_ID_LAST_USED))
+        if (!(unpack_u8(db_obj_free_id, &freeid, flags) & FREE_ID_LAST_USED))
             return -EILSEQ;
         if (ULONG_MAX - k_id < FREE_ID_RANGE_SZ)
             return -ENOSPC;
@@ -860,9 +855,9 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
 
         k_id += FREE_ID_RANGE_SZ;
         pack_u64(db_key, &k, id, k_id);
-        omemset(&freeid.used_id, 0);
-        used_id_set(freeid.used_id, k_id, k_id, 1);
-        freeid.flags = FREE_ID_LAST_USED;
+        memset(freeid_used_id, 0, packed_memb_size(db_obj_free_id, used_id));
+        used_id_set(freeid_used_id, k_id, k_id, 1);
+        pack_u8(db_obj_free_id, &freeid, flags, FREE_ID_LAST_USED);
         res = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
         if (res != 0)
             return res;
@@ -871,9 +866,11 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
         return 0;
     }
 
-    used_id_set(freeid.used_id, k_id, ret, 1);
-    res = memcchr(freeid.used_id, 0xff, sizeof(freeid.used_id)) == NULL
-          && !(freeid.flags & FREE_ID_LAST_USED)
+    used_id_set(freeid_used_id, k_id, ret, 1);
+    res = memcchr(freeid_used_id, 0xff,
+                  packed_memb_size(db_obj_free_id, used_id))
+          == NULL
+          && !(unpack_u8(db_obj_free_id, &freeid, flags) & FREE_ID_LAST_USED)
           ? do_db_hl_delete(dbctx, &k)
           : do_db_hl_replace(dbctx, &k, &freeid, sizeof(freeid));
     if (res != 0)
@@ -901,9 +898,12 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
     struct db_key k;
     struct db_obj_free_id freeid;
     struct db_obj_header hdr;
+    uint64_t *freeid_used_id;
     uint64_t k_id;
 
     k_id = (id - root_id) / FREE_ID_RANGE_SZ * FREE_ID_RANGE_SZ + root_id;
+    freeid_used_id = (uint64_t *)packed_memb_addr(db_obj_free_id, &freeid,
+                                                  used_id);
 
     pack_u32(db_key, &k, type, TYPE_FREE_ID);
     pack_u64(db_key, &k, id, k_id);
@@ -913,14 +913,14 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
             return res;
 
         /* insert new free ID information object */
-        omemset(&freeid.used_id, 0xff);
-        used_id_set(freeid.used_id, k_id, id, 0);
-        freeid.flags = 0;
+        memset(freeid_used_id, 0xff, packed_memb_size(db_obj_free_id, used_id));
+        used_id_set(freeid_used_id, k_id, id, 0);
+        pack_u8(db_obj_free_id, &freeid, flags, 0);
         res = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
         if (res != 0)
             return res;
     } else {
-        used_id_set(freeid.used_id, k_id, id, 0);
+        used_id_set(freeid_used_id, k_id, id, 0);
         res = do_db_hl_replace(dbctx, &k, &freeid, sizeof(freeid));
         if (res != 0)
             return res;
