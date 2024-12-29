@@ -1801,7 +1801,7 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
     }
 
     if (data == NULL && datafd >= 0)
-        free((void *)d);
+        free(d);
 
     if (!notrans) {
         err = do_db_hl_trans_commit(dbctx);
@@ -1826,7 +1826,7 @@ err2:
         do_db_hl_trans_abort(dbctx);
 err1:
     if (data == NULL && datafd >= 0)
-        free((void *)d);
+        free(d);
     return err;
 }
 
