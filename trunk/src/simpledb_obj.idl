@@ -14,6 +14,13 @@ PACKED_STRUCT(`db_key',
     `uint64_t', `id',   `1',
     `uint8_t',  `key',  `KEY_MAX + 1')
 
+#define FMT_VERSION 1
+
+PACKED_STRUCT(`db_obj_header',
+    `uint64_t', `version',  `1',
+    `uint64_t', `numobj',   `1',
+    `uint8_t',  `reserved', `112')
+
 #endif
 
 /* vi: set expandtab sw=4 ts=4: */

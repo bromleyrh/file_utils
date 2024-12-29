@@ -91,14 +91,6 @@ enum db_obj_type {
     TYPE_FREE_ID        /* look up by id */
 };
 
-#define FMT_VERSION 1
-
-struct db_obj_header {
-    uint64_t    version;
-    uint64_t    numobj;
-    uint8_t     reserved[112];
-} __attribute__((packed));
-
 #define FREE_ID_RANGE_SZ 2048
 
 #define FREE_ID_LAST_USED 1 /* values in all following ranges are free */
@@ -734,8 +726,8 @@ open_or_create(struct db_ctx **dbctx, const char *pathname)
         }
 
         pack_u32(db_key, &k, type, TYPE_HEADER);
-        hdr.version = FMT_VERSION;
-        hdr.numobj = 0;
+        pack_u64(db_obj_header, &hdr, version, FMT_VERSION);
+        pack_u64(db_obj_header, &hdr, numobj, 0);
         err = do_db_hl_insert(ret, &k, &hdr, sizeof(hdr));
         if (err) {
             error(0, -err, "Error creating database file %s", pathname);
@@ -892,7 +884,8 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
     if (res != 1)
         return res == 0 ? -EILSEQ : res;
 
-    ++hdr.numobj;
+    pack_u64(db_obj_header, &hdr, numobj,
+             unpack_u64(db_obj_header, &hdr, numobj) + 1);
     res = do_db_hl_replace(dbctx, &k, &hdr, sizeof(hdr));
     if (res != 0)
         return res;
@@ -938,7 +931,8 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
     if (res != 1)
         return res == 0 ? -EILSEQ : res;
 
-    --hdr.numobj;
+    pack_u64(db_obj_header, &hdr, numobj,
+             unpack_u64(db_obj_header, &hdr, numobj) - 1);
     return do_db_hl_replace(dbctx, &k, &hdr, sizeof(hdr));
 }
 
