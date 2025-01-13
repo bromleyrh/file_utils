@@ -237,7 +237,7 @@ static int
 format_cmd_filter(void *dst, const void *src, void *arg)
 {
     char *tmp;
-    const char *format_cmd = *(const char *const *)src;
+    const char *format_cmd = *(char *const *)src;
 
     (void)arg;
 
