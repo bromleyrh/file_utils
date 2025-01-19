@@ -42,7 +42,7 @@ AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 AX_CHECK_COMPILE_FLAG([-std=c11], [std_flags="-std=c11"], [std_flags=])
 AC_SUBST([std_flags])
 
-warnings=
+warnings="-Wstrict-aliasing"
 
 AX_CHECK_COMPILE_FLAG(
     [-Werror -Wgnu-include-next -Wnewline-eof -Wnullability-extension],
@@ -128,6 +128,12 @@ AX_CHECK_COMPILE_FLAG([-Werror -fstack-protector-all],
     [stack_protector=]
 )
 AC_SUBST([stack_protector])
+
+AX_CHECK_COMPILE_FLAG([-Werror -fstrict-aliasing],
+    [strict_aliasing="-fstrict-aliasing"],
+    [strict_aliasing=]
+)
+AC_SUBST([strict_aliasing])
 
 AC_CHECK_FUNCS_ONCE([strerror_l])
 
