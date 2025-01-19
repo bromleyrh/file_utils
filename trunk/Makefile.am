@@ -32,9 +32,10 @@ fortify_source_defines = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 coverage_analysis_cflags =
 endif
 
+std_cppflags = -D_XOPEN_SOURCE=700
 std_cflags = @std_flags@
 
-AM_CPPFLAGS =
+AM_CPPFLAGS = $(std_cppflags)
 AM_CFLAGS = $(coverage_analysis_cflags) $(std_cflags) -ftrapv -pipe -Wall \
 	-Wextra
 
