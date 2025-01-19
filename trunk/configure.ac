@@ -39,6 +39,9 @@ AC_PROG_RANLIB
 
 AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
 
+AX_CHECK_COMPILE_FLAG([-std=c11], [std_flags="-std=c11"], [std_flags=])
+AC_SUBST([std_flags])
+
 AC_ARG_ENABLE([sanitizers],
               [  --enable-sanitizers     enable GCC sanitizers],
               [AS_CASE(

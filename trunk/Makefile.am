@@ -32,19 +32,22 @@ fortify_source_defines = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 coverage_analysis_cflags =
 endif
 
+std_cflags = @std_flags@
+
+AM_CPPFLAGS =
+AM_CFLAGS = $(coverage_analysis_cflags) $(std_cflags) -ftrapv -pipe -Wall \
+	-Wextra
+
 if SANITIZERS
-AM_CPPFLAGS = $(debug_cppflags_debug)
-AM_CFLAGS = $(debug_cflags_debug) $(coverage_analysis_cflags) @sanitizer@ \
-	@stack_protector@ -ftrapv -pipe -Wall -Wextra
+AM_CPPFLAGS += $(debug_cppflags_debug)
+AM_CFLAGS += $(debug_cflags_debug) @sanitizer@ @stack_protector@
 else
 if DEBUG
-AM_CPPFLAGS = $(debug_cppflags_debug)
-AM_CFLAGS = $(debug_cflags_debug) $(coverage_analysis_cflags) \
-	@stack_protector@ -ftrapv -pipe -Wall -Wextra
+AM_CPPFLAGS += $(debug_cppflags_debug)
+AM_CFLAGS += $(debug_cflags_debug) @stack_protector@
 else
-AM_CPPFLAGS = $(debug_cppflags_ndebug) $(fortify_source_defines)
-AM_CFLAGS = $(debug_cflags_ndebug) $(coverage_analysis_cflags) -ftrapv \
-	-fvisibility=hidden -pipe -Wall -Wextra
+AM_CPPFLAGS += $(debug_cppflags_ndebug) $(fortify_source_defines)
+AM_CFLAGS += $(debug_cflags_ndebug) -fvisibility=hidden
 endif
 endif
 
