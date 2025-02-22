@@ -238,11 +238,15 @@ int
 mount_file_system(const char *devpath, const char *mntpath, const char *opts,
                   int flags)
 {
+    char buf[256] = ": ";
+    const char *path;
     int mflags;
     int ret;
     struct libmnt_context *mntctx;
 
-    debug_print("Mounting %s", devpath ? devpath : mntpath);
+    path = devpath ? devpath : mntpath;
+
+    debug_print("Mounting %s", path);
 
     mntctx = mnt_new_context();
     if (mntctx == NULL)
@@ -270,6 +274,13 @@ mount_file_system(const char *devpath, const char *mntpath, const char *opts,
     ret = mnt_context_mount(mntctx);
     if (ret != 0)
         goto err2;
+
+    ret = mnt_context_get_excode(mntctx, 0, buf + 2, sizeof(buf) - 2);
+    if (ret != MNT_EX_SUCCESS) {
+        ret = -EIO;
+        error(0, 0, "Error mounting %s%s", path, buf[2] == '\0' ? "" : &buf[2]);
+        goto err2;
+    }
 
     /* open root directory to provide a handle for subsequent operations */
     ret = open(mntpath, O_DIRECTORY | O_RDONLY);
