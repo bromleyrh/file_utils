@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,6 +71,8 @@ static void buserr_handler(int);
 
 static int set_sigbus_handler(void);
 static int parse_cmdline(int, char **);
+
+static int saprintf(char **, const char *, ...);
 
 static int is_on_fs_of_type(const char *, __fsword_t);
 static int get_dest_info(char *);
@@ -141,6 +144,47 @@ parse_cmdline(int argc, char **argv)
     dst = argv[argc-1];
 
     return 0;
+}
+
+static int
+saprintf(char **strp, const char *format, ...)
+{
+    char *ret;
+    int n, res;
+    va_list ap;
+
+    va_start(ap, format);
+    n = vsnprintf(NULL, 0, format, ap);
+    va_end(ap);
+    if (n < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    ++n;
+
+    ret = malloc(n);
+    if (ret == NULL)
+        return -1;
+
+    va_start(ap, format);
+    res = vsnprintf(ret, n, format, ap);
+    va_end(ap);
+    if (res < 0) {
+        res = EINVAL;
+        goto err;
+    }
+    if (res >= n) {
+        res = EIO;
+        goto err;
+    }
+
+    *strp = ret;
+    return res;
+
+err:
+    free(ret);
+    errno = res;
+    return -1;
 }
 
 static int
@@ -429,7 +473,7 @@ do_link(int fd, const char *name)
 {
     char *path;
 
-    if (asprintf(&path, "/proc/self/fd/%d", fd) == -1) {
+    if (saprintf(&path, "/proc/self/fd/%d", fd) < 0) {
         error(0, 0, "Out of memory");
         return -1;
     }
@@ -455,7 +499,7 @@ copy(int n)
     srcfile = srcs[n];
 
     if (dstdir) {
-        if (asprintf(&dstfile, "%s/%s", dst, basename_safe(srcfile)) == -1) {
+        if (saprintf(&dstfile, "%s/%s", dst, basename_safe(srcfile)) == -1) {
             error(0, 0, "Out of memory");
             return -1;
         }
