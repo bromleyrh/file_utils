@@ -54,7 +54,7 @@ struct dest {
 };
 
 #if !defined(HAVE___FSWORD_T)
-typedef unsigned __fsword_t;
+typedef uint64_t __fsword_t;
 
 #endif
 static char **srcs;
