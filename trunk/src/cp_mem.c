@@ -515,7 +515,7 @@ copy(int n)
         fd1 = open(srcfile, O_RDONLY);
         if (fd1 == -1) {
             error(0, errno, "Couldn't open %s", srcfile);
-            return -1;
+            goto err1;
         }
     }
 
@@ -533,13 +533,13 @@ copy(int n)
 #endif
     if (fd2 == -1) {
         error(0, errno, "Couldn't open %s", dstfile);
-        goto err1;
+        goto err2;
     }
 
     if (do_copy(fd1, fd2, hugetlbfs) == -1)
-        goto err2;
+        goto err3;
     if (copy_mode(fd1, fd2) == -1)
-        goto err2;
+        goto err3;
 
     close(fd1);
 #ifdef O_TMPFILE
@@ -548,17 +548,24 @@ copy(int n)
 #endif
     if (close(fd2) == -1) {
         error(0, errno, "Couldn't close %s", dstfile);
-        return -1;
+        goto err1;
     }
 
     if (verbose)
         infomsgf("%s -> %s\n", srcfile, dstfile);
+
+    if (dstdir)
+        free(dstfile);
+
     return 0;
 
-err2:
+err3:
     close(fd2);
-err1:
+err2:
     close(fd1);
+err1:
+    if (dstdir)
+        free(dstfile);
     return -1;
 }
 
