@@ -51,6 +51,7 @@ src_libverify_mkv_plugin_la_LDFLAGS = \
 src_libverify_mkv_plugin_la_LIBADD = @libmatroska_link_dep@
 
 include src/libbackup/Makefile.am
+include src/sys_dep/Makefile.am
 
 backup_link = -L$(abs_builddir)/src/libbackup/.libs -lbackup
 backup_link_dep = @libutil_link_dep@
@@ -62,7 +63,7 @@ if HAVE_LIBXFS
 bin_PROGRAMS += src/xfsutil
 endif
 
-bin_cppflags =
+bin_cppflags = -Isrc -Isrc/sys_dep
 
 src_attr_idx_SOURCES = src/attr_idx.c
 src_attr_idx_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
@@ -72,7 +73,8 @@ src_attr_idx_LDADD = @libutil_link_dep@
 src_cp_mem_SOURCES = src/cp_mem.c
 src_cp_mem_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_cp_mem_CFLAGS = $(AM_CFLAGS)
-src_cp_mem_LDADD = @libutil_link_dep@
+src_cp_mem_LDADD = src/sys_dep/libsys.a @libutil_link_dep@
+src_cp_mem_DEPENDENCIES = src/sys_dep/libsys.a
 
 src_fastcat_SOURCES = src/fastcat.c
 src_fastcat_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
@@ -109,10 +111,11 @@ src_replicate_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \
 	@libutil_cppflags@ $(trace_cppflags)
 src_replicate_CFLAGS = $(AM_CFLAGS)
-src_replicate_LDADD = src/libfileutil.a -lcap -lm -lmount -lpthread \
-	$(backup_link) $(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ \
-	@libutil_link_dep@
-src_replicate_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la
+src_replicate_LDADD = src/libfileutil.a src/sys_dep/libsys.a -lcap -lm -lmount \
+	-lpthread $(backup_link) $(backup_link_dep) @dbus_link_dep@ \
+	@libjson_link_dep@ @libutil_link_dep@
+src_replicate_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la \
+	src/sys_dep/libsys.a
 
 src_simpledb_SOURCES = src/simpledb.c
 src_simpledb_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
@@ -124,16 +127,21 @@ src_sparse_scan_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_sparse_scan_CFLAGS = $(AM_CFLAGS)
 src_sparse_scan_LDADD = @libutil_link_dep@
 
+src_tmpfile_SOURCES = src/tmpfile.c
+src_tmpfile_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
+src_tmpfile_CFLAGS = $(AM_CFLAGS)
+
 src_verify_SOURCES = src/debug.c src/util.c src/verify.c src/verify_conf.c \
 	src/verify_io.c src/verify_scan.c
 src_verify_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \
 	@libutil_cppflags@ @openssl_cppflags@ $(trace_cppflags)
 src_verify_CFLAGS = $(AM_CFLAGS)
-src_verify_LDADD = src/libfileutil.a -lcap -lm -lmount -lrt $(backup_link) \
-	$(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ @libutil_link_dep@ \
-	@openssl_link_dep@
-src_verify_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la
+src_verify_LDADD = src/libfileutil.a src/sys_dep/libsys.a -lcap -lm -lmount \
+	-lrt $(backup_link) $(backup_link_dep) @dbus_link_dep@ @libjson_link_dep@ \
+	@libutil_link_dep@ @openssl_link_dep@
+src_verify_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la \
+	src/sys_dep/libsys.a
 
 else
 

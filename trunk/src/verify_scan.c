@@ -5,6 +5,7 @@
 #include "config.h"
 
 #include "debug.h"
+#include "sys_dep.h"
 #include "util.h"
 #include "verify_common.h"
 #include "verify_io.h"
@@ -52,7 +53,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/vfs.h>
 
 #ifdef HAVE_XFS_XFS_H
 #include <xfs/xfs.h>
@@ -106,7 +106,7 @@ static int get_io_size(ssize_t *, int);
 static int get_huge_page_size(int64_t *);
 #endif
 
-static int direct_io_supported(const struct statfs *);
+static int direct_io_supported(const struct fs_stat *);
 static int set_direct_io(int);
 
 static void cancel_aio(struct aiocb *);
@@ -273,11 +273,11 @@ end1:
 #endif
 
 static int
-direct_io_supported(const struct statfs *s)
+direct_io_supported(const struct fs_stat *s)
 {
     int i;
 
-    static const __fsword_t no_direct_io[] = {
+    static const uint64_t no_direct_io[] = {
         /* ext4 read() calls may return EINVAL when the file offset is
            positioned at the end of the file and O_DIRECT is enabled */
         /* FIXME: check if behavior the same on ext2 and ext3 */
@@ -865,7 +865,7 @@ verif_fn(void *arg)
     int hugetlbfl, nhugep;
     int64_t fullbufsize = 0;
     ssize_t bufsz;
-    struct statfs s;
+    struct fs_stat s;
     struct verif_args *vargs = arg;
     struct verif_walk_ctx wctx;
 
@@ -896,11 +896,11 @@ verif_fn(void *arg)
     fullbufsize = wctx.bufsz;
 #endif
 
-    if (fstatfs(vargs->srcfd, &s) == -1) {
+    if (get_fs_stat(vargs->srcfd, &s) == -1) {
         err = ERR_TAG(errno);
         goto stat_err;
     }
-    wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_frsize;
+    wctx.fsbytesused = (s.f_blocks - s.f_bfree) * s.f_bsize;
     wctx.bytesverified = 0;
     wctx.filesprocessed = 0;
     wctx.use_direct_io = direct_io_supported(&s);

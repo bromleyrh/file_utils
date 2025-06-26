@@ -7,6 +7,7 @@
 #include "replicate_common.h"
 #include "replicate_fs.h"
 #include "replicate_trans.h"
+#include "sys_dep.h"
 #include "util.h"
 
 #include <dbus/dbus.h>
@@ -35,7 +36,6 @@
 #include <sys/capability.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/vfs.h>
 #include <sys/wait.h>
 
 struct copy_ctx {
@@ -329,15 +329,16 @@ copy_fn(void *arg)
     int ret;
     struct copy_args *cargs = arg;
     struct copy_ctx cctx;
-    struct statfs ds, ss;
+    struct fs_stat ds, ss;
 
-    if (fstatfs(cargs->srcfd, &ss) == -1 || fstatfs(cargs->dstfd, &ds) == -1) {
+    if (get_fs_stat(cargs->srcfd, &ss) == -1
+        || get_fs_stat(cargs->dstfd, &ds) == -1) {
         ret = errno;
         error(0, ret, "Error getting file system statistics");
         return ERR_TAG(ret);
     }
     cctx.busconn = cargs->busconn;
-    cctx.fsbytesused = (ss.f_blocks - ss.f_bfree) * ss.f_frsize;
+    cctx.fsbytesused = (ss.f_blocks - ss.f_bfree) * ss.f_bsize;
     cctx.bytescopied = 0;
     cctx.lastdev = 0;
     cctx.lastino = 0;

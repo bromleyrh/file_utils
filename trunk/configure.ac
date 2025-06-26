@@ -198,8 +198,6 @@ EOF
          ]
      )
 
-     AC_CHECK_TYPES([__fsword_t], [], [], [[#include <sys/vfs.h>]])
-
      PKG_CHECK_MODULES([dbus], [dbus-1],
          [dbus_cppflags=$dbus_CFLAGS
           dbus_link_dep=$dbus_LIBS]

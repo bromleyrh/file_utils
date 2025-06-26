@@ -6,9 +6,8 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#include "config.h"
-
 #include "common.h"
+#include "sys_dep.h"
 
 #include <files/acc_ctl.h>
 #include <files/util.h>
@@ -53,10 +52,6 @@ struct dest {
     int         hugetlbfs;
 };
 
-#if !defined(HAVE___FSWORD_T)
-typedef uint64_t __fsword_t;
-
-#endif
 static char **srcs;
 static char *dst;
 static int dstdir;
@@ -74,7 +69,7 @@ static int parse_cmdline(int, char **);
 
 static int saprintf(char **, const char *, ...);
 
-static int is_on_fs_of_type(const char *, __fsword_t);
+static int is_on_fs_of_type(const char *, uint64_t);
 static int get_dest_info(char *);
 
 static off_t get_hugepage_size(int);
@@ -188,16 +183,16 @@ err:
 }
 
 static int
-is_on_fs_of_type(const char *pathname, __fsword_t fstype)
+is_on_fs_of_type(const char *pathname, uint64_t fstype)
 {
-    struct statfs buf;
+    struct fs_stat buf;
 
-    while (statfs(pathname, &buf) == -1) {
+    while (get_fs_stat_path(pathname, &buf) == -1) {
         if (errno != EINTR)
             return -1;
     }
 
-    return (__fsword_t)buf.f_type == fstype;
+    return buf.f_type == fstype;
 }
 
 static int

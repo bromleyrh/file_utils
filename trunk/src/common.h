@@ -9,6 +9,8 @@
 
 #include <stdio.h>
 
+#define EXPORTED __attribute__((__visibility__("default")))
+
 /* for eliminating false positives from static analysis tools */
 #ifdef ASSERT_MACROS
 #include <assert.h>
