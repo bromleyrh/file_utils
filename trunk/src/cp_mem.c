@@ -270,6 +270,8 @@ get_page_offset(off_t off, int hugetlbfs_fd)
 static int
 dest_init(int fd, int on_hugetlbfs, struct dest *dst)
 {
+    int blksize;
+
     if (dst == NULL)
         return -1;
 
@@ -277,10 +279,11 @@ dest_init(int fd, int on_hugetlbfs, struct dest *dst)
 
     dst->buf.buf = NULL;
 
-    if (ioctl(dst->fd, FIGETBSZ, &dst->blksize) == -1) {
+    if (ioctl(dst->fd, FIGETBSZ, &blksize) == -1) {
         error(0, errno, "Couldn't get destination file system block size");
         return -1;
     }
+    dst->blksize = blksize;
 
     dst->hugetlbfs = on_hugetlbfs;
 
