@@ -377,7 +377,7 @@ do_write(struct dest *dst, const void *buf, size_t count)
         return -1;
 
     for (byteswritten = 0; byteswritten < count; byteswritten += blockbytes) {
-        if (count - byteswritten < (size_t)dst->blksize)
+        if (count - byteswritten < dst->blksize)
             blockbytes = count - byteswritten;
         else {
             blockbytes = dst->blksize;
