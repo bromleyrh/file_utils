@@ -15,7 +15,6 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
-#include <libgen.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
