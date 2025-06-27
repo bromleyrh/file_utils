@@ -56,7 +56,7 @@ include src/libbackup/Makefile.am
 include src/sys_dep/Makefile.am
 
 backup_link = -L$(abs_builddir)/src/libbackup/.libs -lbackup
-backup_link_dep = @libutil_link_dep@
+backup_link_dep = src/sys_dep/libsys.a @libutil_link_dep@
 
 bin_PROGRAMS += src/attr_idx src/cp_mem src/fastcat src/fastcp src/md_verify \
 	src/mkmanifest src/open src/open_pipes src/replicate src/simpledb \
@@ -87,7 +87,8 @@ src_fastcat_DEPENDENCIES = src/sys_dep/libsys.a
 src_fastcp_SOURCES = src/fastcp.c
 src_fastcp_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_fastcp_CFLAGS = $(AM_CFLAGS)
-src_fastcp_LDADD = @libutil_link_dep@
+src_fastcp_LDADD = src/sys_dep/libsys.a @libutil_link_dep@
+src_fastcp_DEPENDENCIES = src/sys_dep/libsys.a
 
 src_md_verify_SOURCES = src/md_verify.c src/strptime.c
 src_md_verify_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@

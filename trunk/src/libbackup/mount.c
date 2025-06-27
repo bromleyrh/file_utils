@@ -9,6 +9,7 @@
 #include "backup.h"
 #include "backup_util.h"
 #include "common.h"
+#include "sys_dep.h"
 
 #include <libmount/libmount.h>
 
@@ -283,7 +284,7 @@ mount_file_system(const char *devpath, const char *mntpath, const char *opts,
     }
 
     /* open root directory to provide a handle for subsequent operations */
-    ret = open(mntpath, O_DIRECTORY | O_RDONLY);
+    ret = openat_directory(AT_FDCWD, mntpath, O_RDONLY, 0);
     if (ret == -1) {
         ret = -errno;
         unmount_file_system(mntpath, -1);

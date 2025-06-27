@@ -33,6 +33,8 @@ else
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/get_bsz.c
 endif
 
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/openat_directory.c
+
 if LINUX
 if HAVE_O_TMPFILE
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/openat_tmpfile.c

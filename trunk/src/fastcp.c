@@ -2,6 +2,8 @@
  * fastcp.c
  */
 
+#include "sys_dep.h"
+
 #include <option_parsing.h>
 #include <strings_ext.h>
 
@@ -129,7 +131,7 @@ main(int argc, char **argv)
         *dstbn = '\0';
         dstdn = dst;
     }
-    dstdirfd = open(dstdn, O_DIRECTORY | O_RDONLY);
+    dstdirfd = openat_directory(AT_FDCWD, dstdn, O_RDONLY, 0);
     if (dstdirfd == -1) {
         error(0, errno, "Error opening %s", dstdn);
         goto err1;
