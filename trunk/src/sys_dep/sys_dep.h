@@ -5,10 +5,16 @@
 #ifndef _SYS_DEP_H
 #define _SYS_DEP_H
 
+#include "config.h"
+
 #include "common.h"
 
 #include <stdint.h>
 
+#ifdef HAVE_LINUX_MAGIC_H
+#include <linux/magic.h>
+
+#endif
 typedef struct {
     int64_t val[2];
 } fs_id_t;
