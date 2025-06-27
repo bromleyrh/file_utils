@@ -21,4 +21,15 @@ else
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/get_bsz.c
 endif
 
+if LINUX
+if HAVE_O_TMPFILE
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/openat_tmpfile.c
+sys_dep_cppflags += -DSYS_DEP_OPENAT_TMPFILE
+else
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/openat_tmpfile.c
+endif
+else
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/openat_tmpfile.c
+endif
+
 ## vi: set noexpandtab sw=4 ts=4:

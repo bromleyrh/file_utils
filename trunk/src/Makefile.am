@@ -50,6 +50,8 @@ src_libverify_mkv_plugin_la_LDFLAGS = \
 	-version-info @lvmp_cur@:@lvmp_rev@:@lvmp_age@
 src_libverify_mkv_plugin_la_LIBADD = @libmatroska_link_dep@
 
+sys_dep_cppflags = -Isrc -Isrc/sys_dep
+
 include src/libbackup/Makefile.am
 include src/sys_dep/Makefile.am
 
@@ -63,7 +65,7 @@ if HAVE_LIBXFS
 bin_PROGRAMS += src/xfsutil
 endif
 
-bin_cppflags = -Isrc -Isrc/sys_dep
+bin_cppflags = $(sys_dep_cppflags)
 
 src_attr_idx_SOURCES = src/attr_idx.c
 src_attr_idx_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
@@ -130,6 +132,8 @@ src_sparse_scan_LDADD = @libutil_link_dep@
 src_tmpfile_SOURCES = src/tmpfile.c
 src_tmpfile_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
 src_tmpfile_CFLAGS = $(AM_CFLAGS)
+src_tmpfile_LDADD = src/sys_dep/libsys.a
+src_tmpfile_DEPENDENCIES = src/sys_dep/libsys.a
 
 src_verify_SOURCES = src/debug.c src/util.c src/verify.c src/verify_conf.c \
 	src/verify_io.c src/verify_scan.c

@@ -6,6 +6,8 @@
 
 #define _GNU_SOURCE
 
+#include "sys_dep.h"
+
 #include <strings_ext.h>
 
 #include <files/acc_ctl.h>
@@ -23,7 +25,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#ifdef O_TMPFILE
+#ifdef SYS_DEP_OPENAT_TMPFILE
 static size_t dirname_len(const char *);
 
 #endif
@@ -42,7 +44,7 @@ static int copy_file(int, int, int [2], int);
 
 static int link_file(int, const char *);
 
-#ifdef O_TMPFILE
+#ifdef SYS_DEP_OPENAT_TMPFILE
 static size_t
 dirname_len(const char *path)
 {
@@ -122,7 +124,7 @@ close_stdout_pipe(int pipefd[2])
 static int
 open_file(char *path)
 {
-#ifdef O_TMPFILE
+#ifdef SYS_DEP_OPENAT_TMPFILE
     int ret;
     size_t dnlen;
 
@@ -131,7 +133,7 @@ open_file(char *path)
         return -EISDIR;
 
     path[dnlen] = '\0';
-    ret = open(path, O_TMPFILE | O_WRONLY, ACC_MODE_DEFAULT);
+    ret = openat_tmpfile(AT_FDCWD, path, O_WRONLY, ACC_MODE_DEFAULT);
     path[dnlen] = '/';
 
     return ret == -1 ? -errno : ret;

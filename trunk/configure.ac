@@ -180,6 +180,8 @@ EOF
            ]
           )
 
+     AX_O_TMPFILE
+
      AC_CHECK_FUNCS([syncfs])
 
      AC_CHECK_LIB([mount], [mnt_table_uniq_fs],
@@ -228,6 +230,8 @@ EOF
 )
 
 AM_CONDITIONAL([HAVE_LIBXFS], [test "x$libxfs" = "xtrue"])
+
+AM_CONDITIONAL([HAVE_O_TMPFILE], [test "x$ax_cv_o_tmpfile" = "xyes"])
 
 PKG_CHECK_MODULES([libutil], [libutil],
     [libutil_cppflags=$libutil_CFLAGS

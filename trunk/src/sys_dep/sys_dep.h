@@ -15,6 +15,8 @@
 #include <linux/magic.h>
 
 #endif
+#include <sys/types.h>
+
 typedef struct {
     int64_t val[2];
 } fs_id_t;
@@ -34,6 +36,9 @@ EXPORTED int get_fs_stat_path(const char *path, struct fs_stat *buf);
 EXPORTED int get_fs_stat(int fd, struct fs_stat *buf);
 
 EXPORTED int get_bsz(int fd, int *bsz);
+
+EXPORTED int openat_tmpfile(int dirfd, const char *pathname, int flags,
+                            mode_t mode);
 
 #endif
 

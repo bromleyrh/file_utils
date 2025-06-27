@@ -2,8 +2,6 @@
  * cp_mem.c
  */
 
-#define _GNU_SOURCE
-
 #define _FILE_OFFSET_BITS 64
 
 #include "common.h"
@@ -81,7 +79,7 @@ static int do_write(struct dest *, const void *, size_t);
 
 static int do_copy(int, int, int);
 static int copy_mode(int, int);
-#ifdef O_TMPFILE
+#ifdef SYS_DEP_OPENAT_TMPFILE
 static int do_link(int, const char *);
 #endif
 
@@ -460,7 +458,7 @@ copy_mode(int fd1, int fd2)
     return 0;
 }
 
-#ifdef O_TMPFILE
+#ifdef SYS_DEP_OPENAT_TMPFILE
 static int
 do_link(int fd, const char *name)
 {
@@ -509,14 +507,14 @@ copy(int n)
         }
     }
 
-#ifdef O_TMPFILE
+#ifdef SYS_DEP_OPENAT_TMPFILE
     if (hugetlbfs)
         fd2 = open(dstfile, O_CREAT | O_RDWR, ACC_MODE_DEFAULT);
     else {
         char buf[PATH_MAX];
 
-        fd2 = open(dirname_safe(dstfile, buf, sizeof(buf)), O_RDWR | O_TMPFILE,
-                   ACC_MODE_DEFAULT);
+        fd2 = openat_tmpfile(AT_FDCWD, dirname_safe(dstfile, buf, sizeof(buf)),
+                             O_RDWR, ACC_MODE_DEFAULT);
     }
 #else
     fd2 = open(dstfile, O_CREAT | O_RDWR, ACC_MODE_DEFAULT);
@@ -532,7 +530,7 @@ copy(int n)
         goto err3;
 
     close(fd1);
-#ifdef O_TMPFILE
+#ifdef SYS_DEP_OPENAT_TMPFILE
     if (!hugetlbfs)
         do_link(fd2, dstfile);
 #endif
