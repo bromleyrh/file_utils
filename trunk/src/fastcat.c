@@ -16,7 +16,6 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/uio.h>
 
 #define MAX_WRITE (1024 * 1024)
 
