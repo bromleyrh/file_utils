@@ -4,8 +4,6 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#define _GNU_SOURCE
-
 #include "sys_dep.h"
 
 #include <errno.h>
@@ -24,7 +22,7 @@
 
 static int do_copy(int, int);
 static int do_file_send(int, int);
-static int do_splice(int, int);
+static int do_fifo_transfer(int, int);
 
 static int
 do_copy(int fd_in, int fd_out)
@@ -66,12 +64,12 @@ do_file_send(int fd_in, int fd_out)
 }
 
 static int
-do_splice(int fd_in, int fd_out)
+do_fifo_transfer(int fd_in, int fd_out)
 {
     for (;;) {
         ssize_t ret;
 
-        ret = splice(fd_in, NULL, fd_out, NULL, MAX_WRITE, SPLICE_F_MORE);
+        ret = fifo_transfer(fd_in, NULL, fd_out, NULL, MAX_WRITE, 1);
         if (ret <= 0) {
             if (ret == 0)
                 break;
@@ -122,7 +120,7 @@ main(int argc, char **argv)
         }
 
         if (S_ISFIFO(s_out.st_mode) || S_ISFIFO(s_in.st_mode))
-            err = do_splice(fd_in, STDOUT_FILENO);
+            err = do_fifo_transfer(fd_in, STDOUT_FILENO);
         else if (S_ISREG(s_in.st_mode))
             err = do_file_send(fd_in, STDOUT_FILENO);
         else

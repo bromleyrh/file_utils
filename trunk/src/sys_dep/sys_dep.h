@@ -44,6 +44,9 @@ EXPORTED int openat_tmpfile(int dirfd, const char *pathname, int flags,
 EXPORTED ssize_t file_send(int out_fd, int in_fd, int64_t *offset,
                            size_t count);
 
+EXPORTED ssize_t fifo_transfer(int fd_in, int64_t *off_in, int fd_out,
+                               int64_t *off_out, size_t len, unsigned partial);
+
 #endif
 
 /* vi: set expandtab sw=4 ts=4: */

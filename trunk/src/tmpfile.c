@@ -37,7 +37,7 @@ static int open_file(char *);
 
 static ssize_t do_copy(int, int);
 static ssize_t do_tee(int, int);
-static ssize_t do_splice(int, int);
+static ssize_t do_fifo_transfer(int, int);
 
 static int copy_file(int, int, int [2], int);
 
@@ -171,9 +171,9 @@ do_tee(int fd_in, int fd_out)
 }
 
 static ssize_t
-do_splice(int fd_in, int fd_out)
+do_fifo_transfer(int fd_in, int fd_out)
 {
-    return splice(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
+    return fifo_transfer(fd_in, NULL, fd_out, NULL, MAX_LEN, 0);
 }
 
 #undef MAX_LEN
@@ -189,7 +189,7 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
             if (ret < 1)
                 break;
 
-            ret = do_splice(fd_in, fd_out);
+            ret = do_fifo_transfer(fd_in, fd_out);
             if (ret < 1)
                 break;
         }
@@ -198,11 +198,11 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
             ret = do_tee(fd_in, stdout_pipe[1]);
             if (ret < 1)
                 break;
-            ret = do_splice(stdout_pipe[0], STDOUT_FILENO);
+            ret = do_fifo_transfer(stdout_pipe[0], STDOUT_FILENO);
             if (ret < 0)
                 break;
 
-            ret = do_splice(fd_in, fd_out);
+            ret = do_fifo_transfer(fd_in, fd_out);
             if (ret < 1)
                 break;
         }
@@ -215,13 +215,13 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
             if (ret < 0)
                 break;
 
-            ret = do_splice(fd_in, fd_out);
+            ret = do_fifo_transfer(fd_in, fd_out);
             if (ret < 1)
                 break;
         }
     } else {
         for (;;) {
-            ret = do_splice(fd_in, fd_out);
+            ret = do_fifo_transfer(fd_in, fd_out);
             if (ret < 1)
                 break;
         }
