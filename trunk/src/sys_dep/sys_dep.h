@@ -9,6 +9,7 @@
 
 #include "common.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef HAVE_LINUX_MAGIC_H
@@ -39,6 +40,9 @@ EXPORTED int get_bsz(int fd, int *bsz);
 
 EXPORTED int openat_tmpfile(int dirfd, const char *pathname, int flags,
                             mode_t mode);
+
+EXPORTED ssize_t file_send(int out_fd, int in_fd, int64_t *offset,
+                           size_t count);
 
 #endif
 

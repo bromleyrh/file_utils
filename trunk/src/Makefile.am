@@ -81,6 +81,8 @@ src_cp_mem_DEPENDENCIES = src/sys_dep/libsys.a
 src_fastcat_SOURCES = src/fastcat.c
 src_fastcat_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
 src_fastcat_CFLAGS = $(AM_CFLAGS)
+src_fastcat_LDADD = src/sys_dep/libsys.a
+src_fastcat_DEPENDENCIES = src/sys_dep/libsys.a
 
 src_fastcp_SOURCES = src/fastcp.c
 src_fastcp_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@

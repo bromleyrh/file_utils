@@ -6,6 +6,8 @@
 
 #define _GNU_SOURCE
 
+#include "sys_dep.h"
+
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -14,7 +16,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -22,7 +23,7 @@
 #define MAX_WRITE (1024 * 1024)
 
 static int do_copy(int, int);
-static int do_sendfile(int, int);
+static int do_file_send(int, int);
 static int do_splice(int, int);
 
 static int
@@ -48,12 +49,12 @@ err:
 }
 
 static int
-do_sendfile(int fd_in, int fd_out)
+do_file_send(int fd_in, int fd_out)
 {
     for (;;) {
         ssize_t ret;
 
-        ret = sendfile(fd_out, fd_in, NULL, MAX_WRITE);
+        ret = file_send(fd_out, fd_in, NULL, MAX_WRITE);
         if (ret <= 0) {
             if (ret == 0)
                 break;
@@ -123,7 +124,7 @@ main(int argc, char **argv)
         if (S_ISFIFO(s_out.st_mode) || S_ISFIFO(s_in.st_mode))
             err = do_splice(fd_in, STDOUT_FILENO);
         else if (S_ISREG(s_in.st_mode))
-            err = do_sendfile(fd_in, STDOUT_FILENO);
+            err = do_file_send(fd_in, STDOUT_FILENO);
         else
             err = do_copy(fd_in, STDOUT_FILENO);
         if (err) {

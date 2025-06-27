@@ -10,9 +10,15 @@ src_sys_dep_libsys_a_CPPFLAGS = $(AM_CPPFLAGS) -Isrc -Isrc/sys_dep
 src_sys_dep_libsys_a_CFLAGS = $(AM_CFLAGS)
 
 if LINUX
-src_sys_dep_libsys_a_SOURCES = src/sys_dep/linux/get_fs_stat.c
+src_sys_dep_libsys_a_SOURCES = src/sys_dep/linux/file_send.c
 else
-src_sys_dep_libsys_a_SOURCES = src/sys_dep/generic/get_fs_stat.c
+src_sys_dep_libsys_a_SOURCES = src/sys_dep/generic/file_send.c
+endif
+
+if LINUX
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/get_fs_stat.c
+else
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/get_fs_stat.c
 endif
 
 if LINUX
