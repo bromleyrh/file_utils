@@ -2,9 +2,9 @@
  * open.c
  */
 
-#define _GNU_SOURCE
-
 #define _FILE_OFFSET_BITS 64
+
+#include "sys_dep.h"
 
 #include <files/util.h>
 
@@ -49,7 +49,9 @@ main(int argc, char **argv)
         args = &argv[2];
     }
 
-    fd = open(file, (direct ? O_DIRECT : 0) | O_RDONLY);
+    fd = direct
+         ? openat_direct(AT_FDCWD, file, O_RDONLY, 0)
+         : open(file, O_RDONLY);
     if (fd == -1)
         error(EXIT_FAILURE, errno, "Could not open %s", file);
 

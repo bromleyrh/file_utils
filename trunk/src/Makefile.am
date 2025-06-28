@@ -103,7 +103,8 @@ src_mkmanifest_LDADD = @libutil_link_dep@
 src_open_SOURCES = src/open.c
 src_open_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_open_CFLAGS = $(AM_CFLAGS)
-src_open_LDADD = @libutil_link_dep@
+src_open_LDADD = src/sys_dep/libsys.a @libutil_link_dep@
+src_open_DEPENDENCIES = src/sys_dep/libsys.a
 
 src_open_pipes_SOURCES = src/open_pipes.c
 src_open_pipes_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
@@ -149,6 +150,12 @@ src_verify_LDADD = src/libfileutil.a src/sys_dep/libsys.a -lcap -lm -lmount \
 	@libutil_link_dep@ @openssl_link_dep@
 src_verify_DEPENDENCIES = src/libfileutil.a src/libbackup/libbackup.la \
 	src/sys_dep/libsys.a
+
+src_xfsutil_SOURCES = src/xfsutil.c
+src_xfsutil_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
+src_xfsutil_CFLAGS = $(AM_CFLAGS)
+src_xfsutil_LDADD = src/sys_dep/libsys.a
+src_xfsutil_DEPENDENCIES = src/sys_dep/libsys.a
 
 else
 

@@ -3,7 +3,8 @@
  */
 
 #define _FILE_OFFSET_BITS 64
-#define _GNU_SOURCE
+
+#include "sys_dep.h"
 
 #include <errno.h>
 #include <error.h>
@@ -44,7 +45,6 @@ static int
 test_dio(int fd)
 {
     int err;
-    int fl;
     struct dioattr dioattrs;
     void *buf;
 
@@ -57,10 +57,7 @@ test_dio(int fd)
     if (err)
         return err;
 
-    fl = fcntl(fd, F_GETFL);
-    if (fl == -1)
-        goto err;
-    if (fcntl(fd, F_SETFL, fl | O_DIRECT) == -1)
+    if (fcntl_setfl_direct(fd) == -1)
         goto err;
 
     if (pread(fd, buf, dioattrs.d_miniosz, 0) == -1) {

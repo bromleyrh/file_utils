@@ -297,14 +297,9 @@ direct_io_supported(const struct fs_stat *s)
 static int
 set_direct_io(int fd)
 {
-    int fl;
-
-    fl = fcntl(fd, F_GETFL);
-    return fl != -1
-           && (fcntl(fd, F_SETFL, fl | O_DIRECT) != -1 || errno == EINVAL)
-           ? 0 : ERR_TAG(errno); /* EINVAL from fcntl(F_SETFL, fl | O_DIRECT)
-                                    means O_DIRECT not supported by file
-                                    system */
+    return fcntl_setfl_direct(fd) != -1 || errno == EINVAL
+           ? 0 : ERR_TAG(errno); /* EINVAL from fcntl_setfl_direct() means
+                                    O_DIRECT not supported by file system */
 }
 
 static void

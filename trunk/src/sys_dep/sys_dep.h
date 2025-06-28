@@ -51,11 +51,16 @@ EXPORTED int get_fs_stat(int fd, struct fs_stat *buf);
 
 EXPORTED int get_bsz(int fd, int *bsz);
 
+EXPORTED int openat_direct(int dirfd, const char *pathname, int flags,
+                           mode_t mode);
+
 EXPORTED int openat_directory(int dirfd, const char *pathname, int flags,
                               int nofollow);
 
 EXPORTED int openat_tmpfile(int dirfd, const char *pathname, int flags,
                             mode_t mode);
+
+EXPORTED int fcntl_setfl_direct(int fd);
 
 EXPORTED ssize_t file_send(int out_fd, int in_fd, int64_t *offset,
                            size_t count);
