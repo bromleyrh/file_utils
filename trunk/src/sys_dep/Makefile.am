@@ -22,6 +22,12 @@ src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/fifo_transfer.c
 endif
 
 if LINUX
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/file_punch.c
+else
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/file_punch.c
+endif
+
+if LINUX
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/file_send.c
 else
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/file_send.c

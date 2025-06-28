@@ -4,7 +4,7 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#define _GNU_SOURCE
+#include "sys_dep.h"
 
 #define MIN_MAX_MACROS
 #include "common.h"
@@ -120,21 +120,14 @@ do_create_holes(struct file_info *fi, uint64_t begin, uint64_t end)
 {
     int err = 0;
 
-    (void)fi;
-    (void)begin;
-    (void)end;
-
-#if defined(FALLOC_FL_PUNCH_HOLE) && defined(FALLOC_FL_KEEP_SIZE)
-    if (fallocate(fi->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
-                  begin * BLKSIZE, (end + 1 - begin) * BLKSIZE) == -1) {
+    if (file_punch(fi->fd, begin * BLKSIZE, (end + 1 - begin) * BLKSIZE,
+                   FILE_PUNCH_KEEP_SIZE)
+        == -1) {
         error(0, errno, "Error creating hole in file");
         if (errno != EINTR)
             return errno;
         err = EINTR;
     }
-#else
-    return ENOTSUP;
-#endif
 
     if (preserve_times) {
         struct timespec times[2];

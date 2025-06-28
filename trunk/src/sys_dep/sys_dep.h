@@ -43,6 +43,8 @@ struct fs_stat {
 #define CONTEXT_SEM_UNDO_LIST   256
 #define CONTEXT_USERS           512
 
+#define FILE_PUNCH_KEEP_SIZE 1
+
 EXPORTED int context_new(int flags);
 
 EXPORTED int get_fs_stat_path(const char *path, struct fs_stat *buf);
@@ -64,6 +66,8 @@ EXPORTED int fcntl_setfl_direct(int fd);
 
 EXPORTED ssize_t file_send(int out_fd, int in_fd, int64_t *offset,
                            size_t count);
+
+EXPORTED int file_punch(int fd, int64_t offset, int64_t len, unsigned flags);
 
 EXPORTED ssize_t fifo_transfer(int fd_in, int64_t *off_in, int fd_out,
                                int64_t *off_out, size_t len, unsigned partial);

@@ -131,7 +131,8 @@ src_simpledb_LDADD = @libutil_link_dep@
 src_sparse_scan_SOURCES = src/sparse_scan.c
 src_sparse_scan_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags) @libutil_cppflags@
 src_sparse_scan_CFLAGS = $(AM_CFLAGS)
-src_sparse_scan_LDADD = @libutil_link_dep@
+src_sparse_scan_LDADD = src/sys_dep/libsys.a @libutil_link_dep@
+src_sparse_scan_DEPENDENCIES = src/sys_dep/libsys.a
 
 src_tmpfile_SOURCES = src/tmpfile.c
 src_tmpfile_CPPFLAGS = $(AM_CPPFLAGS) $(bin_cppflags)
