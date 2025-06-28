@@ -72,6 +72,8 @@ EXPORTED int file_punch(int fd, int64_t offset, int64_t len, unsigned flags);
 EXPORTED ssize_t fifo_transfer(int fd_in, int64_t *off_in, int fd_out,
                                int64_t *off_out, size_t len, unsigned partial);
 
+EXPORTED ssize_t fifo_copy(int fd_in, int fd_out, size_t len, unsigned partial);
+
 EXPORTED int fsync_fs(int fd);
 
 #endif

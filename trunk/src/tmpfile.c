@@ -4,8 +4,6 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#define _GNU_SOURCE
-
 #include "sys_dep.h"
 
 #include <strings_ext.h>
@@ -36,7 +34,7 @@ static int close_stdout_pipe(int [2]);
 static int open_file(char *);
 
 static ssize_t do_copy(int, int);
-static ssize_t do_tee(int, int);
+static ssize_t do_fifo_copy(int, int);
 static ssize_t do_fifo_transfer(int, int);
 
 static int copy_file(int, int, int [2], int);
@@ -165,9 +163,9 @@ do_copy(int fd_in, int fd_out)
 }
 
 static ssize_t
-do_tee(int fd_in, int fd_out)
+do_fifo_copy(int fd_in, int fd_out)
 {
-    return tee(fd_in, fd_out, MAX_LEN, 0);
+    return fifo_copy(fd_in, fd_out, MAX_LEN, 0);
 }
 
 static ssize_t
@@ -185,7 +183,7 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
 
     if (stdout_pipe[0] == STDOUT_FILENO) {
         for (;;) {
-            ret = do_tee(fd_in, STDOUT_FILENO);
+            ret = do_fifo_copy(fd_in, STDOUT_FILENO);
             if (ret < 1)
                 break;
 
@@ -195,7 +193,7 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
         }
     } else if (stdout_splice) {
         for (;;) {
-            ret = do_tee(fd_in, stdout_pipe[1]);
+            ret = do_fifo_copy(fd_in, stdout_pipe[1]);
             if (ret < 1)
                 break;
             ret = do_fifo_transfer(stdout_pipe[0], STDOUT_FILENO);
@@ -208,7 +206,7 @@ copy_file(int fd_in, int fd_out, int stdout_pipe[2], int stdout_splice)
         }
     } else if (stdout_pipe[0] >= 0) {
         for (;;) {
-            ret = do_tee(fd_in, stdout_pipe[1]);
+            ret = do_fifo_copy(fd_in, stdout_pipe[1]);
             if (ret < 1)
                 break;
             ret = do_copy(stdout_pipe[0], STDOUT_FILENO);

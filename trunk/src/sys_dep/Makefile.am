@@ -16,6 +16,12 @@ src_sys_dep_libsys_a_SOURCES = src/sys_dep/generic/context_new.c
 endif
 
 if LINUX
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/fifo_copy.c
+else
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/fifo_copy.c
+endif
+
+if LINUX
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/fifo_transfer.c
 else
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/fifo_transfer.c
