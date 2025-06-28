@@ -161,7 +161,7 @@ mount_ns_unshare()
     struct libmnt_table *tbl;
 
     /* requires CAP_SYS_ADMIN */
-    if (unshare(CLONE_NEWNS) == -1) {
+    if (context_new(CONTEXT_NS) == -1) {
         ret = -errno;
         error(0, errno, "Error unsharing namespace");
         return ret;

@@ -32,6 +32,19 @@ struct fs_stat {
     uint64_t    f_flags;    /* mount flags of file system */
 };
 
+#define CONTEXT_FILE_TAB        1
+#define CONTEXT_FS_ATTRS        2
+#define CONTEXT_HOST            4
+#define CONTEXT_NET             8
+#define CONTEXT_NS              16
+#define CONTEXT_NS_IPC          32
+#define CONTEXT_PROC_TAB        64
+#define CONTEXT_RESOURCES       128
+#define CONTEXT_SEM_UNDO_LIST   256
+#define CONTEXT_USERS           512
+
+EXPORTED int context_new(int flags);
+
 EXPORTED int get_fs_stat_path(const char *path, struct fs_stat *buf);
 
 EXPORTED int get_fs_stat(int fd, struct fs_stat *buf);
