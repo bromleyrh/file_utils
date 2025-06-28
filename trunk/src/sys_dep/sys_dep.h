@@ -63,6 +63,8 @@ EXPORTED ssize_t file_send(int out_fd, int in_fd, int64_t *offset,
 EXPORTED ssize_t fifo_transfer(int fd_in, int64_t *off_in, int fd_out,
                                int64_t *off_out, size_t len, unsigned partial);
 
+EXPORTED int fsync_fs(int fd);
+
 #endif
 
 /* vi: set expandtab sw=4 ts=4: */

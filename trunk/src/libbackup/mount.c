@@ -2,8 +2,6 @@
  * mount.c
  */
 
-#define _GNU_SOURCE
-
 #include "config.h"
 
 #include "backup.h"
@@ -323,8 +321,8 @@ unmount_file_system(const char *path, int rootfd)
         /* explicitly synchronize file system for greater assurance of data
            integrity if file system is writable (however, this should be
            unnecessary) */
-#ifdef HAVE_SYNCFS
-        syncfs(rootfd);
+#ifdef SYS_DEP_FSYNC_FS
+        fsync_fs(rootfd);
 #else
         sync();
 #endif

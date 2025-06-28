@@ -28,6 +28,17 @@ src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/file_send.c
 endif
 
 if LINUX
+if HAVE_SYNCFS
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/fsync_fs.c
+sys_dep_cppflags += -DSYS_DEP_FSYNC_FS
+else
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/fsync_fs.c
+endif
+else
+src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/fsync_fs.c
+endif
+
+if LINUX
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/get_fs_stat.c
 else
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/get_fs_stat.c
