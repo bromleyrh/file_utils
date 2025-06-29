@@ -19,4 +19,15 @@ _setresuid(uid_t ruid, uid_t euid, uid_t suid)
     return -1;
 }
 
+int
+_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
+{
+    (void)rgid;
+    (void)egid;
+    (void)sgid;
+
+    errno = ENOTSUP;
+    return -1;
+}
+
 /* vi: set expandtab sw=4 ts=4: */

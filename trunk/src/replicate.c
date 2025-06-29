@@ -271,7 +271,7 @@ init_privs()
 
     /* FIXME: needed to mount file systems; prevents invoking user from sending
        signals to replicate */
-    if (_setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
+    if (_setresuid(0, 0, 0) == -1 || _setresgid(0, 0, 0) == -1)
         return ERR_TAG(errno);
 
     return set_capabilities();
