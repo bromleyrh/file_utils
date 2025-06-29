@@ -412,7 +412,7 @@ do_copy(struct copy_args *copy_args)
         goto err1;
     }
 
-    if (setgroups(0, NULL) == -1) {
+    if (_setgroups(0, NULL) == -1) {
         ret = errno;
         error(0, ret, "Error setting groups");
         ret = ERR_TAG(ret);
@@ -456,7 +456,7 @@ do_copy(struct copy_args *copy_args)
         goto err4;
 
     ret = seteuid(euid) == 0 && setegid(egid) == 0
-          && setgroups(nsgids, sgids) == 0
+          && _setgroups(nsgids, sgids) == 0
           ? 0 : ERR_TAG(errno);
 
     free(sgids);
@@ -468,7 +468,7 @@ err4:
 err3:
     (void)(tmp = setegid(egid));
 err2:
-    setgroups(nsgids, sgids);
+    _setgroups(nsgids, sgids);
 err1:
     free(sgids);
     return ret;

@@ -113,7 +113,7 @@ src_open_pipes_LDADD = @libutil_link_dep@
 
 src_replicate_SOURCES = src/debug.c src/replicate.c src/replicate_conf.c \
 	src/replicate_trans.c src/util.c
-src_replicate_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
+src_replicate_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \
 	@libutil_cppflags@ $(trace_cppflags)
 src_replicate_CFLAGS = $(AM_CFLAGS)
