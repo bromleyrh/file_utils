@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "debug.h"
+#include "sys_dep.h"
 #include "verify_common.h"
 #include "verify_conf.h"
 #include "verify_scan.h"
@@ -366,7 +367,7 @@ init_privs()
 
     /* FIXME: needed to mount file systems; prevents invoking user from sending
        signals to verify */
-    if (setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
+    if (_setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
         return ERR_TAG(errno);
 
     return set_capabilities();

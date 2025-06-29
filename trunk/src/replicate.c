@@ -7,6 +7,7 @@
 #include "replicate_common.h"
 #include "replicate_conf.h"
 #include "replicate_trans.h"
+#include "sys_dep.h"
 #include "util.h"
 
 #include <dbus/dbus.h>
@@ -270,7 +271,7 @@ init_privs()
 
     /* FIXME: needed to mount file systems; prevents invoking user from sending
        signals to replicate */
-    if (setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
+    if (_setresuid(0, 0, 0) == -1 || setresgid(0, 0, 0) == -1)
         return ERR_TAG(errno);
 
     return set_capabilities();

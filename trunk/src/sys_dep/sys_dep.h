@@ -47,6 +47,8 @@ struct fs_stat {
 
 EXPORTED int context_new(int flags);
 
+EXPORTED int _setresuid(uid_t ruid, uid_t euid, uid_t suid);
+
 EXPORTED int get_fs_stat_path(const char *path, struct fs_stat *buf);
 
 EXPORTED int get_fs_stat(int fd, struct fs_stat *buf);
