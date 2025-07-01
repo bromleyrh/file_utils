@@ -1327,12 +1327,11 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
         if (err)
             goto err4;
 
-        if (op == OP_ABORT_TRANS || op == OP_COMMIT_TRANS) {
-            if (op == OP_ABORT_TRANS) {
-                err = -ECANCELED;
-                goto err4;
-            }
+        if (op == OP_COMMIT_TRANS)
             goto end;
+        if (op == OP_ABORT_TRANS) {
+            err = -ECANCELED;
+            goto err4;
         }
 
         /* receive key */
