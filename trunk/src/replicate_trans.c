@@ -20,7 +20,6 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
-#include <fenv.h>
 #include <grp.h>
 #include <limits.h>
 #include <signal.h>
@@ -312,14 +311,13 @@ copy_cb(int fd, int dirfd, const char *name, const char *path, struct stat *s,
 
     pcnt = 100.0 * cctx->bytescopied / cctx->fsbytesused;
     if (debug) {
-        double throughput;
+        double throughput, tm;
         struct timespec curtm, difftm;
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
         timespec_diff(&curtm, &cctx->starttm, &difftm);
-        throughput = cctx->bytescopied
-                     / (difftm.tv_sec + difftm.tv_nsec * 1e-9)
-                     / (1024 * 1024);
+        tm = difftm.tv_sec + difftm.tv_nsec * 1e-9;
+        throughput = tm == 0.0 ? 0.0 : cctx->bytescopied / tm / (1024 * 1024);
         infomsgf("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
     }
     ret = broadcast_progress(cctx->busconn, pcnt);
@@ -334,7 +332,6 @@ static int
 copy_fn(void *arg)
 {
     extern uint64_t nfilesproc;
-    int fexcepts = 0;
     int fl;
     int ret;
     struct copy_args *cargs = arg;
@@ -366,23 +363,12 @@ copy_fn(void *arg)
 
     cctx.hookumask = umask(0);
 
-    if (debug) {
-        /* disable floating-point traps from calculations for debugging
-           output */
-        fexcepts = fedisableexcept(FE_ALL_EXCEPT);
-        if (fexcepts == -1) {
-            TRACE(0, "fedisableexcept()");
-            return ERR_TAG(EIO);
-        }
-    }
-
     clock_gettime(CLOCK_MONOTONIC_RAW, &cctx.starttm);
 
     ret = dir_copy_fd(cargs->srcfd, cargs->dstfd, fl, &copy_cb, &cctx);
     if (ret < 0)
         ret = ERR_TAG(-ret);
     if (debug) {
-        feenableexcept(fexcepts);
         infochr('\n');
     }
     if (cctx.lastpath != NULL)
