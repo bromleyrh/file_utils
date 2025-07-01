@@ -60,7 +60,7 @@ static int fs_supports_tmpfile(__fsword_t);
 static int check_protected_hard_links(void);
 
 static int getsgids(gid_t **, int *);
-static int check_creds(uid_t, gid_t, uid_t, gid_t);
+static int check_creds(uid_t, gid_t, uid_t, gid_t, const gid_t *, int);
 
 static int broadcast_progress(DBusConnection *, double);
 
@@ -159,12 +159,22 @@ getsgids(gid_t **sgids, int *nsgids)
 }
 
 static int
-check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid)
+check_creds(uid_t ruid, gid_t rgid, uid_t uid, gid_t gid, const gid_t *sgids,
+            int nsgids)
 {
+    int i;
+
     if (ruid == 0 || ruid == uid)
         return 0;
 
-    return rgid == gid || group_member(gid) ? 0 : ERR_TAG(EPERM);
+    if (rgid == gid)
+        return 0;
+    for (i = 0; i < nsgids; i++) {
+        if (sgids[i] == gid)
+            return 0;
+    }
+
+    return ERR_TAG(EPERM);
 }
 
 static int
@@ -403,22 +413,24 @@ do_copy(struct copy_args *copy_args)
                 "errors may occur\n");
     }
 
-    ret = check_creds(ruid, rgid, copy_args->uid, copy_args->gid);
-    if (ret != 0) {
-        error(0, 0, "Credentials invalid");
-        return ret;
-    }
-
     ret = getsgids(&sgids, &nsgids);
     if (ret != 0) {
         error(0, -err_get_code(ret), "Error getting groups");
         return ret;
     }
+
+    ret = check_creds(ruid, rgid, copy_args->uid, copy_args->gid, sgids,
+                      nsgids);
+    if (ret != 0) {
+        error(0, 0, "Credentials invalid");
+        goto err1;
+    }
+
     if (setgroups(0, NULL) == -1) {
         ret = errno;
         error(0, ret, "Error setting groups");
-        free(sgids);
-        return ERR_TAG(ret);
+        ret = ERR_TAG(ret);
+        goto err1;
     }
 
     egid = getegid();
@@ -426,28 +438,28 @@ do_copy(struct copy_args *copy_args)
         ret = errno;
         error(0, ret, "Error changing group");
         ret = ERR_TAG(ret);
-        goto err1;
+        goto err2;
     }
     euid = geteuid();
     if (copy_args->uid != (uid_t)-1 && seteuid(copy_args->uid) == -1) {
         ret = errno;
         error(0, ret, "Error changing user");
         ret = ERR_TAG(ret);
-        goto err2;
+        goto err3;
     }
 
     /* allow preservation of set-group-ID mode bits */
     caps = cap_get_proc();
     if (caps == NULL) {
         ret = ERR_TAG(errno);
-        goto err3;
+        goto err4;
     }
     if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &capval_fsetid, CAP_SET) == -1
         || cap_set_proc(caps) == -1) {
         ret = errno;
         error(0, ret, "Error setting process privileges");
         ret = ERR_TAG(ret);
-        goto err3;
+        goto err4;
     }
     cap_free(caps);
 
@@ -455,7 +467,7 @@ do_copy(struct copy_args *copy_args)
 
     ret = copy_fn(copy_args);
     if (ret != 0)
-        goto err3;
+        goto err4;
 
     ret = seteuid(euid) == 0 && setegid(egid) == 0
           && setgroups(nsgids, sgids) == 0
@@ -465,12 +477,13 @@ do_copy(struct copy_args *copy_args)
 
     return ret;
 
-err3:
+err4:
     (void)(tmp = seteuid(euid));
-err2:
+err3:
     (void)(tmp = setegid(egid));
-err1:
+err2:
     setgroups(nsgids, sgids);
+err1:
     free(sgids);
     return ret;
 }
