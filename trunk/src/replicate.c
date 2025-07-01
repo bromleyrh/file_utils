@@ -142,31 +142,6 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
     }
 }
 
-void
-debug_print(const char *fmt, ...)
-{
-    if (debug) {
-        va_list ap;
-
-        va_start(ap, fmt);
-        vfprintf(stderr, fmt, ap);
-        va_end(ap);
-        fputc('\n', stderr);
-    }
-}
-
-void
-log_print(int priority, const char *fmt, ...)
-{
-    if (log_transfers) {
-        va_list ap;
-
-        va_start(ap, fmt);
-        vsyslog(priority, fmt, ap);
-        va_end(ap);
-    }
-}
-
 static int
 enable_debugging_features(int trace)
 {
@@ -699,15 +674,15 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
             err = pthread_sigmask(SIG_SETMASK, &oldset, NULL);
             if (err)
                 return ERR_TAG(err);
-            log_print(LOG_INFO, "Stopping before transfer %d", i);
+            LOG_PRINT(LOG_INFO, "Stopping before transfer %d", i);
             break;
         }
         err = pthread_sigmask(SIG_SETMASK, &oldset, NULL);
         if (err)
             return ERR_TAG(err);
 
-        debug_print("Transfer %d:", i + 1);
-        log_print(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
+        DEBUG_PRINT("Transfer %d:", i + 1);
+        LOG_PRINT(LOG_INFO, "Starting transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
 
         if (transfer->hook != NULL) {
@@ -822,7 +797,7 @@ do_transfers(struct replicate_ctx *ctx, int sessid)
         if (ca.hookfd != -1)
             close(ca.hookfd);
 
-        log_print(LOG_INFO, "Finished transfer %d: %s -> %s", i + 1,
+        LOG_PRINT(LOG_INFO, "Finished transfer %d: %s -> %s", i + 1,
                   transfer->srcpath, transfer->dstpath);
 
         err = sess_record_complete(sesspath, transfer->srcpath);

@@ -451,7 +451,7 @@ do_copy(struct copy_args *copy_args)
     }
     cap_free(caps);
 
-    debug_print("Performing copy");
+    DEBUG_PUTS("Performing copy");
 
     ret = copy_fn(copy_args);
     if (ret != 0)

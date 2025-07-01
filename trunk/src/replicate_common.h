@@ -8,6 +8,7 @@
 #include <dbus/dbus.h>
 
 #include <stdio.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #define FORMAT_CMD_DEST_SPECIFIER "$dest"
@@ -41,10 +42,28 @@ extern gid_t rgid;
 
 #define TRACE(err, ...) trace(__FILE__, __func__, __LINE__, err, __VA_ARGS__)
 
+#define DEBUG_PUTS(str) \
+    do { \
+        if (debug) \
+            fputs(str "\n", stderr); \
+    } while (0)
+
+#define DEBUG_PRINT(fmt, ...) \
+    do { \
+        if (debug) { \
+            fprintf(stderr, fmt, __VA_ARGS__); \
+            fputc('\n', stderr); \
+        } \
+    } while (0)
+
+#define LOG_PRINT(priority, fmt, ...) \
+    do { \
+        if (log_transfers) \
+            syslog(priority, fmt, __VA_ARGS__); \
+    } while (0)
+
 void trace(const char *file, const char *func, int line, int err,
            const char *fmt, ...);
-void debug_print(const char *fmt, ...);
-void log_print(int priority, const char *fmt, ...);
 
 int do_transfers(struct replicate_ctx *ctx, int sessid);
 void print_transfers(FILE *, struct transfer *transfers, int num);
