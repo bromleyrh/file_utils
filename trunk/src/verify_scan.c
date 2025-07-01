@@ -907,8 +907,8 @@ verif_fn(void *arg)
     wctx.filesprocessed = 0;
     wctx.use_direct_io = direct_io_supported(&s);
 
-    wctx.buf1 = mmap(NULL, wctx.bufsz, PROT_READ | PROT_WRITE,
-                     MAP_ANONYMOUS | MAP_PRIVATE | hugetlbfl, -1, 0);
+    wctx.buf1 = mmap_anonymous(NULL, wctx.bufsz, PROT_READ | PROT_WRITE,
+                               MAP_PRIVATE | hugetlbfl, -1, 0);
     if (wctx.buf1 == MAP_FAILED) {
         err = ERR_TAG(errno);
         goto alloc_err2;
