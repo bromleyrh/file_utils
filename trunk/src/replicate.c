@@ -66,6 +66,8 @@ uint64_t nfilesproc;
 
 static volatile sig_atomic_t end;
 
+static int clear_env(void);
+
 static int enable_debugging_features(int);
 
 static int set_capabilities(void);
@@ -140,6 +142,43 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
 #endif
         errno = old_errno;
     }
+}
+
+static int
+clear_env()
+{
+    char *buf;
+    char **env;
+    extern char **environ;
+    int err;
+
+    for (env = environ; *env != NULL; env++) {
+        char *end;
+
+        buf = strdup(*env);
+        if (buf == NULL)
+            return -errno;
+
+        end = strchr(buf, '=');
+        if (end == NULL) {
+            err = -EIO;
+            goto err;
+        }
+        *end = '\0';
+
+        if (unsetenv(buf) == -1) {
+            err = -errno;
+            goto err;
+        }
+
+        free(buf);
+    }
+
+    return 0;
+
+err:
+    free(buf);
+    return err;
 }
 
 static int
@@ -877,7 +916,7 @@ main(int argc, char **argv)
     int sessid;
     struct replicate_ctx ctx;
 
-    if (getuid() != 0 && clearenv() != 0)
+    if (getuid() != 0 && clear_env() != 0)
         return EXIT_FAILURE;
 
     if (setvbuf(stdout, NULL, _IOLBF, 0) != 0)
