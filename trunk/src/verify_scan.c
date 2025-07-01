@@ -101,7 +101,7 @@ static int check_creds(uid_t, gid_t, uid_t, gid_t, const gid_t *, int);
 static int print_chksum(FILE *, unsigned char *, unsigned);
 
 static int get_io_size(ssize_t *, int);
-#ifdef MAP_HUGETLB
+#ifdef HAVE_MAP_HUGETLB
 static int get_huge_page_size(int64_t *);
 #endif
 
@@ -222,7 +222,7 @@ get_io_size(ssize_t *bufsz, int rootfd)
 #endif
 }
 
-#ifdef MAP_HUGETLB
+#ifdef HAVE_MAP_HUGETLB
 
 #define MEMINFO "/proc/meminfo"
 #define HUGE_PAGE_SIZE_KEY "Hugepagesize:"
@@ -864,12 +864,13 @@ verif_fn(void *arg)
 {
     extern uint64_t nfilesproc;
     int err;
-    int hugetlbfl, nhugep;
+    int nhugep;
     int64_t fullbufsize = 0;
     ssize_t bufsz;
     struct fs_stat s;
     struct verif_args *vargs = arg;
     struct verif_walk_ctx wctx;
+    unsigned hugetlbfl;
 
     err = get_io_size(&bufsz, vargs->srcfd);
     if (err)
@@ -880,7 +881,7 @@ verif_fn(void *arg)
     }
     wctx.bufsz = bufsz * 2;
 
-#ifdef MAP_HUGETLB
+#ifdef HAVE_MAP_HUGETLB
     err = get_huge_page_size(&fullbufsize);
     if (err || fullbufsize == 0) {
         if (err)
@@ -888,7 +889,7 @@ verif_fn(void *arg)
         hugetlbfl = 0;
         fullbufsize = wctx.bufsz;
     } else {
-        hugetlbfl = MAP_HUGETLB;
+        hugetlbfl = 1;
         nhugep = (wctx.bufsz + fullbufsize - 1) / fullbufsize;
         if ((size_t)fullbufsize < wctx.bufsz)
             fullbufsize *= nhugep;
@@ -908,7 +909,7 @@ verif_fn(void *arg)
     wctx.use_direct_io = direct_io_supported(&s);
 
     wctx.buf1 = mmap_anonymous(NULL, wctx.bufsz, PROT_READ | PROT_WRITE,
-                               MAP_PRIVATE | hugetlbfl, -1, 0);
+                               MAP_PRIVATE, hugetlbfl, -1, 0);
     if (wctx.buf1 == MAP_FAILED) {
         err = ERR_TAG(errno);
         goto alloc_err2;

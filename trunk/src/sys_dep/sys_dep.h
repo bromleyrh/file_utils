@@ -54,7 +54,7 @@ EXPORTED int _setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 EXPORTED int _setgroups(size_t size, const gid_t *list);
 
 EXPORTED void *mmap_anonymous(void *addr, size_t length, int prot, int flags,
-                              int fd, int64_t offset);
+                              unsigned huge_pages, int fd, int64_t offset);
 
 EXPORTED int get_fs_stat_path(const char *path, struct fs_stat *buf);
 

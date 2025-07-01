@@ -180,6 +180,7 @@ EOF
            ]
           )
 
+     AX_MAP_HUGETLB
      AX_O_TMPFILE
 
      AC_CHECK_FUNCS([syncfs])
@@ -233,6 +234,7 @@ AM_CONDITIONAL([HAVE_LIBXFS], [test "x$libxfs" = "xtrue"])
 
 AM_CONDITIONAL([HAVE_SYNCFS], [test "x$ac_cv_func_syncfs" = "xyes"])
 
+AM_CONDITIONAL([HAVE_MAP_HUGETLB], [test "x$ax_cv_map_hugetlb" = "xyes"])
 AM_CONDITIONAL([HAVE_O_TMPFILE], [test "x$ax_cv_o_tmpfile" = "xyes"])
 
 PKG_CHECK_MODULES([libutil], [libutil],

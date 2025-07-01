@@ -142,7 +142,7 @@ src_tmpfile_DEPENDENCIES = src/sys_dep/libsys.a
 
 src_verify_SOURCES = src/debug.c src/util.c src/verify.c src/verify_conf.c \
 	src/verify_io.c src/verify_scan.c
-src_verify_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
+src_verify_CPPFLAGS = $(AM_CPPFLAGS) -D_FILE_OFFSET_BITS=64 \
 	-Isrc/libbackup/include $(bin_cppflags) @dbus_cppflags@ @libjson_cppflags@ \
 	@libutil_cppflags@ @openssl_cppflags@ $(trace_cppflags)
 src_verify_CFLAGS = $(AM_CFLAGS)

@@ -64,6 +64,9 @@ endif
 
 if LINUX
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/linux/mmap_anonymous.c
+if HAVE_MAP_HUGETLB
+sys_dep_cppflags += -DSYS_DEP_MAP_HUGETLB
+endif
 else
 src_sys_dep_libsys_a_SOURCES += src/sys_dep/generic/mmap_anonymous.c
 endif

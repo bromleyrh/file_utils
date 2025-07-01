@@ -11,13 +11,14 @@
 #include <sys/mman.h>
 
 void *
-mmap_anonymous(void *addr, size_t length, int prot, int flags, int fd,
-               int64_t offset)
+mmap_anonymous(void *addr, size_t length, int prot, int flags,
+               unsigned huge_pages, int fd, int64_t offset)
 {
     (void)addr;
     (void)length;
     (void)prot;
     (void)flags;
+    (void)huge_pages;
     (void)fd;
     (void)offset;
 
