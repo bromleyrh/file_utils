@@ -1606,12 +1606,9 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
         goto end;
 
     /* send key */
-    if (key->type == KEY_INTERNAL)
-        err = write_msg((char *)&key->id, sizeof(key->id), sockfd);
-    else {
-        /* FIXME: avoid cast to non-const type */
-        err = write_msg((char *)key->key, keylen, sockfd);
-    }
+    err = key->type == KEY_INTERNAL
+          ? write_msg((char *)&key->id, sizeof(key->id), sockfd)
+          : write_msg((char *)key->key, keylen, sockfd);
     if (err)
         goto err;
     err = write_msg(NULL, 0, sockfd);
