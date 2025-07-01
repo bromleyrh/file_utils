@@ -70,15 +70,35 @@ struct plugin_list {
 
 #define TRACE(err, ...) trace(__FILE__, __func__, __LINE__, err, __VA_ARGS__)
 
+#define DEBUG_PUTS(str) \
+    do { \
+        if (debug) \
+            fputs(str "\n", stderr); \
+    } while (0)
+
+#define _DEBUG_EOL() fputc('\n', stderr)
+
+#define _DEBUG_PRINT(print_suffix, fmt, ...) \
+    do { \
+        if (debug) { \
+            fprintf(stderr, fmt, __VA_ARGS__); \
+            print_suffix; \
+        } \
+    } while (0)
+
 #define DEBUG_PRINT(...) \
-    debug_print(1, __VA_ARGS__)
+    _DEBUG_PRINT(_DEBUG_EOL(), __VA_ARGS__)
 #define DEBUG_PRINT_NO_NL(...) \
-    debug_print(0, __VA_ARGS__)
+    _DEBUG_PRINT(, __VA_ARGS__)
+
+#define LOG_PRINT(priority, fmt, ...) \
+    do { \
+        if (log_verifs) \
+            syslog(priority, fmt, __VA_ARGS__); \
+    } while (0)
 
 void trace(const char *file, const char *func, int line, int err,
            const char *fmt, ...);
-void debug_print(int nl, const char *fmt, ...);
-void log_print(int priority, const char *fmt, ...);
 
 int do_verifs(struct verify_ctx *ctx);
 void print_verifs(FILE *f, struct verif *verifs, int num);

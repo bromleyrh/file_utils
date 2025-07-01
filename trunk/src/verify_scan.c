@@ -1037,7 +1037,7 @@ do_verif(struct verif_args *verif_args)
         goto err2;
     }
 
-    DEBUG_PRINT("Performing verification");
+    DEBUG_PUTS("Performing verification");
 
     ret = verif_fn(verif_args);
     if (ret != 0)

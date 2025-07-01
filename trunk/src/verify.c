@@ -152,32 +152,6 @@ trace(const char *file, const char *func, int line, int err, const char *fmt,
     }
 }
 
-void
-debug_print(int nl, const char *fmt, ...)
-{
-    if (debug) {
-        va_list ap;
-
-        va_start(ap, fmt);
-        vfprintf(stderr, fmt, ap);
-        va_end(ap);
-        if (nl)
-            fputc('\n', stderr);
-    }
-}
-
-void
-log_print(int priority, const char *fmt, ...)
-{
-    if (log_verifs) {
-        va_list ap;
-
-        va_start(ap, fmt);
-        vsyslog(priority, fmt, ap);
-        va_end(ap);
-    }
-}
-
 static signed char
 from_hex(char hexchar)
 {
@@ -901,7 +875,7 @@ do_verifs(struct verify_ctx *ctx)
         verif = &ctx->verifs[i];
 
         DEBUG_PRINT("Verification %d:", i + 1);
-        log_print(LOG_INFO, "Starting verifcation %d: %s", i + 1,
+        LOG_PRINT(LOG_INFO, "Starting verifcation %d: %s", i + 1,
                   verif->srcpath);
 
         if (verif->check_cmd != NULL) {
@@ -960,7 +934,7 @@ do_verifs(struct verify_ctx *ctx)
             goto err1;
         }
 
-        log_print(LOG_INFO, "Finished verifcation %d: %s", i + 1,
+        LOG_PRINT(LOG_INFO, "Finished verifcation %d: %s", i + 1,
                   verif->srcpath);
     }
 
