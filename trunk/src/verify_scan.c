@@ -34,7 +34,6 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
-#include <fenv.h>
 #include <grp.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -446,7 +445,7 @@ err1:
 static int
 verif_chksums_cb(int fd, off_t flen, void *ctx)
 {
-    double pcnt, throughput;
+    double pcnt, throughput, tm;
     int err;
     struct timespec curtm, difftm;
     struct verif_walk_ctx *wctx = ctx;
@@ -460,9 +459,8 @@ verif_chksums_cb(int fd, off_t flen, void *ctx)
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &curtm);
     timespec_diff(&curtm, &wctx->starttm, &difftm);
-    throughput = wctx->bytesverified
-                 / (difftm.tv_sec + difftm.tv_nsec * 1e-9)
-                 / (1024 * 1024);
+    tm = difftm.tv_sec + difftm.tv_nsec * 1e-9;
+    throughput = tm == 0.0 ? 0.0 : wctx->bytesverified / tm / (1024 * 1024);
     DEBUG_PRINT_NO_NL("\rProgress: %.6f%% (%11.6f MiB/s)", pcnt, throughput);
     if (debug)
         wctx->incomplete_line_output = 1;
@@ -866,7 +864,6 @@ verif_fn(void *arg)
 {
     extern uint64_t nfilesproc;
     int err;
-    int fexcepts = 0;
     int hugetlbfl, nhugep;
     int64_t fullbufsize = 0;
     ssize_t bufsz;
@@ -953,21 +950,10 @@ verif_fn(void *arg)
     wctx.prefix = vargs->prefix;
     wctx.incomplete_line_output = 0;
 
-    if (debug) {
-        /* disable floating-point traps from calculations for debugging
-           output */
-        fexcepts = fedisableexcept(FE_ALL_EXCEPT);
-        if (fexcepts == -1) {
-            TRACE(0, "fedisableexcept()");
-            err = ERR_TAG(EIO);
-            goto end2;
-        }
-    }
-
     wctx.transfer_size = 512 * 1024;
     err = io_state_init(&wctx.io_state);
     if (err)
-        goto end3;
+        goto end2;
 
     wctx.plist = vargs->plist;
 
@@ -979,9 +965,6 @@ verif_fn(void *arg)
 
     io_state_free(wctx.io_state);
 
-end3:
-    if (debug)
-        feenableexcept(fexcepts);
 end2:
     avl_tree_free(wctx.output_data);
 end1:
