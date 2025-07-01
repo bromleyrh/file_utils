@@ -25,7 +25,7 @@ static int (*orig_open64)(const char *, int, ...);
     do { \
         va_list args; \
         va_start(args, flags); \
-        mode = va_arg(args, mode_t); \
+        mode = va_arg(args, int); \
         va_end(args); \
     } while (0); \
 
