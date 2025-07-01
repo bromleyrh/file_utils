@@ -41,6 +41,10 @@
 
 #define CONFIG_ROOT_ID "conf"
 
+struct creat_args {
+    mode_t mode;
+};
+
 static int expand_string(char **, char **, size_t *, size_t);
 
 static int get_gid(const char *, gid_t *);
@@ -206,7 +210,7 @@ open_as_real_user(int *fd, const char *path, int flags, ...)
         va_list ap;
 
         va_start(ap, flags);
-        ret = open(path, flags, va_arg(ap, mode_t));
+        ret = open(path, flags, va_arg(ap, struct creat_args *)->mode);
         va_end(ap);
     } else
         ret = open(path, flags);
