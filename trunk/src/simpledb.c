@@ -2241,7 +2241,7 @@ do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
         return res;
     }
 
-    keybuf = (char *)packed_memb_addr(db_key, &k, key);
+    keybuf = packed_memb_addr(db_key, &k, key);
 
     pack_u32(db_key, &k, type, TYPE_EXTERNAL);
     strlcpy(keybuf, key->key, packed_memb_size(db_key, key));
