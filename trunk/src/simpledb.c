@@ -328,7 +328,7 @@ static int
 db_walk_cb(const void *key, const void *data, size_t datasize, void *ctx)
 {
     const struct db_key *k = key;
-    int datafd = (intptr_t)ctx;
+    int datafd = *(int *)ctx;
     int ret;
 
     switch (unpack_u32(db_key, k, type)) {
@@ -2496,7 +2496,7 @@ do_dump(struct db_ctx *dbctx, int datafd)
 {
     int err;
 
-    err = do_db_hl_walk(dbctx, &db_walk_cb, (void *)(intptr_t)datafd);
+    err = do_db_hl_walk(dbctx, &db_walk_cb, &datafd);
     if (err)
         error(0, -err, "Error reading database file");
 
