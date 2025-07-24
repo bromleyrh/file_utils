@@ -160,6 +160,15 @@ src_xfsutil_DEPENDENCIES = src/sys_dep/libsys.a
 
 else
 
+gen_files = src/simpledb_obj.h
+
+BUILT_SOURCES += $(gen_files)
+
+CLEANFILES += $(gen_files)
+
+src/simpledb_obj.h: src/simpledb_obj.idl
+	idlc <$^ >$@
+
 bin_PROGRAMS += src/simpledb
 
 src_simpledb_SOURCES = src/simpledb.c
