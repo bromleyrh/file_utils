@@ -1782,8 +1782,8 @@ do_insert(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         type = TYPE_EXTERNAL;
-        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
-                packed_memb_size(db_key, key));
+        _strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                 packed_memb_size(db_key, key));
         break;
     default:
         abort();
@@ -1871,8 +1871,8 @@ do_update(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         type = TYPE_EXTERNAL;
-        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
-                packed_memb_size(db_key, key));
+        _strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                 packed_memb_size(db_key, key));
         break;
     default:
         abort();
@@ -1934,8 +1934,8 @@ do_look_up(struct db_ctx *dbctx, struct key *key, void **data, size_t *datalen,
         break;
     case KEY_EXTERNAL:
         type = TYPE_EXTERNAL;
-        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
-                packed_memb_size(db_key, key));
+        _strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                 packed_memb_size(db_key, key));
         break;
     default:
         abort();
@@ -2018,8 +2018,8 @@ do_look_up_nearest(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         type = TYPE_EXTERNAL;
-        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
-                packed_memb_size(db_key, key));
+        _strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                 packed_memb_size(db_key, key));
         break;
     default:
         abort();
@@ -2130,8 +2130,8 @@ do_look_up_next(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         type = TYPE_EXTERNAL;
-        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
-                packed_memb_size(db_key, key));
+        _strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                 packed_memb_size(db_key, key));
         break;
     default:
         abort();
@@ -2244,7 +2244,7 @@ do_look_up_prefix(struct db_ctx *dbctx, struct key *key, int datafd)
     keybuf = packed_memb_addr(db_key, &k, key);
 
     pack_u32(db_key, &k, type, TYPE_EXTERNAL);
-    strlcpy(keybuf, key->key, packed_memb_size(db_key, key));
+    _strlcpy(keybuf, key->key, packed_memb_size(db_key, key));
     res = do_db_hl_iter_search(iter, &k);
     if (res < 0) {
         error(0, -res, "Error reading database file");
@@ -2333,8 +2333,8 @@ do_look_up_prev(struct db_ctx *dbctx, struct key *key, void **data,
         break;
     case KEY_EXTERNAL:
         type = TYPE_EXTERNAL;
-        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
-                packed_memb_size(db_key, key));
+        _strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                 packed_memb_size(db_key, key));
         break;
     default:
         abort();
@@ -2445,8 +2445,8 @@ do_delete(struct db_ctx *dbctx, struct key *key, int notrans)
         break;
     case KEY_EXTERNAL:
         type = TYPE_EXTERNAL;
-        strlcpy(packed_memb_addr(db_key, &k, key), key->key,
-                packed_memb_size(db_key, key));
+        _strlcpy(packed_memb_addr(db_key, &k, key), key->key,
+                 packed_memb_size(db_key, key));
         break;
     default:
         abort();
