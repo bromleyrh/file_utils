@@ -38,6 +38,6 @@ elif [ ! -f $dummy_file ]; then
 	do_configure
 fi
 
-scan-build make
+exec scan-build make
 
 # vi: set noexpandtab sw=4 ts=4:
