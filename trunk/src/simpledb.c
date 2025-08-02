@@ -915,14 +915,12 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
         used_id_set(freeid_used_id, k_id, id, 0);
         pack_u8(db_obj_free_id, &freeid, flags, 0);
         res = do_db_hl_insert(dbctx, &k, &freeid, sizeof(freeid));
-        if (res != 0)
-            return res;
     } else {
         used_id_set(freeid_used_id, k_id, id, 0);
         res = do_db_hl_replace(dbctx, &k, &freeid, sizeof(freeid));
-        if (res != 0)
-            return res;
     }
+    if (res != 0)
+        return res;
 
     pack_u32(db_key, &k, type, TYPE_HEADER);
     res = do_db_hl_look_up(dbctx, &k, NULL, &hdr, NULL, 0);
