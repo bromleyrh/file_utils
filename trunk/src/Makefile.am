@@ -27,10 +27,10 @@ src/simpledb_obj.h: src/simpledb_obj.idl
 	idlc <"$<" >"$@"
 
 src/replicate_gram.h: src/replicate.spec
-	scripts/spec_to_h.pl src/replicate.spec $(replicate_gram_macro) >"$@"
+	scripts/spec_to_h.pl "$<" $(replicate_gram_macro) >"$@"
 
 src/verify_gram.h: src/verify.spec
-	scripts/spec_to_h.pl src/verify.spec $(verify_gram_macro) >"$@"
+	scripts/spec_to_h.pl "$<" $(verify_gram_macro) >"$@"
 
 noinst_LIBRARIES += src/libfileutil.a
 
