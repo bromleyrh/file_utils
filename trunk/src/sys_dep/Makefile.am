@@ -54,15 +54,15 @@ generic_sources += src/sys_dep/generic/fsync_fs.c
 endif
 
 if LINUX
-platform_sources += src/sys_dep/linux/get_fs_stat.c
-else
-generic_sources += src/sys_dep/generic/get_fs_stat.c
-endif
-
-if LINUX
 platform_sources += src/sys_dep/linux/get_bsz.c
 else
 generic_sources += src/sys_dep/generic/get_bsz.c
+endif
+
+if LINUX
+platform_sources += src/sys_dep/linux/get_fs_stat.c
+else
+generic_sources += src/sys_dep/generic/get_fs_stat.c
 endif
 
 if LINUX
