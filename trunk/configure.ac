@@ -115,7 +115,7 @@ AS_IF(
          [sanitizer=]
      )
      AS_IF(
-         [test "x$asan_libs" = "x" || test "x$ubsan_libs" = "x"],
+         [test -z "$asan_libs" || test -z "$ubsan_libs"],
          [sanitizer=]
      )
     ]
