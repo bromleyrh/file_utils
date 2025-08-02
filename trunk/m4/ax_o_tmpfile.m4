@@ -25,7 +25,7 @@ return EXIT_SUCCESS;
         ]
      )
      AS_IF(
-        [test $ax_cv_o_tmpfile = yes],
+        [test $ax_cv_o_tmpfile = "yes"],
         [AC_DEFINE(
             [HAVE_O_TMPFILE],
             [1],

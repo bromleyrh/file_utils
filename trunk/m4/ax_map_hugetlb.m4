@@ -24,7 +24,7 @@ return EXIT_SUCCESS;
         ]
      )
      AS_IF(
-        [test $ax_cv_map_hugetlb = yes],
+        [test $ax_cv_map_hugetlb = "yes"],
         [AC_DEFINE(
             [HAVE_MAP_HUGETLB],
             [1],
