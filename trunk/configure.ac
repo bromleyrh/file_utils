@@ -186,19 +186,11 @@ EOF
      AC_CHECK_FUNCS([syncfs])
 
      AC_CHECK_LIB([mount], [mnt_table_uniq_fs],
-         [AC_DEFINE(
-             [HAVE_MNT_TABLE_UNIQ_FS], [1],
-             [Define if you have the 'mnt_table_uniq_fs' function.]
-          )
-         ]
+         AX_DEFINE_HAVE_FUNC([MNT_TABLE_UNIQ_FS], [mnt_table_uniq_fs])
      )
 
      AC_CHECK_LIB([crypto], [EVP_MD_CTX_new],
-         [AC_DEFINE(
-             [HAVE_EVP_MD_CTX_NEW], [1],
-             [Define if you have the 'EVP_MD_CTX_new' function.]
-          )
-         ]
+         AX_DEFINE_HAVE_FUNC([EVP_MD_CTX_NEW], [EVP_MD_CTX_new])
      )
 
      PKG_CHECK_MODULES([dbus], [dbus-1],
