@@ -226,18 +226,21 @@ parse_cmdline(int argc, char **argv, char **sock_pathname, char **pathname,
               enum op *op, struct key *key, int *trans)
 {
     static const enum op ops[256] = {
-        [(unsigned char)'a'] = OP_ABORT_TRANS,
-        [(unsigned char)'c'] = OP_COMMIT_TRANS,
-        [(unsigned char)'d'] = OP_DELETE,
-        [(unsigned char)'i'] = OP_INSERT,
-        [(unsigned char)'L'] = OP_LOOK_UP_NEAREST,
-        [(unsigned char)'l'] = OP_LOOK_UP,
-        [(unsigned char)'P'] = OP_LOOK_UP_PREFIX,
-        [(unsigned char)'p'] = OP_LOOK_UP_PREV,
-        [(unsigned char)'s'] = OP_LOOK_UP_NEXT,
-        [(unsigned char)'T'] = OP_INIT_TRANS,
-        [(unsigned char)'u'] = OP_UPDATE,
-        [(unsigned char)'w'] = OP_DUMP
+#define ENTRY(c, op) \
+        [(unsigned char)c] = op
+        ENTRY('a', OP_ABORT_TRANS),
+        ENTRY('c', OP_COMMIT_TRANS),
+        ENTRY('d', OP_DELETE),
+        ENTRY('i', OP_INSERT),
+        ENTRY('L', OP_LOOK_UP_NEAREST),
+        ENTRY('l', OP_LOOK_UP),
+        ENTRY('P', OP_LOOK_UP_PREFIX),
+        ENTRY('p', OP_LOOK_UP_PREV),
+        ENTRY('s', OP_LOOK_UP_NEXT),
+        ENTRY('T', OP_INIT_TRANS),
+        ENTRY('u', OP_UPDATE),
+        ENTRY('w', OP_DUMP)
+#undef ENTRY
     };
 
     for (;;) {
