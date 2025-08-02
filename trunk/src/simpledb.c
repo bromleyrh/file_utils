@@ -1215,7 +1215,7 @@ return_data(enum op op, struct key *key, uint64_t id, char *buf, size_t len,
         if (key->type == KEY_INTERNAL)
             err = write_msg((char *)&key->id, sizeof(key->id), sockfd);
         else
-            err = write_msg((char *)key->key, strlen(key->key) + 1, sockfd);
+            err = write_msg(key->key, strlen(key->key) + 1, sockfd);
         if (err)
             return err;
         err = write_msg(NULL, 0, sockfd);
@@ -1383,7 +1383,7 @@ process_trans(const char *sock_pathname, const char *pathname, int pipefd)
                 goto err5;
             }
             if (key.type == KEY_EXTERNAL)
-                keybuf = (char *)key.key;
+                keybuf = key.key;
         } else
             err = -err;
 
@@ -1608,7 +1608,7 @@ do_update_trans(const char *sock_pathname, enum op op, struct key *key)
     /* send key */
     err = key->type == KEY_INTERNAL
           ? write_msg((char *)&key->id, sizeof(key->id), sockfd)
-          : write_msg((char *)key->key, keylen, sockfd);
+          : write_msg(key->key, keylen, sockfd);
     if (err)
         goto err;
     err = write_msg(NULL, 0, sockfd);
