@@ -156,7 +156,7 @@ typedef int64_t off64_t;
            [m4_define([linux_tmpfile_fs_types], [BTRFS EXT4 F2FS XFS])
             m4_define([linux_tmpfile_fs_type_hash], [(type >> 8) & 0xff])
 
-            m4_foreach_w(i, linux_tmpfile_fs_types, [AX_LINUX_MAGIC(i)])
+            m4_foreach_w(e, linux_tmpfile_fs_types, [AX_LINUX_MAGIC(e)])
 
             printf "" >src/replicate_fs.h
             exec 9>>src/replicate_fs.h
@@ -165,10 +165,10 @@ typedef int64_t off64_t;
 
 #define LIST_LINUX_TMPFILE_FS_TYPES(type) \
 EOF
-            for i in linux_tmpfile_fs_types; do
-                eval "fs=\$ax_cv_linux_${i}_super_magic"
+            for e in linux_tmpfile_fs_types; do
+                eval "fs=\$ax_cv_linux_${e}_super_magic"
                 AS_IF([test $fs = yes],
-                      [printf '    X(type %s) \\\n' ${i}_SUPER_MAGIC >&9]
+                      [printf '    X(type %s) \\\n' ${e}_SUPER_MAGIC >&9]
                      )
             done
             hash_expr="linux_tmpfile_fs_type_hash"
