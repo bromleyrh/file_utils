@@ -230,7 +230,7 @@ EOF
     ]
 )
 
-AM_CONDITIONAL([HAVE_LIBXFS], [test "$libxfs" = "true"])
+AM_CONDITIONAL([HAVE_LIBXFS], [test "$libxfs" = true])
 
 AM_CONDITIONAL([HAVE_SYNCFS], [test "$ac_cv_func_syncfs" = "yes"])
 
