@@ -37,7 +37,7 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_RANLIB
 
-AM_CONDITIONAL([GCC], [test "x$CC" = "xgcc"])
+AM_CONDITIONAL([GCC], [test "$CC" = "gcc"])
 
 AX_CHECK_COMPILE_FLAG([-std=c11], [std_flags="-std=c11"], [std_flags=])
 AC_SUBST([std_flags])
@@ -152,7 +152,7 @@ typedef int64_t off64_t;
 ])
      AC_CHECK_HEADERS([linux/magic.h])
 
-     AS_IF([test "x$ac_cv_header_linux_magic_h" = "xyes"],
+     AS_IF([test "$ac_cv_header_linux_magic_h" = "yes"],
            [m4_define([linux_tmpfile_fs_types], [BTRFS EXT4 F2FS XFS])
             m4_define([linux_tmpfile_fs_type_hash], [(type >> 8) & 0xff])
 
@@ -230,12 +230,12 @@ EOF
     ]
 )
 
-AM_CONDITIONAL([HAVE_LIBXFS], [test "x$libxfs" = "xtrue"])
+AM_CONDITIONAL([HAVE_LIBXFS], [test "$libxfs" = "true"])
 
-AM_CONDITIONAL([HAVE_SYNCFS], [test "x$ac_cv_func_syncfs" = "xyes"])
+AM_CONDITIONAL([HAVE_SYNCFS], [test "$ac_cv_func_syncfs" = "yes"])
 
-AM_CONDITIONAL([HAVE_MAP_HUGETLB], [test "x$ax_cv_map_hugetlb" = "xyes"])
-AM_CONDITIONAL([HAVE_O_TMPFILE], [test "x$ax_cv_o_tmpfile" = "xyes"])
+AM_CONDITIONAL([HAVE_MAP_HUGETLB], [test "$ax_cv_map_hugetlb" = "yes"])
+AM_CONDITIONAL([HAVE_O_TMPFILE], [test "$ax_cv_o_tmpfile" = "yes"])
 
 PKG_CHECK_MODULES([libutil], [libutil],
     [libutil_cppflags=$libutil_CFLAGS
