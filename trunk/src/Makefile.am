@@ -24,7 +24,7 @@ BUILT_SOURCES += $(gen_files)
 CLEANFILES += $(gen_files)
 
 src/simpledb_obj.h: src/simpledb_obj.idl
-	idlc <"$^" >"$@"
+	idlc <"$<" >"$@"
 
 src/replicate_gram.h: src/replicate.spec
 	scripts/spec_to_h.pl src/replicate.spec $(replicate_gram_macro) >"$@"
@@ -167,7 +167,7 @@ BUILT_SOURCES += $(gen_files)
 CLEANFILES += $(gen_files)
 
 src/simpledb_obj.h: src/simpledb_obj.idl
-	idlc <"$^" >"$@"
+	idlc <"$<" >"$@"
 
 bin_PROGRAMS += src/simpledb
 
