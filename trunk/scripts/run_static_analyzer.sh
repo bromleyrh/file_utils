@@ -6,10 +6,8 @@ configure_opts="--enable-debugging"
 
 do_configure()
 {
-	if [ "$cache_file" != /dev/null ]; then
-		rm -fv "$cache_file"
-	fi
-	
+	test "$cache_file" = /dev/null || rm -fv "$cache_file"
+
 	scan-build ./configure $configure_opts
 	touch $dummy_file
 }
@@ -19,9 +17,7 @@ set -eu
 # import Autoconf cache file path variable
 cache_file=/dev/null
 for f in /usr/share/config.site /usr/local/share/config.site; do
-	if [ -r $f ]; then
-		. $f
-	fi
+	test -r $f && . $f
 done
 
 if [ ! -f configure ]; then
