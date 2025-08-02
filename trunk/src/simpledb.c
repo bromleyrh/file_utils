@@ -839,8 +839,7 @@ get_id(struct db_ctx *dbctx, uint64_t *id)
         return -ENOSPC;
 
     k_id = unpack_u64(db_key, &k, id);
-    freeid_used_id = (uint64_t *)packed_memb_addr(db_obj_free_id, &freeid,
-                                                  used_id);
+    freeid_used_id = packed_memb_addr(db_obj_free_id, &freeid, used_id);
 
     ret = free_id_find(freeid_used_id, k_id);
     if (ret == 0) {
@@ -902,8 +901,7 @@ release_id(struct db_ctx *dbctx, uint64_t root_id, uint64_t id)
     uint64_t k_id;
 
     k_id = (id - root_id) / FREE_ID_RANGE_SZ * FREE_ID_RANGE_SZ + root_id;
-    freeid_used_id = (uint64_t *)packed_memb_addr(db_obj_free_id, &freeid,
-                                                  used_id);
+    freeid_used_id = packed_memb_addr(db_obj_free_id, &freeid, used_id);
 
     pack_u32(db_key, &k, type, TYPE_FREE_ID);
     pack_u64(db_key, &k, id, k_id);
