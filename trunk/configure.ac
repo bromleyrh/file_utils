@@ -167,7 +167,7 @@ typedef int64_t off64_t;
 EOF
             for e in linux_tmpfile_fs_types; do
                 eval "fs=\$ax_cv_linux_${e}_super_magic"
-                AS_IF([test $fs = yes],
+                AS_IF([test $fs = "yes"],
                       [printf '    X(type %s) \\\n' ${e}_SUPER_MAGIC >&9]
                      )
             done
