@@ -24,13 +24,13 @@ BUILT_SOURCES += $(gen_files)
 CLEANFILES += $(gen_files)
 
 src/simpledb_obj.h: src/simpledb_obj.idl
-	idlc <"$<" >"$@"
+	idlc <"$^" >"$@"
 
 src/replicate_gram.h: src/replicate.spec
-	scripts/spec_to_h.pl "$<" $(replicate_gram_macro) >"$@"
+	scripts/spec_to_h.pl "$^" $(replicate_gram_macro) >"$@"
 
 src/verify_gram.h: src/verify.spec
-	scripts/spec_to_h.pl "$<" $(verify_gram_macro) >"$@"
+	scripts/spec_to_h.pl "$^" $(verify_gram_macro) >"$@"
 
 noinst_LIBRARIES += src/libfileutil.a
 
@@ -167,7 +167,7 @@ BUILT_SOURCES += $(gen_files)
 CLEANFILES += $(gen_files)
 
 src/simpledb_obj.h: src/simpledb_obj.idl
-	idlc <"$<" >"$@"
+	idlc <"$^" >"$@"
 
 bin_PROGRAMS += src/simpledb
 
