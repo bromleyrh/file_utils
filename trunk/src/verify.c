@@ -164,6 +164,17 @@ from_hex(char hexchar)
     return -1;
 }
 
+int
+syncfd(int fd)
+{
+    while (fsync(fd) == -1) {
+        if (errno != EINTR)
+            return -errno;
+    }
+
+    return 0;
+}
+
 static int
 scan_chksum(const char *str, unsigned char *sum, unsigned sumlen)
 {
@@ -928,11 +939,13 @@ do_verifs(struct verify_ctx *ctx)
             goto err1;
         }
 
-        if (va.dstf != stdout && fsync(fileno(va.dstf)) == -1) {
-            err = errno;
-            error(0, err, "Error writing output file %s", ctx->output_file);
-            err = ERR_TAG(err);
-            goto err1;
+        if (va.dstf != stdout) {
+            err = syncfd(fileno(va.dstf));
+            if (err) {
+                error(0, err, "Error writing output file %s", ctx->output_file);
+                err = ERR_TAG(err);
+                goto err1;
+            }
         }
 
         LOG_PRINT(LOG_INFO, "Finished verifcation %d: %s", i + 1,
